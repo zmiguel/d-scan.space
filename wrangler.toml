@@ -1,0 +1,12 @@
+name = "d-scan-space"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+[vars]
+NODE_VERSION = "22"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "d-scan-space"
+database_id = "f59ff703-92ac-43c0-808c-45b46ed6539a"
+preview_database_id = "3dda8b42-2cef-4feb-aaec-2f08c6825863"
+migrations_dir = "drizzle/migrations"

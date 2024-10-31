@@ -1,10 +1,11 @@
 <script>
 	import '../app.css';
 	import { page } from '$app/stores';
+	let { children } = $props();
 	import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte';
 	import { Footer, FooterCopyright, FooterLink, FooterLinkGroup } from 'flowbite-svelte';
 	import { DarkMode } from 'flowbite-svelte';
-	$: activeUrl = $page.url.pathname;
+	const activeUrl = $derived($page.url.pathname);
 </script>
 
 <div class="relative px-8">
@@ -25,7 +26,7 @@
 		</NavUl>
 	</Navbar>
 	<div class="mt-16 mb-8">
-		<slot />
+		{@render children()}
 	</div>
 	<Footer>
 		<FooterCopyright href="/" by="D-Scan™" year={2024} />
