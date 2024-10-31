@@ -5,7 +5,7 @@ import { redirect } from '@sveltejs/kit';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
-	create: async ({request, platform }) => {
+	create: async ({ request, platform }) => {
 		const data = await request.formData();
 		const content = data.get('scan_content');
 		const is_public = data.has('is_public');
@@ -33,5 +33,5 @@ export const actions = {
 		});
 
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
-	},
+	}
 };
