@@ -46,7 +46,7 @@
 		>
 			<FooterLink href="/about">About</FooterLink>
 			<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
-			<FooterLink href="/about">Contact</FooterLink>
+			<FooterLink href="/contact">Contact</FooterLink>
 		</FooterLinkGroup>
 	</Footer>
 </div>

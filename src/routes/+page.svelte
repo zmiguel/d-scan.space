@@ -4,6 +4,10 @@
 	import { enhance } from '$app/forms';
 </script>
 
+<svelte:head>
+	<title>Home | D-Scan Space!</title>
+</svelte:head>
+
 <div class="content-center">
 	<form method="POST" use:enhance action="/scan">
 		<Label for="textarea-id" class="mb-2"
