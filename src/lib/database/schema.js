@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// SCANS
+
 export const scans = sqliteTable('scans', {
 	id: text().primaryKey(),
 	data: text().notNull(),
@@ -22,4 +24,35 @@ export const scanGroups = sqliteTable('scan_groups', {
 	createdAt: text('created_at')
 		.default(sql`CURRENT_TIMESTAMP`)
 		.notNull()
+});
+
+// PLAYERS, CORPS & ALLIANCES
+
+export const players = sqliteTable('players', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	corporation_id: integer()
+		.references(() => corporations.id)
+		.notNull(),
+	alliance_id: integer().references(() => alliances.id),
+	last_seen: text().notNull(),
+	created_at: text().notNull(),
+	updated_at: text().notNull()
+});
+
+export const corporations = sqliteTable('corporations', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	ticker: text().notNull(),
+	alliance_id: integer().references(() => alliances.id),
+	created_at: text().notNull(),
+	updated_at: text().notNull()
+});
+
+export const alliances = sqliteTable('alliances', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	ticker: text().notNull(),
+	created_at: text().notNull(),
+	updated_at: text().notNull()
 });
