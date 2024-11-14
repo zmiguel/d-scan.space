@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// SCANS
+
 export const scans = sqliteTable('scans', {
 	id: text().primaryKey(),
 	data: text().notNull(),
@@ -9,8 +11,8 @@ export const scans = sqliteTable('scans', {
 		.references(() => scanGroups.id),
 	scan_type: text().notNull(),
 
-	createdAt: text('created_at')
-		.default(sql`CURRENT_TIMESTAMP`)
+	created_at: integer()
+		.default(sql`(unixepoch())`)
 		.notNull()
 });
 
@@ -19,7 +21,38 @@ export const scanGroups = sqliteTable('scan_groups', {
 	public: integer().notNull().default(0),
 	system: text(),
 
-	createdAt: text('created_at')
-		.default(sql`CURRENT_TIMESTAMP`)
+	created_at: integer()
+		.default(sql`(unixepoch())`)
 		.notNull()
+});
+
+// CHARACTERS, CORPS & ALLIANCES
+
+export const characters = sqliteTable('characters', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	corporation_id: integer()
+		.references(() => corporations.id)
+		.notNull(),
+	alliance_id: integer().references(() => alliances.id),
+	last_seen: integer().default(sql`(unixepoch())`).notNull(),
+	created_at: integer().default(sql`(unixepoch())`).notNull(),
+	updated_at: integer().default(sql`(unixepoch())`).notNull()
+});
+
+export const corporations = sqliteTable('corporations', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	ticker: text().notNull(),
+	alliance_id: integer().references(() => alliances.id),
+	created_at: integer().default(sql`(unixepoch())`).notNull(),
+	updated_at: integer().default(sql`(unixepoch())`).notNull()
+});
+
+export const alliances = sqliteTable('alliances', {
+	id: integer().primaryKey(),
+	name: text().notNull(),
+	ticker: text().notNull(),
+	created_at: integer().default(sql`(unixepoch())`).notNull(),
+	updated_at: integer().default(sql`(unixepoch())`).notNull()
 });

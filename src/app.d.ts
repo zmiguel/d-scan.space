@@ -1,6 +1,5 @@
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
-import { drizzle } from 'drizzle-orm/d1';
 
 declare global {
 	namespace App {
