@@ -10,11 +10,8 @@ export async function createNewLocalScan(db, data) {
 	const scanGroupId = uid.randomUUID(8);
 	const scanId = uid.randomUUID(12);
 
-	// split data in lines
-	const lines = data.split('\n');
-
 	// get characters in database
-	const charactersInDB = await getCharactersByName(db, lines);
+	const charactersInDB = await getCharactersByName(db, data);
 
 	// check if we are missing characters from the database
 	const missingCharacters = lines.filter(l => !charactersInDB.some(c => c.name === l));
