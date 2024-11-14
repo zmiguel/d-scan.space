@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import ShortUniqueId from 'short-unique-id';
 import { scanGroups, scans } from '$lib/database/schema.js';
 import { redirect } from '@sveltejs/kit';
+import { createNewLocalScan } from '$lib/server/local.js';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
@@ -27,7 +28,7 @@ export const actions = {
 		// LOCAL SCAN
 		if (!isDirectional) {
 			// 2. Send lines to processor function
-			//
+			const result = await createNewLocalScan(db, content);
 			// 3. Save the scan in KV Store
 			//
 			// 4. Add data to DB

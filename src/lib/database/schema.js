@@ -35,9 +35,9 @@ export const players = sqliteTable('players', {
 		.references(() => corporations.id)
 		.notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	last_seen: text().notNull(),
-	created_at: text().notNull(),
-	updated_at: text().notNull()
+	last_seen: text().default(sql`CURRENT_TIMESTAMP`).notNull(),
+	created_at: text().default(sql`CURRENT_TIMESTAMP`).notNull(),
+	updated_at: text().default(sql`CURRENT_TIMESTAMP`).notNull()
 });
 
 export const corporations = sqliteTable('corporations', {
@@ -45,14 +45,14 @@ export const corporations = sqliteTable('corporations', {
 	name: text().notNull(),
 	ticker: text().notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	created_at: text().notNull(),
-	updated_at: text().notNull()
+	created_at: text().default(sql`CURRENT_TIMESTAMP`).notNull(),
+	updated_at: text().default(sql`CURRENT_TIMESTAMP`).notNull()
 });
 
 export const alliances = sqliteTable('alliances', {
 	id: integer().primaryKey(),
 	name: text().notNull(),
 	ticker: text().notNull(),
-	created_at: text().notNull(),
-	updated_at: text().notNull()
+	created_at: text().default(sql`CURRENT_TIMESTAMP`).notNull(),
+	updated_at: text().default(sql`CURRENT_TIMESTAMP`).notNull()
 });

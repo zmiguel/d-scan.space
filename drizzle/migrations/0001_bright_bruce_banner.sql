@@ -1,1 +1,0 @@
-ALTER TABLE `scan_groups` ADD `public` integer DEFAULT 0 NOT NULL;
