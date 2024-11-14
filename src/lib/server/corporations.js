@@ -2,6 +2,8 @@
  *  Functions related to corporations
  */
 import { addCorporation, getCorporationByID, updateCorporation } from '$lib/database/corporations.js';
+import { getAllianceByID } from '$lib/database/alliances.js';
+import { addAllianceFromESI } from '$lib/server/alliances.js';
 
 export async function updateCorp(db, id, returnData = false) {
 	const corp = await getCorporationByID(db, id);
@@ -43,9 +45,17 @@ export async function addCorporationFromESI(db, id) {
 	);
 
 	const corpInfo = await corpData.json()
+	corpInfo.id = id;
 
-	// check if alliance exists
-	// TODO: Add alliance check
+	if(corpInfo.alliance_id) {
+		// check if we have the alliance in the database
+		let alliance = await getAllianceByID(db, corpInfo.alliance_id);
+
+		if (!alliance) {
+			// add alliance to database
+			await addAllianceFromESI(db, corpInfo.alliance_id);
+		}
+	}
 
 	await addCorporation(db, corpInfo);
 }

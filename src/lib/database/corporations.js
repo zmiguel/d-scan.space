@@ -3,21 +3,15 @@
  */
 
 import { corporations, alliances } from '../database/schema';
+import { eq } from 'drizzle-orm';
 
 
 export async function getCorporationByID(db, id) {
 	return await db
-		.select(
-			corporations.id,
-			corporations.name,
-			corporations.ticker,
-			corporations.alliance_id,
-			alliances.name.as('alliance_name')
-		)
+		.select()
 		.from(corporations)
-		.where(corporations.id.eq(id))
-		.leftJoin(alliances, corporations.alliance_id.eq(alliances.id))
-		.run();
+		.where(eq(corporations.id, id))
+		.get();
 }
 
 export async function updateCorporation(db, data) {
@@ -26,7 +20,8 @@ export async function updateCorporation(db, data) {
 		.set({
 			name: data.name,
 			ticker: data.ticker,
-			alliance_id: data.alliance_id? data.alliance_id : null
+			alliance_id: data.alliance_id ? data.alliance_id : null,
+			updated_at: Math.floor(Date.now() / 1000)
 		})
 		.where(corporations.id.eq(data.id))
 		.run();
@@ -39,7 +34,8 @@ export async function addCorporation(db, data) {
 			id: data.id,
 			name: data.name,
 			ticker: data.ticker,
-			alliance_id: data.alliance_id? data.alliance_id : null
+			alliance_id: data.alliance_id ?? null
 		})
+		.onConflictDoNothing()
 		.run();
 }

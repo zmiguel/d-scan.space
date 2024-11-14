@@ -4,6 +4,7 @@
 
 import ShortUniqueId from 'short-unique-id';
 import { getCharactersByName } from '$lib/database/characters.js';
+import { addCharactersFromESI } from '$lib/server/characters.js';
 
 export async function createNewLocalScan(db, data) {
 	const uid = new ShortUniqueId();
@@ -14,11 +15,13 @@ export async function createNewLocalScan(db, data) {
 	const charactersInDB = await getCharactersByName(db, data);
 
 	// check if we are missing characters from the database
-	const missingCharacters = lines.filter(l => !charactersInDB.some(c => c.name === l));
+	const missingCharacters = await data.filter(l => !charactersInDB.some(c => c.name === l));
 
-	if (missingCharacters.length > 0) {
+	console.log("Missing:", missingCharacters);
+
+	if (missingCharacters.length  > 0) {
 		// get missing characters from ESI
-
+		await addCharactersFromESI(db, missingCharacters);
 	}
 
 

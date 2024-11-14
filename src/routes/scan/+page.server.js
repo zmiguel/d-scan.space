@@ -27,11 +27,7 @@ export const actions = {
 
 		// LOCAL SCAN
 		if (!isDirectional) {
-			// 2. Send lines to processor function
 			const result = await createNewLocalScan(db, lines);
-			// 3. Save the scan in KV Store
-			//
-			// 4. Add data to DB
 		} else {
 			// DIRECTIONAL SCAN
 			//
