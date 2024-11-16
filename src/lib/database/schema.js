@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // SCANS
 
@@ -31,6 +31,7 @@ export const scanGroups = sqliteTable('scan_groups', {
 export const characters = sqliteTable('characters', {
 	id: integer().primaryKey(),
 	name: text().notNull(),
+	sec_status: real().notNull().default(0),
 	corporation_id: integer()
 		.references(() => corporations.id)
 		.notNull(),

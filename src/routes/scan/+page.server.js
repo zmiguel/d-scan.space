@@ -25,6 +25,10 @@ export const actions = {
 			return parts.length === 4 && !isNaN(parts[0]);
 		});
 
+		const uid = new ShortUniqueId();
+		const scanGroupId = uid.randomUUID(8);
+		const scanId = uid.randomUUID(12);
+
 		// LOCAL SCAN
 		if (!isDirectional) {
 			const result = await createNewLocalScan(db, lines);
@@ -34,9 +38,6 @@ export const actions = {
 			// TBD.
 		}
 
-		const uid = new ShortUniqueId();
-		const scanGroupId = uid.randomUUID(8);
-		const scanId = uid.randomUUID(12);
 
 		await db.insert(scanGroups).values({
 			id: scanGroupId,
