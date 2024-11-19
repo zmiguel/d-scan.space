@@ -21,11 +21,11 @@
 		"@sveltejs/adapter-auto": "^3.3.1",
 		"@sveltejs/adapter-cloudflare": "^4.7.4",
 		"@sveltejs/kit": "^2.8.1",
-		"@sveltejs/vite-plugin-svelte": "^4.0.0",
+		"@sveltejs/vite-plugin-svelte": "^4.0.1",
 		"@types/eslint": "9.6.1",
 		"autoprefixer": "^10.4.20",
 		"drizzle-kit": "^0.28.1",
-		"eslint": "^9.14.0",
+		"eslint": "^9.15.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.46.0",
 		"flowbite": "^2.5.2",
@@ -34,17 +34,17 @@
 		"prettier": "^3.3.3",
 		"prettier-plugin-svelte": "^3.2.8",
 		"short-unique-id": "^5.2.0",
-		"svelte": "^5.1.16",
-		"svelte-check": "^4.0.7",
+		"svelte": "^5.2.3",
+		"svelte-check": "^4.0.9",
 		"tailwind-merge": "^2.5.4",
-		"tailwindcss": "^3.4.14",
+		"tailwindcss": "^3.4.15",
 		"typescript": "^5.6.3",
 		"vite": "^5.4.11",
 		"vitest": "^2.1.5",
-		"wrangler": "^3.86.1"
+		"wrangler": "^3.87.0"
 	},
 	"type": "module",
 	"dependencies": {
-		"drizzle-orm": "^0.36.2"
+		"drizzle-orm": "^0.36.3"
 	}
 }
