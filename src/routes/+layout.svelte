@@ -36,7 +36,7 @@
 			<DarkMode class="p-0" />
 		</NavUl>
 	</Navbar>
-	<div class="mt-16 mb-8">
+	<div class="mt-16 mb-8 text-gray-900 dark:text-gray-300">
 		{@render children()}
 	</div>
 	<Footer>
