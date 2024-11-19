@@ -6,19 +6,24 @@ import ShortUniqueId from 'short-unique-id';
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 
-
-async function getCharacters(db, data){
+async function getCharacters(db, data) {
 	// get characters in database
 	const charactersInDB = await getCharactersByName(db, data);
 
-	const missingCharacters = await data.filter(l => !charactersInDB.some(c => c.name === l));
-	const outdatedCharacters = await charactersInDB.filter(c => c.updated_at < Math.floor(Date.now() / 1000) - 86400);
-	const goodCharacters = await charactersInDB.filter(c => c.updated_at >= Math.floor(Date.now() / 1000) - 86400);
+	const missingCharacters = await data.filter((l) => !charactersInDB.some((c) => c.name === l));
+	const outdatedCharacters = await charactersInDB.filter(
+		(c) => c.updated_at < Math.floor(Date.now() / 1000) - 86400
+	);
+	const goodCharacters = await charactersInDB.filter(
+		(c) => c.updated_at >= Math.floor(Date.now() / 1000) - 86400
+	);
 
-	console.log(`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`);
+	console.log(
+		`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`
+	);
 
 	// check if we are missing characters from the database
-	if (missingCharacters.length  > 0) {
+	if (missingCharacters.length > 0) {
 		// get missing characters from ESI
 		await addCharactersFromESI(db, missingCharacters);
 	}
@@ -30,7 +35,7 @@ async function getCharacters(db, data){
 	}
 
 	// get all outdated and missing characters from db
-	const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map(c => c.name)];
+	const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map((c) => c.name)];
 	const updatedCharacters = await getCharactersByName(db, charactersToFetch);
 
 	// merge good with updated
@@ -43,37 +48,37 @@ export async function createNewLocalScan(db, data) {
 	const scanId = uid.randomUUID(12);
 
 	const allCharacters = await getCharacters(db, data);
-	updateCharactersLastSeen(db, allCharacters);  // No need for Async here
+	updateCharactersLastSeen(db, allCharacters); // No need for Async here
 
 	/* process scan data & build scan json
-	*
-	* Format:
-	* {
-	*   type: local,
-	*   alliances: [
-	* 	 {
-	* 		 name: "Alliance Name",
-	*      ticker: "ABC",
-	* 		 corporations: [
-	* 			 {
-	* 				 name: "Corp Name",
-	*          ticker: "DEF",
-	* 				 characters: [
-	* 					 {
-	*              name: "Character Name",
-	*              sec_status: 0.0,
-	*            },
-	* 				 ],
-	* 			 character_count: 0
-	* 			 },
-	* 			 ...
-	* 		 ],
-	*    corporation_count: 0
-	* 	 character_count: 0
-	* 	 },
-	* 	 ...
-	*  ],
-	*/
+	 *
+	 * Format:
+	 * {
+	 *   type: local,
+	 *   alliances: [
+	 * 	 {
+	 * 		 name: "Alliance Name",
+	 *      ticker: "ABC",
+	 * 		 corporations: [
+	 * 			 {
+	 * 				 name: "Corp Name",
+	 *          ticker: "DEF",
+	 * 				 characters: [
+	 * 					 {
+	 *              name: "Character Name",
+	 *              sec_status: 0.0,
+	 *            },
+	 * 				 ],
+	 * 			 character_count: 0
+	 * 			 },
+	 * 			 ...
+	 * 		 ],
+	 *    corporation_count: 0
+	 * 	 character_count: 0
+	 * 	 },
+	 * 	 ...
+	 *  ],
+	 */
 
 	const formattedData = {
 		type: 'local',
@@ -82,8 +87,15 @@ export async function createNewLocalScan(db, data) {
 
 	const alliancesMap = new Map();
 
-	allCharacters.forEach(character => {
-		const { alliance_name, alliance_ticker, corporation_name, corporation_ticker, name, sec_status } = character;
+	allCharacters.forEach((character) => {
+		const {
+			alliance_name,
+			alliance_ticker,
+			corporation_name,
+			corporation_ticker,
+			name,
+			sec_status
+		} = character;
 
 		if (!alliancesMap.has(alliance_name)) {
 			alliancesMap.set(alliance_name, {
@@ -113,12 +125,10 @@ export async function createNewLocalScan(db, data) {
 		alliance.character_count++;
 	});
 
-	formattedData.alliances = Array.from(alliancesMap.values()).map(alliance => {
+	formattedData.alliances = Array.from(alliancesMap.values()).map((alliance) => {
 		alliance.corporations = Array.from(alliance.corporations.values());
 		return alliance;
 	});
-
-	console.log(formattedData);
 
 	return formattedData;
 }

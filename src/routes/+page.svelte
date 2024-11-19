@@ -2,6 +2,15 @@
 	import { Textarea, Label, Button } from 'flowbite-svelte';
 	import { Toggle } from 'flowbite-svelte';
 	import { enhance } from '$app/forms';
+
+	let isLoading = false;
+	function handleSubmit(event) {
+		isLoading = true;
+	}
+
+	function handleComplete(event) {
+		isLoading = false;
+	}
 </script>
 
 <svelte:head>
@@ -9,7 +18,10 @@
 </svelte:head>
 
 <div class="content-center">
-	<form method="POST" use:enhance action="/scan">
+	{#if isLoading}
+		<div class="text-primary-700 dark:text-primary-400">Loading...</div>
+	{/if}
+	<form method="POST" use:enhance action="/scan" on:submit={handleSubmit} on:reset={handleComplete}>
 		<Label for="textarea-id" class="mb-2"
 			>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
 			<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
