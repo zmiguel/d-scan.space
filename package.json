@@ -31,7 +31,7 @@
 		"flowbite": "^2.5.2",
 		"flowbite-svelte": "^0.47.4",
 		"postcss": "^8.5.3",
-		"prettier": "^3.5.1",
+		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"short-unique-id": "^5.2.0",
 		"svelte": "^5.20.2",
