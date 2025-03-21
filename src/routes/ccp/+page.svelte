@@ -19,9 +19,9 @@
 		and all associated logos and designs are the intellectual property of CCP hf. All artwork,
 		screenshots, characters, vehicles, storylines, world facts or other recognizable features of the
 		intellectual property relating to these trademarks are likewise the intellectual property of CCP
-		hf. CCP hf. has granted permission to EVE Reactions Calculator to use EVE Online and all
+		hf. CCP hf. has granted permission to D-Scan Space to use EVE Online and all
 		associated logos and designs for promotional and information purposes on its website but does
-		not endorse, and is not in any way affiliated with, EVE Reactions Calculator.
+		not endorse, and is not in any way affiliated with, D-Scan Space.
 	</p>
 	<br />
 	<p class="font-normal text-gray-700 dark:text-gray-400">

@@ -9,7 +9,7 @@
 </script>
 
 <div class="relative px-8">
-	<Navbar class="px-2 sm:px-4 fixed py-0 w-full z-20 top-0 start-0 border-b">
+	<Navbar class="bg-gray-100 dark:bg-gray-900 px-2 sm:px-4 fixed py-0 w-full z-20 top-0 start-0 border-b">
 		<NavBrand href="/">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +40,7 @@
 		{@render children()}
 	</div>
 	<Footer>
-		<FooterCopyright href="/" by="D-Scan™" year={2024} />
+		<FooterCopyright href="/" by="D-Scan™" year={2025} />
 		<FooterLinkGroup
 			ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
 		>

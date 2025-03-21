@@ -36,7 +36,6 @@ export async function getCharactersByName(db, names) {
 	}
 
 	const batchResults = await Promise.all(batchPromises);
-
 	return batchResults.flat();
 }
 
@@ -46,7 +45,7 @@ export async function addOrUpdateCharacterDB(db, data){
 		.values({
 			id: data.id,
 			name: data.name,
-			sec_status: data.security_status,
+			sec_status: data.sec_status,
 			corporation_id: data.corporation_id,
 			alliance_id: data.alliance_id
 		})
@@ -54,6 +53,7 @@ export async function addOrUpdateCharacterDB(db, data){
 			target: characters.id,
 			set: {
 				name: data.name,
+				sec_status: data.sec_status,
 				corporation_id: data.corporation_id,
 				alliance_id: data.alliance_id,
 				updated_at: Math.floor(Date.now() / 1000)

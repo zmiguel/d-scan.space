@@ -6,7 +6,7 @@ import { addCorporationFromESI } from '$lib/server/corporations.js';
 import { getAllianceByID } from '$lib/database/alliances.js';
 import { addAllianceFromESI } from '$lib/server/alliances.js';
 import { addOrUpdateCharacterDB, getCharactersByName } from '$lib/database/characters.js';
-
+import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id){
 	const characterData = await fetch(
@@ -54,6 +54,16 @@ async function addOrUpdateCharacter(db, data){
 }
 
 export async function addCharactersFromESI(db, characters, sanityCheck = false) {
+	// check if characters is empty
+	if (characters.length === 0 || !characters) {
+		console.warn(
+			'Tried to add characters from ESI but characters array was empty'
+		);
+		return;
+	}
+
+	console.info(`Adding ${characters.length} characters from ESI`);
+
 	// sanity check if we already have it in the database
 	if (sanityCheck) {
 		const charactersInDB = await getCharactersByName(db, characters);
@@ -62,24 +72,55 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 		}
 	}
 
-	console.log('Fetching Character Info from ESI: ', characters);
-
 	// Get Character IDS
-	const universeIds = await fetch(
-		'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
-		{
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify(characters)
-		}
-	)
+	const BATCH_SIZE = 250;
+	const batches = [];
 
-	const charactersIds = await universeIds.json();
+	// Split characters into batches
+	for (let i = 0; i < characters.length; i += BATCH_SIZE) {
+		const batch = characters.slice(i, i + BATCH_SIZE);
+		batches.push(batch);
+	}
+
+	// Process all batches in parallel
+	const batchPromises = batches.map(async (batch) => {
+		const response = await fetch(
+			'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(batch)
+			}
+		);
+		// check if response is ok
+		if (!response.ok) {
+			console.error(`Failed to get character ids from ESI ${JSON.stringify(response)}`);
+			return {};
+		}
+		return response.json();
+	});
+
+	// Wait for all batch requests to complete
+	const batchResults = await Promise.all(batchPromises);
+
+	// Combine all batch results
+	const charactersIds = batchResults.reduce((combined, result) => {
+		if (result && result.characters) {
+			if (!combined.characters) {
+				combined.characters = [];
+			}
+			combined.characters = [...combined.characters, ...result.characters];
+		}
+		return combined;
+	}, {});
 
 	// check if charactersIds is empty or if characters is empty
 	if (!charactersIds || !charactersIds.characters) {
+		console.error(
+			'Tried to add characters from ESI but charactersIds array was empty'
+		);
 		return;
 	}
 

@@ -16,7 +16,9 @@ export const actions = {
 			return { status: 400, body: 'No scan content provided' };
 		}
 
-		const lines = content.split('\n');
+		let lines = content.split('\n');
+		// remove empty lines
+		lines = lines.filter((line) => line.trim().length > 0);
 
 		// Figure out if local or directional scan
 		//  - Directional scans start with numbers and have 3 tabs per line
@@ -28,10 +30,10 @@ export const actions = {
 		const uid = new ShortUniqueId();
 		const scanGroupId = uid.randomUUID(8);
 		const scanId = uid.randomUUID(12);
-
+		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			const result = await createNewLocalScan(db, lines);
+			result = await createNewLocalScan(db, lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//
@@ -48,9 +50,9 @@ export const actions = {
 
 		await db.insert(scans).values({
 			id: scanId,
-			data: content,
+			data: JSON.stringify(result),
 			scan_group_id: scanGroupId,
-			scan_type: 'test',
+			scan_type: isDirectional ? "directional" : "local",
 			createdAt: new Date().toISOString()
 		});
 
