@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import ShortUniqueId from 'short-unique-id';
-import { scanGroups, scans } from '$lib/database/schema.js';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
+import { compressJson } from '$lib/server/compressor.js';
+import { createNewScan } from '$lib/database/scans.js';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
@@ -11,12 +12,15 @@ export const actions = {
 		const content = /** @type {(string | null)} */ (data.get('scan_content'));
 		const is_public = data.has('is_public');
 		const db = drizzle(platform?.env.DB);
+		const kv = platform?.env.KV;
 
 		if (!content) {
 			return { status: 400, body: 'No scan content provided' };
 		}
 
-		const lines = content.split('\n');
+		let lines = content.split('\n');
+		// remove empty lines
+		lines = lines.filter((line) => line.trim().length > 0);
 
 		// Figure out if local or directional scan
 		//  - Directional scans start with numbers and have 3 tabs per line
@@ -25,33 +29,32 @@ export const actions = {
 			return parts.length === 4 && !isNaN(parts[0]);
 		});
 
+		const uid = new ShortUniqueId();
+		const scanGroupId = uid.randomUUID(8);
+		const scanId = uid.randomUUID(12);
+		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			const result = await createNewLocalScan(db, lines);
+			result = await createNewLocalScan(db, lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//
 			// TBD.
 		}
 
-		const uid = new ShortUniqueId();
-		const scanGroupId = uid.randomUUID(8);
-		const scanId = uid.randomUUID(12);
+		try {
+			await createNewScan(db, {
+				scanGroupId,
+				scanId,
+				is_public,
+				isDirectional
+			});
 
-		await db.insert(scanGroups).values({
-			id: scanGroupId,
-			system: null,
-			public: is_public ? 1 : 0,
-			createdAt: new Date().toISOString()
-		});
-
-		await db.insert(scans).values({
-			id: scanId,
-			data: content,
-			scan_group_id: scanGroupId,
-			scan_type: 'test',
-			createdAt: new Date().toISOString()
-		});
+			await kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
+		} catch (e) {
+			console.error('Failed to store scan data', e);
+			return { status: 500, body: 'Failed to store scan data' };
+		}
 
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 	}

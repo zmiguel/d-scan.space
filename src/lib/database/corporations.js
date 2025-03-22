@@ -2,16 +2,11 @@
  * All DB functions related to corporations
  */
 
-import { corporations, alliances } from '../database/schema';
+import { corporations } from '../database/schema';
 import { eq } from 'drizzle-orm';
 
-
 export async function getCorporationByID(db, id) {
-	return await db
-		.select()
-		.from(corporations)
-		.where(eq(corporations.id, id))
-		.get();
+	return await db.select().from(corporations).where(eq(corporations.id, id)).get();
 }
 
 export async function updateCorporation(db, data) {

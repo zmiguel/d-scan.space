@@ -1,11 +1,10 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // SCANS
 
 export const scans = sqliteTable('scans', {
 	id: text().primaryKey(),
-	data: text().notNull(),
 	scan_group_id: text()
 		.notNull()
 		.references(() => scanGroups.id),
@@ -31,13 +30,21 @@ export const scanGroups = sqliteTable('scan_groups', {
 export const characters = sqliteTable('characters', {
 	id: integer().primaryKey(),
 	name: text().notNull(),
+	sec_status: real().notNull().default(0),
 	corporation_id: integer()
 		.references(() => corporations.id)
 		.notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	last_seen: integer().default(sql`(unixepoch())`).notNull(),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	last_seen: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	deleted_at: integer()
 });
 
 export const corporations = sqliteTable('corporations', {
@@ -45,14 +52,22 @@ export const corporations = sqliteTable('corporations', {
 	name: text().notNull(),
 	ticker: text().notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull()
 });
 
 export const alliances = sqliteTable('alliances', {
 	id: integer().primaryKey(),
 	name: text().notNull(),
 	ticker: text().notNull(),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull()
 });

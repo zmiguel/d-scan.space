@@ -1,0 +1,1 @@
+ALTER TABLE `characters` ADD `sec_status` real DEFAULT 0 NOT NULL;
