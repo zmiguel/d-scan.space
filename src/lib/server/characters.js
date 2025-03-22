@@ -71,41 +71,35 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 	// Get Character IDS
 	const BATCH_SIZE = 500;
 	const batches = [];
-	const CONCURRENCY_LIMIT = 2; // Set concurrency limit to 2
 
-// Split characters into batches
+	// Split characters into batches
 	for (let i = 0; i < characters.length; i += BATCH_SIZE) {
 		const batch = characters.slice(i, i + BATCH_SIZE);
 		batches.push(batch);
 	}
 
-// Process batches with concurrency limit
-	const batchResults = [];
-	for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
-		const currentBatches = batches.slice(i, i + CONCURRENCY_LIMIT);
-		const currentPromises = currentBatches.map(async (batch) => {
-			const response = await fetch(
-				'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(batch)
-				}
-			);
-			// check if response is ok
-			if (!response.ok) {
-				console.error(`Failed to get character ids from ESI ${JSON.stringify(response)}`);
-				return {};
+	// Process all batches in parallel
+	const batchPromises = batches.map(async (batch) => {
+		const response = await fetch(
+			'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(batch)
 			}
-			return response.json();
-		});
+		);
+		// check if response is ok
+		if (!response.ok) {
+			console.error(`Failed to get character ids from ESI ${JSON.stringify(response)}`);
+			return {};
+		}
+		return response.json();
+	});
 
-		// Wait for current batch of requests to complete before processing next batch
-		const results = await Promise.all(currentPromises);
-		batchResults.push(...results);
-	}
+	// Wait for all batch requests to complete
+	const batchResults = await Promise.all(batchPromises);
 
 	// Combine all batch results
 	const charactersIds = batchResults.reduce((combined, result) => {
