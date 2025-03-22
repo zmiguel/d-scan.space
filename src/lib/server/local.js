@@ -82,16 +82,20 @@ export async function createNewLocalScan(db, data) {
 
 	allCharacters.forEach((character) => {
 		const {
+			alliance_id,
 			alliance_name,
 			alliance_ticker,
+			corporation_id,
 			corporation_name,
 			corporation_ticker,
+			id,
 			name,
 			sec_status
 		} = character;
 
 		if (!alliancesMap.has(alliance_name)) {
 			alliancesMap.set(alliance_name, {
+				id: alliance_id,
 				name: alliance_name,
 				ticker: alliance_ticker,
 				corporations: new Map(),
@@ -104,6 +108,7 @@ export async function createNewLocalScan(db, data) {
 
 		if (!alliance.corporations.has(corporation_name)) {
 			alliance.corporations.set(corporation_name, {
+				id: corporation_id,
 				name: corporation_name,
 				ticker: corporation_ticker,
 				characters: [],
@@ -113,7 +118,7 @@ export async function createNewLocalScan(db, data) {
 		}
 
 		const corporation = alliance.corporations.get(corporation_name);
-		corporation.characters.push({ name, sec_status });
+		corporation.characters.push({ id, name, sec_status });
 		corporation.character_count++;
 		alliance.character_count++;
 	});
