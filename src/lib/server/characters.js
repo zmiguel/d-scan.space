@@ -89,7 +89,7 @@ export async function addCharactersFromESI(db, worker, characters, sanityCheck =
 	// Combine all batch results
 	const charactersBatch = batchResults.reduce((combined, result) => {
 		if (result) {
-			combined.characters = [...combined, ...result];
+			combined = [...combined, ...result];
 		}
 		return combined;
 	}, {});
