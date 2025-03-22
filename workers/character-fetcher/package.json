@@ -1,5 +1,5 @@
 {
-	"name": "updater",
+	"name": "character-fetcher",
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
@@ -9,8 +9,8 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"wrangler": "^3.0.0",
-		"vitest": "1.3.0",
-		"@cloudflare/vitest-pool-workers": "^0.1.0"
+		"@cloudflare/vitest-pool-workers": "^0.7.5",
+		"vitest": "~3.0.7",
+		"wrangler": "^4.3.0"
 	}
 }

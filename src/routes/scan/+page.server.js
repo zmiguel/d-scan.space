@@ -13,6 +13,7 @@ export const actions = {
 		const is_public = data.has('is_public');
 		const db = drizzle(platform?.env.DB);
 		const kv = platform?.env.KV;
+		const worker = platform?.env.WORKER;
 
 		if (!content) {
 			return { status: 400, body: 'No scan content provided' };
@@ -35,7 +36,7 @@ export const actions = {
 		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			result = await createNewLocalScan(db, lines);
+			result = await createNewLocalScan(db, worker, lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//

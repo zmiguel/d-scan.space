@@ -5,7 +5,7 @@
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 
-async function getCharacters(db, data) {
+async function getCharacters(db, worker, data) {
 	// get characters in database
 	const charactersInDB = await getCharactersByName(db, data);
 
@@ -24,7 +24,7 @@ async function getCharacters(db, data) {
 	// check if we are missing characters from the database
 	if (missingCharacters.length > 0) {
 		// get missing characters from ESI
-		await addCharactersFromESI(db, missingCharacters);
+		await addCharactersFromESI(db, worker, missingCharacters);
 	}
 
 	// check if characters are outdated in database
@@ -41,8 +41,8 @@ async function getCharacters(db, data) {
 	return [...goodCharacters, ...updatedCharacters];
 }
 
-export async function createNewLocalScan(db, data) {
-	const allCharacters = await getCharacters(db, data);
+export async function createNewLocalScan(db, worker, data) {
+	const allCharacters = await getCharacters(db, worker, data);
 	updateCharactersLastSeen(db, allCharacters); // No need for Async here
 
 	/* process scan data & build scan json

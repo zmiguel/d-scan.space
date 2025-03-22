@@ -11,6 +11,7 @@ declare global {
 			env: {
 				DB: D1Database;
 				KV: KVNamespace;
+				WORKER: Service;
 			};
 			context: {
 				waitUntil(promise: Promise<any>): void;

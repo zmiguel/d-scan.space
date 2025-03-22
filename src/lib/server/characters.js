@@ -53,7 +53,7 @@ async function addOrUpdateCharacter(db, data) {
 	});
 }
 
-export async function addCharactersFromESI(db, characters, sanityCheck = false) {
+export async function addCharactersFromESI(db, worker, characters, sanityCheck = false) {
 	// check if characters is empty
 	if (characters.length === 0 || !characters) {
 		console.warn('Tried to add characters from ESI but characters array was empty');
@@ -80,47 +80,28 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 
 	// Process all batches in parallel
 	const batchPromises = batches.map(async (batch) => {
-		const response = await fetch(
-			'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(batch)
-			}
-		);
-		// check if response is ok
-		if (!response.ok) {
-			console.error(`Failed to get character ids from ESI ${JSON.stringify(response)}`);
-			return {};
-		}
-		return response.json();
+		return await worker.namesToCharacters(batch);
 	});
 
 	// Wait for all batch requests to complete
 	const batchResults = await Promise.all(batchPromises);
 
 	// Combine all batch results
-	const charactersIds = batchResults.reduce((combined, result) => {
-		if (result && result.characters) {
-			if (!combined.characters) {
-				combined.characters = [];
-			}
-			combined.characters = [...combined.characters, ...result.characters];
+	const charactersBatch = batchResults.reduce((combined, result) => {
+		if (result) {
+			combined.characters = [...combined, ...result];
 		}
 		return combined;
 	}, {});
 
 	// check if charactersIds is empty or if characters is empty
-	if (!charactersIds || !charactersIds.characters) {
+	if (!charactersBatch) {
 		console.error('Tried to add characters from ESI but charactersIds array was empty');
 		return;
 	}
 
-	const characterPromises = charactersIds.characters.map(async (character) => {
-		const characterInfo = await getCharacterFromESI(character.id);
-		await addOrUpdateCharacter(db, characterInfo);
+	const characterPromises = charactersBatch.map(async (character) => {
+		await addOrUpdateCharacter(db, character);
 	});
 
 	await Promise.all(characterPromises);
