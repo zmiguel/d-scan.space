@@ -15,7 +15,6 @@
 	const systemName = "Jita";
 	const constellation = "Kimotoro";
 	const region = "The Forge";
-	const scanTimestamp = 1742550438;
 
 	// Function to determine security color based on value
 	function getSecurityClass(secValue) {
@@ -25,7 +24,7 @@
 	}
 
 	// Format the timestamp using ISO 8601 format with UTC
-	const formattedTimestamp = new Date(scanTimestamp*1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+	const formattedTimestamp = new Date(data.created_at*1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
 </script>
 
@@ -38,24 +37,33 @@
 				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-2 border-b-2 dark:border-gray-600">
 					<div class="flex items-center gap-2 mb-2 sm:mb-0">
 						<Breadcrumb aria-label="System location" class="bg-transparent p-0 mb-0">
-							<BreadcrumbItem>
-								<svelte:fragment slot="icon">
-									<Badge class="me-2" color={getSecurityClass(systemSecurity)}>{systemSecurity.toFixed(1)}</Badge>
-								</svelte:fragment>
-								{systemName}
-							</BreadcrumbItem>
-							<BreadcrumbItem>
-								<svelte:fragment slot="icon">
-									<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
-								</svelte:fragment>
-								{constellation}
-							</BreadcrumbItem>
-							<BreadcrumbItem>
-								<svelte:fragment slot="icon">
-									<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
-								</svelte:fragment>
-								<span class="align-text-top">{region}</span>
-							</BreadcrumbItem>
+							{#if data.system}
+								<BreadcrumbItem>
+									<svelte:fragment slot="icon">
+										<Badge class="me-2" color={getSecurityClass(systemSecurity)}>{systemSecurity.toFixed(1)}</Badge>
+									</svelte:fragment>
+									{systemName}
+								</BreadcrumbItem>
+								<BreadcrumbItem>
+									<svelte:fragment slot="icon">
+										<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
+									</svelte:fragment>
+									{constellation}
+								</BreadcrumbItem>
+								<BreadcrumbItem>
+									<svelte:fragment slot="icon">
+										<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
+									</svelte:fragment>
+									<span class="align-text-top">{region}</span>
+								</BreadcrumbItem>
+							{:else}
+								<BreadcrumbItem>
+									<svelte:fragment slot="icon">
+										<Badge class="me-2" color="purple">?</Badge>
+									</svelte:fragment>
+									<span class="italic">Unknown System</span>
+								</BreadcrumbItem>
+							{/if}
 						</Breadcrumb>
 					</div>
 					<div class="text-sm text-gray-600 dark:text-gray-400">

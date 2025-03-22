@@ -44,8 +44,6 @@ async function getCharacters(db, data) {
 
 export async function createNewLocalScan(db, data) {
 	const uid = new ShortUniqueId();
-	const scanGroupId = uid.randomUUID(8);
-	const scanId = uid.randomUUID(12);
 
 	const allCharacters = await getCharacters(db, data);
 	updateCharactersLastSeen(db, allCharacters); // No need for Async here
@@ -54,7 +52,6 @@ export async function createNewLocalScan(db, data) {
 	 *
 	 * Format:
 	 * {
-	 *   type: local,
 	 *   alliances: [
 	 * 	 {
 	 * 		 name: "Alliance Name",
@@ -81,7 +78,6 @@ export async function createNewLocalScan(db, data) {
 	 */
 
 	const formattedData = {
-		type: 'local',
 		alliances: []
 	};
 

@@ -5,7 +5,6 @@ import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const scans = sqliteTable('scans', {
 	id: text().primaryKey(),
-	data: text().notNull(),
 	scan_group_id: text()
 		.notNull()
 		.references(() => scanGroups.id),
@@ -38,7 +37,8 @@ export const characters = sqliteTable('characters', {
 	alliance_id: integer().references(() => alliances.id),
 	last_seen: integer().default(sql`(unixepoch())`).notNull(),
 	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	updated_at: integer().default(sql`(unixepoch())`).notNull(),
+	deleted_at: integer()
 });
 
 export const corporations = sqliteTable('corporations', {

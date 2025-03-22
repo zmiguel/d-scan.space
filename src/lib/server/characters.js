@@ -62,8 +62,6 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 		return;
 	}
 
-	console.info(`Adding ${characters.length} characters from ESI`);
-
 	// sanity check if we already have it in the database
 	if (sanityCheck) {
 		const charactersInDB = await getCharactersByName(db, characters);

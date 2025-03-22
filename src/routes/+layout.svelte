@@ -40,7 +40,7 @@
 		{@render children()}
 	</div>
 	<Footer>
-		<FooterCopyright href="/" by="D-Scan™" year={2025} />
+		<FooterCopyright href="/" by="D-Scan"/>
 		<FooterLinkGroup
 			ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
 		>

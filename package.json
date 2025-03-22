@@ -11,7 +11,7 @@
 		"test": "vitest",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"pages:preview": "npm run build && wrangler pages dev --compatibility-date=2024-02-08 .svelte-kit/cloudflare",
+		"pages:preview": "npm run build && wrangler pages dev .svelte-kit/cloudflare",
 		"pages:deploy": "npm run build && wrangler pages deploy .svelte-kit/cloudflare",
 		"db:generate": "drizzle-kit generate",
 		"d1:migrate": "wrangler d1 migrations apply d-scan-space --local"
@@ -20,7 +20,7 @@
 		"@popperjs/core": "^2.11.8",
 		"@sveltejs/adapter-auto": "^3.3.1",
 		"@sveltejs/adapter-cloudflare": "^5.1.0",
-		"@sveltejs/kit": "^2.20.1",
+		"@sveltejs/kit": "^2.20.2",
 		"@sveltejs/vite-plugin-svelte": "^4.0.4",
 		"@types/eslint": "9.6.1",
 		"autoprefixer": "^10.4.21",
@@ -35,14 +35,14 @@
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"short-unique-id": "^5.2.0",
-		"svelte": "^5.23.2",
+		"svelte": "^5.25.0",
 		"svelte-check": "^4.1.5",
 		"tailwind-merge": "^3.0.2",
 		"tailwindcss": "^3.4.17",
 		"typescript": "^5.8.2",
 		"vite": "^5.4.14",
 		"vitest": "^3.0.9",
-		"wrangler": "^3.114.2"
+		"wrangler": "^4.3.0"
 	},
 	"type": "module",
 	"dependencies": {

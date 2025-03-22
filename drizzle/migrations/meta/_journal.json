@@ -15,6 +15,20 @@
       "when": 1731710591541,
       "tag": "0001_romantic_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1742591890663,
+      "tag": "0002_far_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1742599724326,
+      "tag": "0003_silky_sinister_six",
+      "breakpoints": true
     }
   ]
 }
