@@ -86,17 +86,12 @@ export async function addCharactersFromESI(db, worker, characters, sanityCheck =
 	// Wait for all batch requests to complete
 	const batchResults = await Promise.all(batchPromises);
 
-	// Combine all batch results
-	const charactersBatch = batchResults.reduce((combined, result) => {
-		if (result) {
-			combined = [...combined, ...result];
-		}
-		return combined;
-	}, {});
+	// Combine all batch results into a single array
+	const charactersBatch = batchResults.flat();
 
-	// check if charactersIds is empty or if characters is empty
-	if (!charactersBatch) {
-		console.error('Tried to add characters from ESI but charactersIds array was empty');
+	// check if the combined results are empty
+	if (!charactersBatch || charactersBatch.length === 0) {
+		console.error('Tried to add characters from ESI but character results were empty');
 		return;
 	}
 
