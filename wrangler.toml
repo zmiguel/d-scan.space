@@ -21,7 +21,7 @@ database_name = "d-scan-space-preview"
 
 [[services]]
 binding = "WORKER_HELPER"
-service = "d-scan-space_character-fetcher"
+service = "d-scan-space-worker-helper"
 
 [env.production.vars]
 NODE_VERSION = "22"
@@ -37,4 +37,4 @@ binding = "KV"
 
 [[env.production.services]]
 binding = "WORKER_HELPER"
-service = "d-scan-space_character-fetcher"
+service = "d-scan-space-worker-helper"

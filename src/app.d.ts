@@ -11,10 +11,7 @@ declare global {
 			env: {
 				DB: D1Database;
 				KV: KVNamespace;
-				WORKER_HELPER: {
-					namesToCharacters(names: string[]): Promise<any[]>;
-					// Add other methods your worker exposes
-				};
+				WORKER_HELPER: Service;
 			};
 			context: {
 				waitUntil(promise: Promise<any>): void;

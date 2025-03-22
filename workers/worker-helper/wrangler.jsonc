@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "d-scan-space_character-fetcher",
+	"name": "d-scan-space-worker-helper",
 	"main": "src/index.js",
 	"compatibility_date": "2025-03-20",
 	"observability": {
