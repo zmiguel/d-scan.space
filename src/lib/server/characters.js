@@ -6,9 +6,9 @@ import { addCorporationFromESI } from '$lib/server/corporations.js';
 import { getAllianceByID } from '$lib/database/alliances.js';
 import { addAllianceFromESI } from '$lib/server/alliances.js';
 import { addOrUpdateCharacterDB, getCharactersByName } from '$lib/database/characters.js';
-import { DOOMHEIM_ID } from '$lib/server/constants.js';
+//import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
-async function getCharacterFromESI(id){
+async function getCharacterFromESI(id) {
 	const characterData = await fetch(
 		`https://esi.evetech.net/latest/characters/${id}/?datasource=tranquility`,
 		{
@@ -24,7 +24,7 @@ async function getCharacterFromESI(id){
 	return characterInfo;
 }
 
-async function addOrUpdateCharacter(db, data){
+async function addOrUpdateCharacter(db, data) {
 	// check if we have the corporation in the database
 	let corp = await getCorporationByID(db, data.corporation_id);
 
@@ -56,9 +56,7 @@ async function addOrUpdateCharacter(db, data){
 export async function addCharactersFromESI(db, characters, sanityCheck = false) {
 	// check if characters is empty
 	if (characters.length === 0 || !characters) {
-		console.warn(
-			'Tried to add characters from ESI but characters array was empty'
-		);
+		console.warn('Tried to add characters from ESI but characters array was empty');
 		return;
 	}
 
@@ -116,9 +114,7 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 
 	// check if charactersIds is empty or if characters is empty
 	if (!charactersIds || !charactersIds.characters) {
-		console.error(
-			'Tried to add characters from ESI but charactersIds array was empty'
-		);
+		console.error('Tried to add characters from ESI but charactersIds array was empty');
 		return;
 	}
 
@@ -130,7 +126,7 @@ export async function addCharactersFromESI(db, characters, sanityCheck = false) 
 	await Promise.all(characterPromises);
 }
 
-export async function updateCharactersFromESI(db, data){
+export async function updateCharactersFromESI(db, data) {
 	const characterPromises = data.map(async (character) => {
 		const characterInfo = await getCharacterFromESI(character.id);
 		await addOrUpdateCharacter(db, characterInfo);

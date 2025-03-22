@@ -43,22 +43,18 @@ export const actions = {
 		}
 
 		try {
-			await createNewScan(
-				db,
-				{
-					scanGroupId,
-					scanId,
-					is_public,
-					isDirectional
-				}
-			);
+			await createNewScan(db, {
+				scanGroupId,
+				scanId,
+				is_public,
+				isDirectional
+			});
 
 			await kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
 		} catch (e) {
 			console.error('Failed to store scan data', e);
 			return { status: 500, body: 'Failed to store scan data' };
 		}
-
 
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 	}

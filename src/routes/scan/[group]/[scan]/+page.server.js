@@ -12,11 +12,11 @@ export async function load({ params, platform }) {
 	 * return the data for the page to render
 	 */
 
-	const getScanResult = await getScanByID(db, scan)
+	const getScanResult = await getScanByID(db, scan);
 	if (!getScanResult) {
 		return {
 			status: 404,
-			body: 'Scan not found',
+			body: 'Scan not found'
 		};
 	}
 	const thisScan = getScanResult[0];
@@ -46,8 +46,14 @@ export async function load({ params, platform }) {
 	return {
 		system: thisScan.system,
 		created_at: thisScan.created_at,
-		local: localScan ? await decompressJson(await platform?.env.KV.get(`${group}${localScan.id}`, "arrayBuffer")) : null,
-		directional: directionalScan ? await decompressJson(await platform?.env.KV.get(`${group}${directionalScan.id}`, "arrayBuffer")) : null,
-		related: groupScans,
+		local: localScan
+			? await decompressJson(await platform?.env.KV.get(`${group}${localScan.id}`, 'arrayBuffer'))
+			: null,
+		directional: directionalScan
+			? await decompressJson(
+					await platform?.env.KV.get(`${group}${directionalScan.id}`, 'arrayBuffer')
+				)
+			: null,
+		related: groupScans
 	};
 }

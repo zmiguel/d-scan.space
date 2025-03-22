@@ -2,7 +2,6 @@
  * File for all Local Scan related functions
  */
 
-import ShortUniqueId from 'short-unique-id';
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 
@@ -43,8 +42,6 @@ async function getCharacters(db, data) {
 }
 
 export async function createNewLocalScan(db, data) {
-	const uid = new ShortUniqueId();
-
 	const allCharacters = await getCharacters(db, data);
 	updateCharactersLastSeen(db, allCharacters); // No need for Async here
 

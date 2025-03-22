@@ -35,9 +35,15 @@ export const characters = sqliteTable('characters', {
 		.references(() => corporations.id)
 		.notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	last_seen: integer().default(sql`(unixepoch())`).notNull(),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull(),
+	last_seen: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
 	deleted_at: integer()
 });
 
@@ -46,14 +52,22 @@ export const corporations = sqliteTable('corporations', {
 	name: text().notNull(),
 	ticker: text().notNull(),
 	alliance_id: integer().references(() => alliances.id),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull()
 });
 
 export const alliances = sqliteTable('alliances', {
 	id: integer().primaryKey(),
 	name: text().notNull(),
 	ticker: text().notNull(),
-	created_at: integer().default(sql`(unixepoch())`).notNull(),
-	updated_at: integer().default(sql`(unixepoch())`).notNull()
+	created_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull(),
+	updated_at: integer()
+		.default(sql`(unixepoch())`)
+		.notNull()
 });

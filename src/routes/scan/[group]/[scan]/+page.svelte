@@ -1,30 +1,33 @@
 <script>
-	import { Breadcrumb, BreadcrumbItem, Badge, Span, Tabs, TabItem } from 'flowbite-svelte';
-	import { ChevronLeftOutline, UsersGroupSolid, InfoCircleSolid, RocketSolid } from 'flowbite-svelte-icons';
+	import { Breadcrumb, BreadcrumbItem, Badge, Tabs, TabItem } from 'flowbite-svelte';
+	import {
+		ChevronLeftOutline,
+		UsersGroupSolid,
+		InfoCircleSolid,
+		RocketSolid
+	} from 'flowbite-svelte-icons';
 	export let data;
 
 	console.log(data);
 
-	// extract alliances, coprs, and chars from data in different arrays
-	var alliances = [];
-	var corporations = [];
-	var characters = [];
-
 	// This would come from your data in a real scenario
 	const systemSecurity = 0.8; // Example value
-	const systemName = "Jita";
-	const constellation = "Kimotoro";
-	const region = "The Forge";
+	const systemName = 'Jita';
+	const constellation = 'Kimotoro';
+	const region = 'The Forge';
 
 	// Function to determine security color based on value
 	function getSecurityClass(secValue) {
-		if (secValue >= 0.5) return "green";
-		if (secValue > 0.0) return "yellow";
-		return "red";
+		if (secValue >= 0.5) return 'green';
+		if (secValue > 0.0) return 'yellow';
+		return 'red';
 	}
 
 	// Format the timestamp using ISO 8601 format with UTC
-	const formattedTimestamp = new Date(data.created_at*1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+	const formattedTimestamp = new Date(data.created_at * 1000)
+		.toISOString()
+		.replace('T', ' ')
+		.replace(/\.\d+Z$/, '');
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
 </script>
 
@@ -34,13 +37,17 @@
 		<div class="col-span-12 md:col-span-10 p-2 bg-white dark:bg-gray-800 rounded-lg">
 			<div class="min-h-[600px]">
 				<!-- First row: Breadcrumbs and timestamp -->
-				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-2 border-b-2 dark:border-gray-600">
+				<div
+					class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-2 border-b-2 dark:border-gray-600"
+				>
 					<div class="flex items-center gap-2 mb-2 sm:mb-0">
 						<Breadcrumb aria-label="System location" class="bg-transparent p-0 mb-0">
 							{#if data.system}
 								<BreadcrumbItem>
 									<svelte:fragment slot="icon">
-										<Badge class="me-2" color={getSecurityClass(systemSecurity)}>{systemSecurity.toFixed(1)}</Badge>
+										<Badge class="me-2" color={getSecurityClass(systemSecurity)}
+											>{systemSecurity.toFixed(1)}</Badge
+										>
 									</svelte:fragment>
 									{systemName}
 								</BreadcrumbItem>
@@ -84,9 +91,7 @@
 								Overview
 							</div>
 							<div class="space-y-2">
-								<div class="text-sm">
-									Overview content goes here
-								</div>
+								<div class="text-sm">Overview content goes here</div>
 							</div>
 						</TabItem>
 						<TabItem
@@ -97,7 +102,6 @@
 								<UsersGroupSolid size="md" />
 								Local
 							</div>
-
 						</TabItem>
 						<TabItem
 							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
@@ -107,7 +111,6 @@
 								<RocketSolid size="md" />
 								Space
 							</div>
-
 						</TabItem>
 					</Tabs>
 				</div>
@@ -119,9 +122,7 @@
 			<h3 class="text-lg font-semibold mb-3 border-b pb-2">Sidebar</h3>
 			<div class="space-y-3">
 				<!-- Sidebar content -->
-				<div class="text-sm">
-					Sidebar content goes here
-				</div>
+				<div class="text-sm">Sidebar content goes here</div>
 			</div>
 		</div>
 	</div>

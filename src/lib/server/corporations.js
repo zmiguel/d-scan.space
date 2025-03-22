@@ -1,7 +1,11 @@
 /**
  *  Functions related to corporations
  */
-import { addCorporation, getCorporationByID, updateCorporation } from '$lib/database/corporations.js';
+import {
+	addCorporation,
+	getCorporationByID,
+	updateCorporation
+} from '$lib/database/corporations.js';
 import { getAllianceByID } from '$lib/database/alliances.js';
 import { addAllianceFromESI } from '$lib/server/alliances.js';
 
@@ -44,10 +48,10 @@ export async function addCorporationFromESI(db, id) {
 		}
 	);
 
-	const corpInfo = await corpData.json()
+	const corpInfo = await corpData.json();
 	corpInfo.id = id;
 
-	if(corpInfo.alliance_id) {
+	if (corpInfo.alliance_id) {
 		// check if we have the alliance in the database
 		let alliance = await getAllianceByID(db, corpInfo.alliance_id);
 

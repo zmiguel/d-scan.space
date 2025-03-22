@@ -39,7 +39,7 @@ export async function getCharactersByName(db, names) {
 	return batchResults.flat();
 }
 
-export async function addOrUpdateCharacterDB(db, data){
+export async function addOrUpdateCharacterDB(db, data) {
 	return await db
 		.insert(characters)
 		.values({
@@ -62,7 +62,7 @@ export async function addOrUpdateCharacterDB(db, data){
 		.run();
 }
 
-export function updateCharactersLastSeen(db, data){
+export function updateCharactersLastSeen(db, data) {
 	const ids = data.map((char) => char.id);
 	db.update(characters)
 		.set({

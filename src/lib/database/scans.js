@@ -19,11 +19,7 @@ export async function getScanByID(db, id) {
 }
 
 export async function getScansByGroupID(db, id) {
-	return await db
-		.select()
-		.from(scans)
-		.where(eq(scans.scan_group_id, id))
-		.all();
+	return await db.select().from(scans).where(eq(scans.scan_group_id, id)).all();
 }
 
 export async function createNewScan(db, data) {
@@ -39,7 +35,7 @@ export async function createNewScan(db, data) {
 	await db.insert(scans).values({
 		id: data.scanId,
 		scan_group_id: data.scanGroupId,
-		scan_type: data.isDirectional ? "directional" : "local",
+		scan_type: data.isDirectional ? 'directional' : 'local',
 		createdAt: timestamp
 	});
 }
