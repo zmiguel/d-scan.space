@@ -70,7 +70,7 @@ export async function addCharactersFromESI(db, worker, characters, sanityCheck =
 
 	// Get Character IDS
 	const BATCH_SIZE = 500;
-	const batches = [];
+	let batches = [];
 
 	// Split characters into batches
 	for (let i = 0; i < characters.length; i += BATCH_SIZE) {
