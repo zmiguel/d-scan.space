@@ -19,20 +19,23 @@ export async function addOrUpdateCorporationsDB(cf, data) {
 	let corporationAddOrUpdateBatch = [];
 	data.forEach((corporation) => {
 		corporationAddOrUpdateBatch.push(
-			cf.db.insert(corporations).values({
-				id: corporation.id,
-				name: corporation.name,
-				ticker: corporation.ticker,
-				alliance_id: corporation.alliance_id ?? null
-			}).onConflictDoUpdate({
-				target: corporations.id,
-				set: {
+			cf.db
+				.insert(corporations)
+				.values({
+					id: corporation.id,
 					name: corporation.name,
 					ticker: corporation.ticker,
-					alliance_id: corporation.alliance_id ?? null,
-					updated_at: Math.floor(Date.now() / 1000)
-				}
-			})
+					alliance_id: corporation.alliance_id ?? null
+				})
+				.onConflictDoUpdate({
+					target: corporations.id,
+					set: {
+						name: corporation.name,
+						ticker: corporation.ticker,
+						alliance_id: corporation.alliance_id ?? null,
+						updated_at: Math.floor(Date.now() / 1000)
+					}
+				})
 		);
 	});
 

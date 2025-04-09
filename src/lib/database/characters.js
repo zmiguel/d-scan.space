@@ -48,22 +48,25 @@ export async function addOrUpdateCharactersDB(cf, data) {
 	let characterAddOrUpdateBatch = [];
 	data.forEach((character) => {
 		characterAddOrUpdateBatch.push(
-			cf.db.insert(characters).values({
-				id: character.id,
-				name: character.name,
-				sec_status: character.sec_status,
-				corporation_id: character.corporation_id,
-				alliance_id: character.alliance_id ?? null
-			}).onConflictDoUpdate({
-				target: characters.id,
-				set: {
+			cf.db
+				.insert(characters)
+				.values({
+					id: character.id,
 					name: character.name,
 					sec_status: character.sec_status,
 					corporation_id: character.corporation_id,
-					alliance_id: character.alliance_id ?? null,
-					updated_at: Math.floor(Date.now() / 1000)
-				}
-			})
+					alliance_id: character.alliance_id ?? null
+				})
+				.onConflictDoUpdate({
+					target: characters.id,
+					set: {
+						name: character.name,
+						sec_status: character.sec_status,
+						corporation_id: character.corporation_id,
+						alliance_id: character.alliance_id ?? null,
+						updated_at: Math.floor(Date.now() / 1000)
+					}
+				})
 		);
 	});
 
@@ -72,7 +75,8 @@ export async function addOrUpdateCharactersDB(cf, data) {
 
 export function updateCharactersLastSeen(cf, data) {
 	const ids = data.map((char) => char.id);
-	cf.db.update(characters)
+	cf.db
+		.update(characters)
 		.set({
 			last_seen: Math.floor(Date.now() / 1000)
 		})

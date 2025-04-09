@@ -4,7 +4,7 @@
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
 
 export async function addOrUpdateCorporations(cf, data) {
-	const corporationsInDB = await getCorporationsByID(cf, data)
+	const corporationsInDB = await getCorporationsByID(cf, data);
 
 	// find missing corporations
 	const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));

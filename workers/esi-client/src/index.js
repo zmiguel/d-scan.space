@@ -39,7 +39,6 @@ async function getCorporationFromESI(id) {
 	return corporationInfo;
 }
 
-
 export default class ESIClient extends WorkerEntrypoint {
 	// Currently, entrypoints without a named handler are not supported
 	async fetch() {

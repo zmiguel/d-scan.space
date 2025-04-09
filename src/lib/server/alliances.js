@@ -3,9 +3,8 @@
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
 
-
 export async function addOrUpdateAlliances(cf, data) {
-	const alliancesInDB = await getAlliancesByID(cf, data)
+	const alliancesInDB = await getAlliancesByID(cf, data);
 
 	// find missing alliances
 	const missingAlliances = data.filter((id) => !alliancesInDB.some((a) => a.id === id));

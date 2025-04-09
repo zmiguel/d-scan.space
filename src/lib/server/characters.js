@@ -6,14 +6,17 @@ import { addOrUpdateAlliances } from '$lib/server/alliances.js';
 import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/characters.js';
 //import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
-
 async function addOrUpdateCharacters(cf, data) {
 	// get list of all corp ids
-	const corpIDs = data.map((char) => char.corporation_id).filter(id => id !== undefined && id !== null);
+	const corpIDs = data
+		.map((char) => char.corporation_id)
+		.filter((id) => id !== undefined && id !== null);
 	const corpIDsUnique = [...new Set(corpIDs)];
 
 	// get list of all alliance ids
-	const allianceIDs = data.map((char) => char.alliance_id).filter(id => id !== undefined && id !== null);
+	const allianceIDs = data
+		.map((char) => char.alliance_id)
+		.filter((id) => id !== undefined && id !== null);
 	const allianceIDsUnique = [...new Set(allianceIDs)];
 
 	// first we check if we have the alliance info and if the info is updated

@@ -5,7 +5,6 @@
 import { alliances } from '../database/schema';
 import { inArray } from 'drizzle-orm';
 
-
 export async function getAlliancesByID(cf, ids) {
 	return await cf.db.select().from(alliances).where(inArray(alliances.id, ids)).all();
 }
@@ -20,18 +19,21 @@ export async function addOrUpdateAlliancesDB(cf, data) {
 	let allianceAddOrUpdateBatch = [];
 	data.forEach((alliance) => {
 		allianceAddOrUpdateBatch.push(
-			cf.db.insert(alliances).values({
-				id: alliance.id,
-				name: alliance.name,
-				ticker: alliance.ticker
-			}).onConflictDoUpdate({
-				target: alliances.id,
-				set: {
+			cf.db
+				.insert(alliances)
+				.values({
+					id: alliance.id,
 					name: alliance.name,
-					ticker: alliance.ticker,
-					updated_at: Math.floor(Date.now() / 1000)
-				}
-			})
+					ticker: alliance.ticker
+				})
+				.onConflictDoUpdate({
+					target: alliances.id,
+					set: {
+						name: alliance.name,
+						ticker: alliance.ticker,
+						updated_at: Math.floor(Date.now() / 1000)
+					}
+				})
 		);
 	});
 
