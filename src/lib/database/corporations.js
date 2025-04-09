@@ -5,32 +5,31 @@
 import { corporations } from '../database/schema';
 import { eq } from 'drizzle-orm';
 
-export async function getCorporationByID(db, id) {
-	return await db.select().from(corporations).where(eq(corporations.id, id)).get();
+export async function getCorporationsByID(cf, ids) {
+	return await cf.db.select().from(corporations).where(eq(corporations.id, ids)).all();
 }
 
-export async function updateCorporation(db, data) {
-	return await db
-		.update(corporations)
-		.set({
-			name: data.name,
-			ticker: data.ticker,
-			alliance_id: data.alliance_id ? data.alliance_id : null,
-			updated_at: Math.floor(Date.now() / 1000)
-		})
-		.where(corporations.id.eq(data.id))
-		.run();
-}
+export async function addOrUpdateCorporationsDB(cf, data) {
+	// add or update corporations in a batch
+	let corporationAddOrUpdateBatch = [];
+	data.forEach((corporation) => {
+		corporationAddOrUpdateBatch.push(
+			cf.db.insert(corporations).values({
+				id: corporation.id,
+				name: corporation.name,
+				ticker: corporation.ticker,
+				alliance_id: corporation.alliance_id ?? null
+			}).onConflictDoUpdate({
+				target: corporations.id,
+				set: {
+					name: corporation.name,
+					ticker: corporation.ticker,
+					alliance_id: corporation.alliance_id ?? null,
+					updated_at: Math.floor(Date.now() / 1000)
+				}
+			})
+		);
+	});
 
-export async function addCorporation(db, data) {
-	return await db
-		.insert(corporations)
-		.values({
-			id: data.id,
-			name: data.name,
-			ticker: data.ticker,
-			alliance_id: data.alliance_id ?? null
-		})
-		.onConflictDoNothing()
-		.run();
+	await cf.db.batch(corporationAddOrUpdateBatch);
 }

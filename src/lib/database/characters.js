@@ -5,14 +5,14 @@
 import { characters, corporations, alliances } from '../database/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-export async function getCharactersByName(db, names) {
+export async function getCharactersByName(cf, names) {
 	// make batches of 100 names to query in parallel
 	const batchSize = 100;
 	const batchPromises = [];
 
 	for (let i = 0; i < names.length; i += batchSize) {
 		const batch = names.slice(i, i + batchSize);
-		const batchPromise = db
+		const batchPromise = cf.db
 			.select({
 				id: characters.id,
 				name: characters.name,
@@ -39,27 +39,30 @@ export async function getCharactersByName(db, names) {
 	return batchResults.flat();
 }
 
-export async function addOrUpdateCharacterDB(db, data) {
-	return await db
-		.insert(characters)
-		.values({
-			id: data.id,
-			name: data.name,
-			sec_status: data.sec_status,
-			corporation_id: data.corporation_id,
-			alliance_id: data.alliance_id
-		})
-		.onConflictDoUpdate({
-			target: characters.id,
-			set: {
-				name: data.name,
-				sec_status: data.sec_status,
-				corporation_id: data.corporation_id,
-				alliance_id: data.alliance_id,
-				updated_at: Math.floor(Date.now() / 1000)
-			}
-		})
-		.run();
+export async function addOrUpdateCharactersDB(db, data) {
+	let characterAddOrUpdateBatch = [];
+	data.forEach((character) => {
+		characterAddOrUpdateBatch.push(
+			db.insert(characters).values({
+				id: character.id,
+				name: character.name,
+				sec_status: character.sec_status,
+				corporation_id: character.corporation_id,
+				alliance_id: character.alliance_id ?? null
+			}).onConflictDoUpdate({
+				target: characters.id,
+				set: {
+					name: character.name,
+					sec_status: character.sec_status,
+					corporation_id: character.corporation_id,
+					alliance_id: character.alliance_id ?? null,
+					updated_at: Math.floor(Date.now() / 1000)
+				}
+			})
+		);
+	});
+
+	await db.batch(characterAddOrUpdateBatch);
 }
 
 export function updateCharactersLastSeen(db, data) {

@@ -38,7 +38,7 @@ export const actions = {
 		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			result = await createNewLocalScan(db, worker, lines);
+			result = await createNewLocalScan(cf, lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//
@@ -46,7 +46,7 @@ export const actions = {
 		}
 
 		try {
-			await createNewScan(db, {
+			await createNewScan(cf, {
 				scanGroupId,
 				scanId,
 				is_public,

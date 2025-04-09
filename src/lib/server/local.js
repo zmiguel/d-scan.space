@@ -5,9 +5,9 @@
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 
-async function getCharacters(db, worker, data) {
+async function getCharacters(cf, data) {
 	// get characters in database
-	const charactersInDB = await getCharactersByName(db, data);
+	const charactersInDB = await getCharactersByName(cf, data);
 
 	const missingCharacters = await data.filter((l) => !charactersInDB.some((c) => c.name === l));
 	const outdatedCharacters = await charactersInDB.filter(
@@ -24,26 +24,26 @@ async function getCharacters(db, worker, data) {
 	// check if we are missing characters from the database
 	if (missingCharacters.length > 0) {
 		// get missing characters from ESI
-		await addCharactersFromESI(db, worker, missingCharacters);
+		await addCharactersFromESI(cf, missingCharacters);
 	}
 
 	// check if characters are outdated in database
 	if (outdatedCharacters.length > 0) {
 		// get updated characters from ESI
-		await updateCharactersFromESI(db, outdatedCharacters);
+		await updateCharactersFromESI(cf, outdatedCharacters);
 	}
 
 	// get all outdated and missing characters from db
 	const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map((c) => c.name)];
-	const updatedCharacters = await getCharactersByName(db, charactersToFetch);
+	const updatedCharacters = await getCharactersByName(cf, charactersToFetch);
 
 	// merge good with updated
 	return [...goodCharacters, ...updatedCharacters];
 }
 
-export async function createNewLocalScan(db, worker, data) {
-	const allCharacters = await getCharacters(db, worker, data);
-	updateCharactersLastSeen(db, allCharacters); // No need for Async here
+export async function createNewLocalScan(cf, data) {
+	const allCharacters = await getCharacters(cf, data);
+	updateCharactersLastSeen(cf, allCharacters); // No need for Async here
 
 	/* process scan data & build scan json
 	 *

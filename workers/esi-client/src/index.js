@@ -13,6 +13,33 @@ async function getCharacterFromESI(id) {
 	return characterInfo;
 }
 
+async function getAllianceFromESI(id) {
+	const allianceData = await fetch(`https://esi.evetech.net/latest/alliances/${id}/?datasource=tranquility`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	});
+
+	const allianceInfo = await allianceData.json();
+	allianceInfo.id = id;
+	return allianceInfo;
+}
+
+async function getCorporationFromESI(id) {
+	const corporationData = await fetch(`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	});
+
+	const corporationInfo = await corporationData.json();
+	corporationInfo.id = id;
+	return corporationInfo;
+}
+
+
 export default class ESIClient extends WorkerEntrypoint {
 	// Currently, entrypoints without a named handler are not supported
 	async fetch() {
@@ -43,6 +70,45 @@ export default class ESIClient extends WorkerEntrypoint {
 		let characterData = [];
 		const characterPromises = data.characters.map(async (character) => {
 			const characterInfo = await getCharacterFromESI(character.id);
+			characterData.push(characterInfo);
+		});
+
+		await Promise.all(characterPromises);
+
+		return characterData;
+	}
+
+	async idsToAlliances(ids) {
+		// get all alliances from esi and return them
+		let allianceData = [];
+		const alliancePromises = ids.map(async (id) => {
+			const allianceInfo = await getAllianceFromESI(id);
+			allianceData.push(allianceInfo);
+		});
+
+		await Promise.all(alliancePromises);
+
+		return allianceData;
+	}
+
+	async idsToCorporations(ids) {
+		// get all corporations from esi and return them
+		let corporationData = [];
+		const corporationPromises = ids.map(async (id) => {
+			const corporationInfo = await getCorporationFromESI(id);
+			corporationData.push(corporationInfo);
+		});
+
+		await Promise.all(corporationPromises);
+
+		return corporationData;
+	}
+
+	async idsToCharacters(ids) {
+		// get all characters from esi and return them
+		let characterData = [];
+		const characterPromises = ids.map(async (id) => {
+			const characterInfo = await getCharacterFromESI(id);
 			characterData.push(characterInfo);
 		});
 

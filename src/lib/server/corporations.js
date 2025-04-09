@@ -1,65 +1,41 @@
 /**
  *  Functions related to corporations
  */
-import {
-	addCorporation,
-	getCorporationByID,
-	updateCorporation
-} from '$lib/database/corporations.js';
-import { getAllianceByID } from '$lib/database/alliances.js';
-import { addAllianceFromESI } from '$lib/server/alliances.js';
+import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
 
-export async function updateCorp(db, id, returnData = false) {
-	const corp = await getCorporationByID(db, id);
+export async function addOrUpdateCorporations(cf, data) {
+	const corporationsInDB = await getCorporationsByID(cf, data)
 
-	if (corp.updatedAt < new Date().getTime() - 86400000) {
-		const corpData = await fetch(
-			`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
-			{
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			}
-		);
+	// find missing corporations
+	const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));
 
-		const corpInfo = await corpData.json();
-		// Update corporation info
-		await updateCorporation(db, corpInfo);
-
-		if (returnData) {
-			return getCorporationByID(db, id);
-		}
-	}
-
-	if (returnData) {
-		return corp;
-	}
-}
-
-export async function addCorporationFromESI(db, id) {
-	const corpData = await fetch(
-		`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		}
+	// find outdated corporations
+	const outdatedCorporations = corporationsInDB.filter(
+		(a) => a.updated_at < Math.floor(Date.now() / 1000) - 86400
 	);
 
-	const corpInfo = await corpData.json();
-	corpInfo.id = id;
+	// combine missing and outdated corporations
+	const corporationsToFetch = [...missingCorporations, ...outdatedCorporations.map((a) => a.id)];
 
-	if (corpInfo.alliance_id) {
-		// check if we have the alliance in the database
-		let alliance = await getAllianceByID(db, corpInfo.alliance_id);
-
-		if (!alliance) {
-			// add alliance to database
-			await addAllianceFromESI(db, corpInfo.alliance_id);
-		}
+	// fetch missing and outdated corporations using the esi client and by batching them all together
+	// we need to ensure we don't exceed the 1000 calls limit of CF workers,
+	// so we must batch them in batches of 500 corporations
+	const BATCH_SIZE = 500;
+	const batches = [];
+	for (let i = 0; i < corporationsToFetch.length; i += BATCH_SIZE) {
+		const batch = corporationsToFetch.slice(i, i + BATCH_SIZE);
+		batches.push(batch);
 	}
+	const batchPromises = batches.map(async (batch) => {
+		return await cf.esi.idsToCorporations(batch);
+	});
+	const batchResults = await Promise.all(batchPromises);
+	const corporationsBatch = batchResults.reduce((combined, result) => {
+		if (result) {
+			combined.corporations = [...combined, ...result];
+		}
+		return combined;
+	}, {});
 
-	await addCorporation(db, corpInfo);
+	await addOrUpdateCorporationsDB(cf, corporationsBatch);
 }
