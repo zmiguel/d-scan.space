@@ -75,11 +75,20 @@ export async function addOrUpdateCharactersDB(cf, data) {
 
 export function updateCharactersLastSeen(cf, data) {
 	const ids = data.map((char) => char.id);
-	cf.db
-		.update(characters)
-		.set({
-			last_seen: Math.floor(Date.now() / 1000)
-		})
-		.where(inArray(characters.id, ids))
-		.run();
+	// make batches of 250 ids to update in parallel
+	const batchSize = 250;
+	const batchPromises = [];
+	for (let i = 0; i < ids.length; i += batchSize) {
+		const batch = ids.slice(i, i + batchSize);
+		const batchPromise = cf.db
+			.update(characters)
+			.set({
+				last_seen: Math.floor(Date.now() / 1000)
+			})
+			.where(inArray(characters.id, batch))
+			.run();
+		batchPromises.push(batchPromise);
+	}
+
+	Promise.all(batchPromises);
 }
