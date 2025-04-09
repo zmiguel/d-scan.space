@@ -11,9 +11,11 @@ export const actions = {
 		const data = await request.formData();
 		const content = /** @type {(string | null)} */ (data.get('scan_content'));
 		const is_public = data.has('is_public');
-		const db = drizzle(platform?.env.DB);
-		const kv = platform?.env.KV;
-		const worker = platform?.env.WORKER;
+		const cf = {
+			db: drizzle(platform?.env.DB),
+			kv: platform?.env.KV,
+			esi: platform?.env.ESI_CLIENT
+		};
 
 		if (!content) {
 			return { status: 400, body: 'No scan content provided' };
@@ -51,7 +53,7 @@ export const actions = {
 				isDirectional
 			});
 
-			await kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
+			await cf.kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
 		} catch (e) {
 			console.error('Failed to store scan data', e);
 			return { status: 500, body: 'Failed to store scan data' };

@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "d-scan-space_character-fetcher",
+	"name": "d-scan-space-esi-client",
 	"main": "src/index.js",
 	"compatibility_date": "2025-03-20",
 	"observability": {
@@ -14,7 +14,8 @@
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
 	 */
-	"placement": { "mode": "smart" }
+	"placement": { "mode": "smart" },
+	"workers_dev": false
 
 	/**
 	 * Bindings

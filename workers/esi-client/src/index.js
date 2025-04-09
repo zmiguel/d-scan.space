@@ -1,37 +1,32 @@
-import { WorkerEntrypoint } from "cloudflare:workers";
+import { WorkerEntrypoint } from 'cloudflare:workers';
 
 async function getCharacterFromESI(id) {
-	const characterData = await fetch(
-		`https://esi.evetech.net/latest/characters/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		}
-	);
+	const characterData = await fetch(`https://esi.evetech.net/latest/characters/${id}/?datasource=tranquility`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	});
 
 	const characterInfo = await characterData.json();
 	characterInfo.id = id;
 	return characterInfo;
 }
 
-export default class WorkerB extends WorkerEntrypoint {
-
+export default class ESIClient extends WorkerEntrypoint {
 	// Currently, entrypoints without a named handler are not supported
-	async fetch() { return new Response(null, {status: 404}); }
+	async fetch() {
+		return new Response(null, { status: 404 });
+	}
 
 	async namesToCharacters(names) {
-		const response = await fetch(
-			'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(names)
-			}
-		);
+		const response = await fetch('https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(names),
+		});
 
 		if (!response.ok) {
 			console.error(`Failed to get character ids from ESI ${JSON.stringify(response)}`);

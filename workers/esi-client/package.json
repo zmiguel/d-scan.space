@@ -1,5 +1,5 @@
 {
-	"name": "character-fetcher",
+	"name": "esi-client",
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
@@ -9,8 +9,8 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.7.5",
+		"@cloudflare/vitest-pool-workers": "^0.7.8",
 		"vitest": "~3.0.7",
-		"wrangler": "^4.3.0"
+		"wrangler": "^4.9.1"
 	}
 }
