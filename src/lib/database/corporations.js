@@ -3,13 +3,18 @@
  */
 
 import { corporations } from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 export async function getCorporationsByID(cf, ids) {
-	return await cf.db.select().from(corporations).where(eq(corporations.id, ids)).all();
+	return await cf.db.select().from(corporations).where(inArray(corporations.id, ids)).all();
 }
 
 export async function addOrUpdateCorporationsDB(cf, data) {
+	if (!data || data.length === 0) {
+		console.warn('Tried to add corporations from ESI but corporations array was empty');
+		return;
+	}
+
 	// add or update corporations in a batch
 	let corporationAddOrUpdateBatch = [];
 	data.forEach((corporation) => {

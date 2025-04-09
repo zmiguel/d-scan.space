@@ -18,6 +18,10 @@ export async function addOrUpdateAlliances(cf, data) {
 	// combine missing and outdated alliances
 	const alliancesToFetch = [...missingAlliances, ...outdatedAlliances.map((a) => a.id)];
 
+	if (alliancesToFetch.length === 0) {
+		return;
+	}
+
 	// fetch missing and outdated alliances using the esi client and by batching them all together
 	// we need to ensure we don't exceed the 1000 calls limit of CF workers,
 	// so we must batch them in batches of 500 alliances
@@ -33,10 +37,10 @@ export async function addOrUpdateAlliances(cf, data) {
 	const batchResults = await Promise.all(batchPromises);
 	const alliancesBatch = batchResults.reduce((combined, result) => {
 		if (result) {
-			combined.alliances = [...combined, ...result];
+			return [...combined, ...result];
 		}
 		return combined;
-	}, {});
+	}, []);
 
 	await addOrUpdateAlliancesDB(cf, alliancesBatch);
 }

@@ -39,11 +39,16 @@ export async function getCharactersByName(cf, names) {
 	return batchResults.flat();
 }
 
-export async function addOrUpdateCharactersDB(db, data) {
+export async function addOrUpdateCharactersDB(cf, data) {
+	if (!data || data.length === 0) {
+		console.warn('Tried to add characters from ESI but characters array was empty');
+		return;
+	}
+
 	let characterAddOrUpdateBatch = [];
 	data.forEach((character) => {
 		characterAddOrUpdateBatch.push(
-			db.insert(characters).values({
+			cf.db.insert(characters).values({
 				id: character.id,
 				name: character.name,
 				sec_status: character.sec_status,
@@ -62,12 +67,12 @@ export async function addOrUpdateCharactersDB(db, data) {
 		);
 	});
 
-	await db.batch(characterAddOrUpdateBatch);
+	await cf.db.batch(characterAddOrUpdateBatch);
 }
 
-export function updateCharactersLastSeen(db, data) {
+export function updateCharactersLastSeen(cf, data) {
 	const ids = data.map((char) => char.id);
-	db.update(characters)
+	cf.db.update(characters)
 		.set({
 			last_seen: Math.floor(Date.now() / 1000)
 		})

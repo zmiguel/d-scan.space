@@ -3,14 +3,19 @@
  */
 
 import { alliances } from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 
 export async function getAlliancesByID(cf, ids) {
-	return await cf.db.select().from(alliances).where(eq(alliances.id, ids)).all();
+	return await cf.db.select().from(alliances).where(inArray(alliances.id, ids)).all();
 }
 
 export async function addOrUpdateAlliancesDB(cf, data) {
+	if (!data || data.length === 0) {
+		console.warn('Tried to add alliances from ESI but alliances array was empty');
+		return;
+	}
+
 	// add or update alliances in a batch
 	let allianceAddOrUpdateBatch = [];
 	data.forEach((alliance) => {

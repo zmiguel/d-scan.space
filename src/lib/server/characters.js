@@ -9,11 +9,11 @@ import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/char
 
 async function addOrUpdateCharacters(cf, data) {
 	// get list of all corp ids
-	const corpIDs = data.map((char) => char.corporation_id);
+	const corpIDs = data.map((char) => char.corporation_id).filter(id => id !== undefined && id !== null);
 	const corpIDsUnique = [...new Set(corpIDs)];
 
 	// get list of all alliance ids
-	const allianceIDs = data.map((char) => char.alliance_id);
+	const allianceIDs = data.map((char) => char.alliance_id).filter(id => id !== undefined && id !== null);
 	const allianceIDsUnique = [...new Set(allianceIDs)];
 
 	// first we check if we have the alliance info and if the info is updated
@@ -63,13 +63,13 @@ export async function addCharactersFromESI(cf, characters, sanityCheck = false) 
 	// Combine all batch results
 	const charactersBatch = batchResults.reduce((combined, result) => {
 		if (result) {
-			combined.characters = [...combined, ...result];
+			return [...combined, ...result];
 		}
 		return combined;
-	}, {});
+	}, []);
 
 	// check if charactersIds is empty or if characters is empty
-	if (!charactersBatch) {
+	if (!charactersBatch || charactersBatch.length === 0) {
 		console.error('Tried to add characters from ESI but charactersIds array was empty');
 		return;
 	}
@@ -93,9 +93,9 @@ export async function updateCharactersFromESI(cf, data) {
 	const batchResults = await Promise.all(batchPromises);
 	const charactersBatch = batchResults.reduce((combined, result) => {
 		if (result) {
-			combined.characters = [...combined, ...result];
+			return [...combined, ...result];
 		}
 		return combined;
-	}, {});
+	}, []);
 	await addOrUpdateCharacters(cf, charactersBatch);
 }

@@ -17,6 +17,10 @@ export async function addOrUpdateCorporations(cf, data) {
 	// combine missing and outdated corporations
 	const corporationsToFetch = [...missingCorporations, ...outdatedCorporations.map((a) => a.id)];
 
+	if (corporationsToFetch.length === 0) {
+		return;
+	}
+
 	// fetch missing and outdated corporations using the esi client and by batching them all together
 	// we need to ensure we don't exceed the 1000 calls limit of CF workers,
 	// so we must batch them in batches of 500 corporations
@@ -32,10 +36,10 @@ export async function addOrUpdateCorporations(cf, data) {
 	const batchResults = await Promise.all(batchPromises);
 	const corporationsBatch = batchResults.reduce((combined, result) => {
 		if (result) {
-			combined.corporations = [...combined, ...result];
+			return [...combined, ...result];
 		}
 		return combined;
-	}, {});
+	}, []);
 
 	await addOrUpdateCorporationsDB(cf, corporationsBatch);
 }
