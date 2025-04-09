@@ -76,7 +76,7 @@ export async function addOrUpdateCharactersDB(cf, data) {
 export function updateCharactersLastSeen(cf, data) {
 	const ids = data.map((char) => char.id);
 	// make batches of 250 ids to update in parallel
-	const batchSize = 250;
+	const batchSize = 100;
 	const batchPromises = [];
 	for (let i = 0; i < ids.length; i += batchSize) {
 		const batch = ids.slice(i, i + batchSize);
