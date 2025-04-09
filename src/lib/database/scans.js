@@ -39,3 +39,14 @@ export async function createNewScan(cf, data) {
 		createdAt: timestamp
 	});
 }
+
+export async function updateScan(cf, data) {
+	const timestamp = Math.floor(Date.now() / 1000);
+
+	await cf.db.insert(scans).values({
+		id: data.scanId,
+		scan_group_id: data.scanGroupId,
+		scan_type: data.isDirectional ? 'directional' : 'local',
+		createdAt: timestamp
+	});
+}

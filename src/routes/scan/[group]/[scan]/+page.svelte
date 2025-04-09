@@ -7,8 +7,7 @@
 		TabItem,
 		Textarea,
 		Button,
-		Timeline,
-		TimelineItem
+		Timeline
 	} from 'flowbite-svelte';
 	import HtmlTimelineItem from '$lib/HtmlTimelineItem.svelte';
 	import {
@@ -18,6 +17,7 @@
 		RocketSolid
 	} from 'flowbite-svelte-icons';
 	import { enhance } from '$app/forms';
+	import { onDestroy } from 'svelte';
 	export let data;
 
 	// This would come from your data in a real scenario
@@ -34,24 +34,41 @@
 	}
 
 	// Format the timestamp using ISO 8601 format with UTC
-	const formattedTimestamp = new Date(data.created_at * 1000)
-		.toISOString()
-		.replace('T', ' ')
-		.replace(/\.\d+Z$/, '');
+	$: formattedTimestamp = data.created_at
+		? new Date(data.created_at * 1000)
+			.toISOString()
+			.replace('T', ' ')
+			.replace(/\.\d+Z$/, '')
+		: '';
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
 
 	// For the sidebar form
 	let isLoading = false;
+	let formError = '';
+
 	function handleSubmit() {
 		isLoading = true;
+		formError = '';
 	}
 
 	function handleComplete() {
 		isLoading = false;
 	}
 
+	// Reset loading state when component is destroyed or page changes
+	onDestroy(() => {
+		isLoading = false;
+		formError = '';
+	});
+
+	// Reset loading state when page data changes (e.g., after navigation)
+	$: if (data && data.params) {
+		isLoading = false;
+		formError = '';
+	}
+
 	// Sort related scans by created_at in descending order (newest first)
-	const sortedRelatedScans = [...data.related].sort((a, b) => b.created_at - a.created_at);
+	$: sortedRelatedScans = data.related ? [...data.related].sort((a, b) => b.created_at - a.created_at) : [];
 
 	// Format timestamp for timeline items
 	function formatTimestamp(timestamp) {
@@ -163,7 +180,7 @@
 						<div class="text-center">
 							<div class="inline-block">
 								<svg
-									class="animate-spin h-5 w-5 text-primary-600"
+									class="animate-spin h-7 w-7 text-primary-600"
 									xmlns="http://www.w3.org/2000/svg"
 									fill="none"
 									viewBox="0 0 24 24"
@@ -183,17 +200,21 @@
 									></path>
 								</svg>
 							</div>
-							<p class="text-xs mt-2 text-gray-600 dark:text-gray-400">Processing...</p>
+							<p class="text-base mt-2 text-gray-600 dark:text-gray-400">Processing...</p>
 						</div>
 					</div>
 				{:else}
 					<form
+						id="update-scan-form"
 						method="POST"
 						use:enhance
-						action="/scan"
 						on:submit={handleSubmit}
 						on:reset={handleComplete}
+						action="/scan"
 					>
+						<!-- Hidden input for scan group -->
+						<input type="hidden" name="scan_group" value={data.params.group} />
+
 						<Textarea
 							id="scan-content"
 							placeholder="Paste your data"
@@ -202,6 +223,9 @@
 							required
 							class="text-sm mb-2"
 						/>
+						{#if formError}
+							<div class="text-red-500 text-xs mb-2">{formError}</div>
+						{/if}
 						<Button
 							class="w-full text-sm"
 							color="primary"
@@ -228,7 +252,7 @@
 							>
 								<svelte:fragment slot="icon">
 									<span
-										class="flex absolute -start-3 justify-center items-center w-6 h-6 bg-primary-200 rounded-full ring-8 ring-white dark:ring-gray-800 dark:bg-primary-900"
+										class="flex absolute -start-3 justify-center items-center w-6 h-6 bg-primary-200 rounded-full dark:bg-primary-900"
 									>
 										{#if scan.scan_type === 'local'}
 											<UsersGroupSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
