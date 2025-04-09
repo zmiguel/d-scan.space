@@ -1,14 +1,24 @@
 <script>
-	import { Breadcrumb, BreadcrumbItem, Badge, Tabs, TabItem } from 'flowbite-svelte';
+	import {
+		Breadcrumb,
+		BreadcrumbItem,
+		Badge,
+		Tabs,
+		TabItem,
+		Textarea,
+		Button,
+		Timeline,
+		TimelineItem
+	} from 'flowbite-svelte';
+	import HtmlTimelineItem from '$lib/HtmlTimelineItem.svelte';
 	import {
 		ChevronLeftOutline,
 		UsersGroupSolid,
 		InfoCircleSolid,
 		RocketSolid
 	} from 'flowbite-svelte-icons';
+	import { enhance } from '$app/forms';
 	export let data;
-
-	console.log(data);
 
 	// This would come from your data in a real scenario
 	const systemSecurity = 0.8; // Example value
@@ -29,6 +39,32 @@
 		.replace('T', ' ')
 		.replace(/\.\d+Z$/, '');
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
+
+	// For the sidebar form
+	let isLoading = false;
+	function handleSubmit() {
+		isLoading = true;
+	}
+
+	function handleComplete() {
+		isLoading = false;
+	}
+
+	// Sort related scans by created_at in descending order (newest first)
+	const sortedRelatedScans = [...data.related].sort((a, b) => b.created_at - a.created_at);
+
+	// Format timestamp for timeline items
+	function formatTimestamp(timestamp) {
+		return new Date(timestamp * 1000)
+			.toISOString()
+			.replace('T', ' ')
+			.replace(/\.\d+Z$/, '');
+	}
+
+	// Format scan type for display
+	function formatScanType(scanType) {
+		return scanType.charAt(0).toUpperCase() + scanType.slice(1) + ' Scan';
+	}
 </script>
 
 <div class="container mx-auto">
@@ -119,10 +155,94 @@
 
 		<!-- Sidebar (15-20% width) -->
 		<div class="col-span-12 md:col-span-2 bg-white dark:bg-gray-800 rounded-lg p-2">
-			<h3 class="text-lg font-semibold mb-3 border-b pb-2">Sidebar</h3>
-			<div class="space-y-3">
-				<!-- Sidebar content -->
-				<div class="text-sm">Sidebar content goes here</div>
+			<!-- Row 1: Update current scan -->
+			<div class="mb-3">
+				<h3 class="text-lg font-semibold mb-3 border-b pb-2">Update Scan</h3>
+				{#if isLoading}
+					<div class="flex flex-col items-center justify-center py-4">
+						<div class="text-center">
+							<div class="inline-block">
+								<svg
+									class="animate-spin h-5 w-5 text-primary-600"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+								>
+									<circle
+										class="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+							</div>
+							<p class="text-xs mt-2 text-gray-600 dark:text-gray-400">Processing...</p>
+						</div>
+					</div>
+				{:else}
+					<form
+						method="POST"
+						use:enhance
+						action="/scan"
+						on:submit={handleSubmit}
+						on:reset={handleComplete}
+					>
+						<Textarea
+							id="scan-content"
+							placeholder="Paste your data"
+							rows="4"
+							name="scan_content"
+							required
+							class="text-sm mb-2"
+						/>
+						<Button
+							class="w-full text-sm"
+							color="primary"
+							type="submit"
+							formaction="/scan?/update"
+							size="sm"
+						>
+							Update
+						</Button>
+					</form>
+				{/if}
+			</div>
+
+			<!-- Row 2: Timeline of related scans -->
+			<div>
+				<h3 class="text-lg font-semibold mb-3 border-b pb-2">Related Scans</h3>
+				{#if sortedRelatedScans.length > 0}
+					<Timeline order="vertical">
+						{#each sortedRelatedScans as scan}
+							<HtmlTimelineItem
+								htmlTitle={`<a href="/scan/${data.params?.group}/${scan.id}" class="text-primary-600 dark:text-primary-400 hover:underline text-sm">${formatScanType(scan.scan_type)}</a> ${scan.id === data.params?.scan ? '<span class="ms-1 text-gray-400 text-sm italic">(here)</span>' : ''}`}
+								date={`${formatTimestamp(scan.created_at)}`}
+								classLi="mb-2"
+							>
+								<svelte:fragment slot="icon">
+									<span
+										class="flex absolute -start-3 justify-center items-center w-6 h-6 bg-primary-200 rounded-full ring-8 ring-white dark:ring-gray-800 dark:bg-primary-900"
+									>
+										{#if scan.scan_type === 'local'}
+											<UsersGroupSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+										{:else}
+											<RocketSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+										{/if}
+									</span>
+								</svelte:fragment>
+							</HtmlTimelineItem>
+						{/each}
+					</Timeline>
+				{:else}
+					<p class="text-sm text-gray-500 dark:text-gray-400">No related scans found.</p>
+				{/if}
 			</div>
 		</div>
 	</div>

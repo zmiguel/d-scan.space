@@ -52,7 +52,7 @@ export default class ESIClient extends WorkerEntrypoint {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify(names),
-			timeout: 30000,
+			timeout: 60000,
 		});
 
 		if (!response.ok) {

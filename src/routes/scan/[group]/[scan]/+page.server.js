@@ -54,6 +54,10 @@ export async function load({ params, platform }) {
 					await platform?.env.KV.get(`${group}${directionalScan.id}`, 'arrayBuffer')
 				)
 			: null,
-		related: groupScans
+		related: groupScans,
+		params: {
+			group: group,
+			scan: scan
+		}
 	};
 }

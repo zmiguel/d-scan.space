@@ -3,7 +3,7 @@
  */
 
 import { corporations } from '../database/schema';
-import {  inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 export async function getCorporationsByID(cf, ids) {
 	// make batches of 100 ids to query in parallel
@@ -12,7 +12,11 @@ export async function getCorporationsByID(cf, ids) {
 
 	for (let i = 0; i < ids.length; i += batchSize) {
 		const batch = ids.slice(i, i + batchSize);
-		const batchPromise = cf.db.select().from(corporations).where(inArray(corporations.id, batch)).all();
+		const batchPromise = cf.db
+			.select()
+			.from(corporations)
+			.where(inArray(corporations.id, batch))
+			.all();
 
 		batchPromises.push(batchPromise);
 	}
