@@ -46,7 +46,7 @@ export async function addCharactersFromESI(cf, characters, sanityCheck = false) 
 	}
 
 	// Get Character IDS
-	const BATCH_SIZE = 500;
+	const BATCH_SIZE = 200;
 	const batches = [];
 
 	// Split characters into batches

@@ -24,7 +24,7 @@ export async function addOrUpdateAlliances(cf, data) {
 	// fetch missing and outdated alliances using the esi client and by batching them all together
 	// we need to ensure we don't exceed the 1000 calls limit of CF workers,
 	// so we must batch them in batches of 500 alliances
-	const BATCH_SIZE = 500;
+	const BATCH_SIZE = 100;
 	const batches = [];
 	for (let i = 0; i < alliancesToFetch.length; i += BATCH_SIZE) {
 		const batch = alliancesToFetch.slice(i, i + BATCH_SIZE);
