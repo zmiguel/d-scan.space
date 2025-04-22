@@ -36,9 +36,9 @@
 	// Format the timestamp using ISO 8601 format with UTC
 	$: formattedTimestamp = data.created_at
 		? new Date(data.created_at * 1000)
-			.toISOString()
-			.replace('T', ' ')
-			.replace(/\.\d+Z$/, '')
+				.toISOString()
+				.replace('T', ' ')
+				.replace(/\.\d+Z$/, '')
 		: '';
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
 
@@ -68,7 +68,9 @@
 	}
 
 	// Sort related scans by created_at in descending order (newest first)
-	$: sortedRelatedScans = data.related ? [...data.related].sort((a, b) => b.created_at - a.created_at) : [];
+	$: sortedRelatedScans = data.related
+		? [...data.related].sort((a, b) => b.created_at - a.created_at)
+		: [];
 
 	// Format timestamp for timeline items
 	function formatTimestamp(timestamp) {
