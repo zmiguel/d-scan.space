@@ -1,5 +1,6 @@
 <script>
 	import {
+		Avatar,
 		Breadcrumb,
 		BreadcrumbItem,
 		Badge,
@@ -19,6 +20,8 @@
 	import { enhance } from '$app/forms';
 	import { onDestroy } from 'svelte';
 	export let data;
+
+	console.log(data);
 
 	// This would come from your data in a real scenario
 	const systemSecurity = 0.8; // Example value
@@ -84,6 +87,34 @@
 	function formatScanType(scanType) {
 		return scanType.charAt(0).toUpperCase() + scanType.slice(1) + ' Scan';
 	}
+
+	let corps = []
+	let pilots = []
+	$: if(data.local){
+		// flatten the list of corps
+		corps = [];
+		data.local.alliances.forEach((alliance) => {
+			let temp = alliance.corporations;
+			temp.forEach((corp)=>(corp.alliance_ticker = alliance.ticker))
+			corps = [...corps, ...temp];
+		});
+		// sort by number
+		corps = corps.sort((a,b) => b.character_count - a.character_count);
+
+		// flatten pilots
+		pilots = [];
+		corps.forEach((corp) => {
+			let temp = corp.characters;
+			temp.forEach((character) => {
+				character.corporation_ticker = corp.ticker;
+				character.alliance_ticker = corp.alliance_ticker;
+			})
+			pilots = [...pilots, ...temp];
+		});
+		// sort alpha
+		pilots = pilots.sort((a,b) => b.name - a.name);
+	}
+
 </script>
 
 <div class="container mx-auto">
@@ -156,6 +187,75 @@
 							<div slot="title" class="flex items-center gap-2">
 								<UsersGroupSolid size="md" />
 								Local
+							</div>
+							<div class=" grid grid-cols-3 gap-2">
+								<div class="col-span-1 border-e-2 border-gray-600">
+									<h1 class="font-bold ms-2 text-xl">Alliances</h1>
+									<div class="col-auto mt-2">
+										{#each data.local?.alliances as alliance }
+											<div
+												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+											>
+												<div class="flex items-center space-x-2 mt-1 rtl:space-x-reverse">
+													<Avatar rounded />
+													<div class="font-medium dark:text-white">
+														<div><span class="text-primary-700 dark:text-primary-400">[{alliance.ticker}]</span> {alliance.name}</div>
+														<div class="text-pink-600 dark:text-pink-400">
+															{alliance.corporation_count} Corporations
+														</div>
+													</div>
+												</div>
+												<div class="text-amber-600 dark:text-amber-400 me-3">
+													{alliance.character_count}
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+								<div class="col-span-1 border-e-2 border-gray-600">
+									<h1 class="font-bold ms-2 text-xl">Corporations</h1>
+									<div class="col-auto mt-2">
+										{#each corps as corp }
+											<div
+												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+											>
+												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
+													<Avatar rounded />
+													<div class="font-medium dark:text-white">
+														<div><span class="text-primary-700 dark:text-primary-400">{"<"+corp.ticker+">"}</span> {corp.name}</div>
+														<div class="text-pink-600 dark:text-pink-400">
+															[{corp.alliance_ticker}]
+														</div>
+													</div>
+												</div>
+												<div class="text-amber-600 dark:text-amber-400 me-2">
+													{corp.character_count}
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+								<div class="col-span-1">
+									<h1 class="font-bold ms-2 text-xl">Pilots</h1>
+									<div class="col-auto mt-2">
+										{#each pilots as pilot }
+											<div
+												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+											>
+												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
+													<Avatar rounded />
+													<div class="font-medium dark:text-white">
+														<div>{pilot.name} <span class="text-primary-700 dark:text-primary-400">{pilot.sec_status}</span></div>
+														<div>
+															<span class="text-pink-600 dark:text-pink-400">[{pilot.alliance_ticker}]</span>
+															<span class="text-amber-600 dark:text-amber-400">{"<"+pilot.corporation_ticker+">"}</span>
+														</div>
+													</div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
 							</div>
 						</TabItem>
 						<TabItem
