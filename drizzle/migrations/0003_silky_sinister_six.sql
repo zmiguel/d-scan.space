@@ -1,1 +1,0 @@
-ALTER TABLE `scans` DROP COLUMN `data`;

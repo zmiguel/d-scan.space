@@ -2,9 +2,12 @@
  * @type {import('drizzle-kit').Config}
  */
 const Config = {
-	out: './drizzle/migrations',
+	dialect: 'postgresql',
+	out: './drizzle',
 	schema: './src/lib/database/schema.js',
-	dialect: 'sqlite'
+	dbCredentials: {
+		url: process.env.DATABASE_URL
+	}
 };
 
 module.exports = Config;

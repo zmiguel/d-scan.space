@@ -1,73 +1,81 @@
-import { sql } from 'drizzle-orm';
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+	pgTable,
+	text,
+	bigint,
+	doublePrecision,
+	timestamp,
+	jsonb,
+	boolean,
+	pgEnum
+} from 'drizzle-orm/pg-core';
 
 // SCANS
 
-export const scans = sqliteTable('scans', {
+export const scanTypesEnum = pgEnum('scanTypes', ['local', 'directional']);
+
+export const scans = pgTable('scans', {
 	id: text().primaryKey(),
-	scan_group_id: text()
+	group_id: text()
 		.notNull()
 		.references(() => scanGroups.id),
-	scan_type: text().notNull(),
+	scan_type: scanTypesEnum().notNull(),
+	data: jsonb().notNull(),
+	raw_data: text().notNull(),
 
-	created_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull()
+	created_at: timestamp().defaultNow().notNull()
 });
 
-export const scanGroups = sqliteTable('scan_groups', {
+export const scanGroups = pgTable('scan_groups', {
 	id: text().primaryKey(),
-	public: integer().notNull().default(0),
-	system: text(),
+	public: boolean().notNull().default(false),
+	system: bigint({ mode: 'number' }).references(() => systems.id),
 
-	created_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull()
+	created_at: timestamp().defaultNow().notNull()
 });
 
-// CHARACTERS, CORPS & ALLIANCES
+// DYNAMIC DATA
 
-export const characters = sqliteTable('characters', {
-	id: integer().primaryKey(),
+export const characters = pgTable('characters', {
+	id: bigint({ mode: 'number' }).primaryKey(),
 	name: text().notNull(),
-	sec_status: real().notNull().default(0),
-	corporation_id: integer()
+	sec_status: doublePrecision().notNull().default(0),
+	corporation_id: bigint({ mode: 'number' })
 		.references(() => corporations.id)
 		.notNull(),
-	alliance_id: integer().references(() => alliances.id),
-	last_seen: integer()
-		.default(sql`(unixepoch())`)
-		.notNull(),
-	created_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull(),
-	updated_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull(),
-	deleted_at: integer()
+	alliance_id: bigint({ mode: 'number' }).references(() => alliances.id),
+	last_seen: timestamp().defaultNow().notNull(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull(),
+	deleted_at: timestamp()
 });
 
-export const corporations = sqliteTable('corporations', {
-	id: integer().primaryKey(),
+export const corporations = pgTable('corporations', {
+	id: bigint({ mode: 'number' }).primaryKey(),
 	name: text().notNull(),
 	ticker: text().notNull(),
-	alliance_id: integer().references(() => alliances.id),
-	created_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull(),
-	updated_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull()
+	alliance_id: bigint({ mode: 'number' }).references(() => alliances.id),
+	last_seen: timestamp().defaultNow().notNull(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull()
 });
 
-export const alliances = sqliteTable('alliances', {
-	id: integer().primaryKey(),
+export const alliances = pgTable('alliances', {
+	id: bigint({ mode: 'number' }).primaryKey(),
 	name: text().notNull(),
 	ticker: text().notNull(),
-	created_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull(),
-	updated_at: integer()
-		.default(sql`(unixepoch())`)
-		.notNull()
+	last_seen: timestamp().defaultNow().notNull(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull()
+});
+
+// STATIC DATA
+
+export const systems = pgTable('systems', {
+	id: bigint({ mode: 'number' }).primaryKey(),
+	name: text().notNull(),
+	constellation: text().notNull(),
+	region: text().notNull(),
+	sec_status: doublePrecision().notNull(),
+	last_seen: timestamp(),
+	updated_at: timestamp().defaultNow().notNull()
 });
