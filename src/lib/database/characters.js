@@ -58,7 +58,7 @@ export async function addOrUpdateCharactersDB(data) {
 }
 
 export function updateCharactersLastSeen(cf, data) {
-	await db
+	db
 		.update(characters)
 		.set({
 			last_seen: Math.floor(Date.now())

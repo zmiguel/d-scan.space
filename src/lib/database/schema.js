@@ -4,7 +4,7 @@ import {
 	bigint,
 	doublePrecision,
 	timestamp,
-	jsonb,
+	json,
 	boolean,
 	pgEnum
 } from 'drizzle-orm/pg-core';
@@ -19,7 +19,7 @@ export const scans = pgTable('scans', {
 		.notNull()
 		.references(() => scanGroups.id),
 	scan_type: scanTypesEnum().notNull(),
-	data: jsonb().notNull(),
+	data: json().notNull(),
 	raw_data: text().notNull(),
 
 	created_at: timestamp().defaultNow().notNull()

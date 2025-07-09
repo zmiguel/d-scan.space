@@ -21,7 +21,7 @@
 		<Table
 			{items}
 			placeholder="Search by System"
-			filter={(item, searchTerm) => item.system.toLowerCase().includes(searchTerm.toLowerCase())}
+			filter={(item, searchTerm) => item.system?.toLowerCase().includes(searchTerm.toLowerCase())}
 		>
 			<TableHead>
 				<TableHeadCell
@@ -39,7 +39,7 @@
 			<TableBody tableBodyClass="divide-y">
 				<TableBodyRow slot="row" let:item on:click={() => open_item(item)}>
 					<TableBodyCell
-						>{new Date(item.created_at * 1000)
+						>{new Date(item.created_at)
 							.toISOString()
 							.replace('T', ' ')
 							.replace(/\.\d+Z$/, '')}</TableBodyCell

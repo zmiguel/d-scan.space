@@ -3,15 +3,42 @@
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
 
-export async function addOrUpdateCorporations(cf, data) {
-	const corporationsInDB = await getCorporationsByID(cf, data);
+
+async function getCorporationFromESI(id) {
+	const corporationData = await fetch(`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	});
+
+	const corporationInfo = await corporationData.json();
+	corporationInfo.id = id;
+	return corporationInfo;
+}
+
+async function idsToCorporations(ids) {
+	// get all corporations from esi and return them
+	let corporationData = [];
+	const corporationPromises = ids.map(async (id) => {
+		const corporationInfo = await getCorporationFromESI(id);
+		corporationData.push(corporationInfo);
+	});
+
+	await Promise.all(corporationPromises);
+
+	return corporationData;
+}
+
+export async function addOrUpdateCorporations(data) {
+	const corporationsInDB = await getCorporationsByID(data);
 
 	// find missing corporations
 	const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));
 
 	// find outdated corporations
 	const outdatedCorporations = corporationsInDB.filter(
-		(a) => a.updated_at < Math.floor(Date.now() / 1000) - 86400
+		(a) => a.updated_at < Math.floor(Date.now()) - 86400
 	);
 
 	// combine missing and outdated corporations
@@ -21,25 +48,7 @@ export async function addOrUpdateCorporations(cf, data) {
 		return;
 	}
 
-	// fetch missing and outdated corporations using the esi client and by batching them all together
-	// we need to ensure we don't exceed the 1000 calls limit of CF workers,
-	// so we must batch them in batches of 500 corporations
-	const BATCH_SIZE = 100;
-	const batches = [];
-	for (let i = 0; i < corporationsToFetch.length; i += BATCH_SIZE) {
-		const batch = corporationsToFetch.slice(i, i + BATCH_SIZE);
-		batches.push(batch);
-	}
-	const batchPromises = batches.map(async (batch) => {
-		return await cf.esi.idsToCorporations(batch);
-	});
-	const batchResults = await Promise.all(batchPromises);
-	const corporationsBatch = batchResults.reduce((combined, result) => {
-		if (result) {
-			return [...combined, ...result];
-		}
-		return combined;
-	}, []);
+	const corporationData = await idsToCorporations(corporationsToFetch);
 
-	await addOrUpdateCorporationsDB(cf, corporationsBatch);
+	await addOrUpdateCorporationsDB(corporationData);
 }

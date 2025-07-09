@@ -38,7 +38,7 @@
 
 	// Format the timestamp using ISO 8601 format with UTC
 	$: formattedTimestamp = data.created_at
-		? new Date(data.created_at * 1000)
+		? new Date(data.created_at)
 				.toISOString()
 				.replace('T', ' ')
 				.replace(/\.\d+Z$/, '')
@@ -77,7 +77,7 @@
 
 	// Format timestamp for timeline items
 	function formatTimestamp(timestamp) {
-		return new Date(timestamp * 1000)
+		return new Date(timestamp)
 			.toISOString()
 			.replace('T', ' ')
 			.replace(/\.\d+Z$/, '');

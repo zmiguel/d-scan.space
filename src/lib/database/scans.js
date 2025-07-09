@@ -11,32 +11,41 @@ export async function getScanByID(id) {
 			id: scans.id,
 			scan_type: scans.scan_type,
 			created_at: scans.created_at,
+			data: scans.data,
 			system: scanGroups.system
 		})
 		.from(scans)
-		.leftJoin(scanGroups, eq(scanGroups.id, scans.scan_group_id))
+		.leftJoin(scanGroups, eq(scanGroups.id, scans.group_id))
 		.where(eq(scans.id, id));
 }
 
 export async function getScansByGroupID(id) {
-	return await db.select().from(scans).where(eq(scans.scan_group_id, id)).all();
+	return db.select({
+		id: scans.id,
+		scan_type: scans.scan_type,
+		created_at: scans.created_at
+	}).from(scans).where(eq(scans.group_id, id));
 }
 
 export async function createNewScan(data) {
 	const timestamp = Math.floor(Date.now());
 
-	await db.insert(scanGroups).values({
-		id: data.scanGroupId,
-		system: null,
-		public: data.is_public,
-		createdAt: timestamp
-	});
+	await db.transaction(async (tx) => {
+		await tx.insert(scanGroups).values({
+			id: data.scanGroupId,
+			system: null,
+			public: data.is_public,
+			createdAt: timestamp
+		});
 
-	await db.insert(scans).values({
-		id: data.scanId,
-		scan_group_id: data.scanGroupId,
-		scan_type: data.type,
-		createdAt: timestamp
+		await tx.insert(scans).values({
+			id: data.scanId,
+			group_id: data.scanGroupId,
+			scan_type: data.type,
+			data: data.data,
+			raw_data: data.raw_data,
+			createdAt: timestamp
+		});
 	});
 }
 
@@ -45,8 +54,10 @@ export async function updateScan(data) {
 
 	await db.insert(scans).values({
 		id: data.scanId,
-		scan_group_id: data.scanGroupId,
+		group_id: data.scanGroupId,
 		scan_type: data.type,
+		data: data.data,
+		raw_data: data.raw_data,
 		createdAt: timestamp
 	});
 }
@@ -55,7 +66,7 @@ export async function getPublicScans() {
 	return db
 		.select({
 			id: scans.id,
-			group_id: scans.scan_group_id,
+			group_id: scans.group_id,
 			scan_type: scans.scan_type,
 			data: scans.data,
 			raw_data: scans.raw_data,
@@ -63,7 +74,7 @@ export async function getPublicScans() {
 			system: scanGroups.system
 		})
 		.from(scans)
-		.leftJoin(scanGroups, eq(scanGroups.id, scans.scan_group_id))
+		.leftJoin(scanGroups, eq(scanGroups.id, scans.group_id))
 		.where(eq(scanGroups.public, true))
 		.orderBy(scans.created_at, 'desc');
 }

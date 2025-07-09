@@ -1,10 +1,7 @@
 import { getScanByID, getScansByGroupID } from '$lib/database/scans.js';
-import { drizzle } from 'drizzle-orm/d1';
-import { decompressJson } from '$lib/server/compressor.js';
 
-export async function load({ params, platform }) {
+export async function load({ params }) {
 	const { group, scan } = params;
-	const db = drizzle(platform?.env.DB);
 
 	/* We need to find the data for this scan group,
 	 * then find the scan data for this scan and all other scans of the group
@@ -12,15 +9,16 @@ export async function load({ params, platform }) {
 	 * return the data for the page to render
 	 */
 
-	const getScanResult = await getScanByID(db, scan);
+	const getScanResult = await getScanByID(scan);
 	if (!getScanResult) {
 		return {
 			status: 404,
 			body: 'Scan not found'
 		};
 	}
+
 	const thisScan = getScanResult[0];
-	const groupScans = await getScansByGroupID(db, group);
+	const groupScans = await getScansByGroupID(group);
 
 	let localScan;
 	let directionalScan;
@@ -47,12 +45,10 @@ export async function load({ params, platform }) {
 		system: thisScan.system,
 		created_at: thisScan.created_at,
 		local: localScan
-			? await decompressJson(await platform?.env.KV.get(`${group}${localScan.id}`, 'arrayBuffer'))
+			? thisScan.data
 			: null,
 		directional: directionalScan
-			? await decompressJson(
-					await platform?.env.KV.get(`${group}${directionalScan.id}`, 'arrayBuffer')
-				)
+			? thisScan.data
 			: null,
 		related: groupScans,
 		params: {

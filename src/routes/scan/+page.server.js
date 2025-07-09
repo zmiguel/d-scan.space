@@ -2,20 +2,14 @@ import { drizzle } from 'drizzle-orm/d1';
 import ShortUniqueId from 'short-unique-id';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
-import { compressJson } from '$lib/server/compressor.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
-	create: async ({ request, platform }) => {
+	create: async ({ request }) => {
 		const data = await request.formData();
 		const content = /** @type {(string | null)} */ (data.get('scan_content'));
 		const is_public = data.has('is_public');
-		const cf = {
-			db: drizzle(platform?.env.DB),
-			kv: platform?.env.KV,
-			esi: platform?.env.ESI_CLIENT
-		};
 
 		if (!content) {
 			return { status: 400, body: 'No scan content provided' };
@@ -38,7 +32,7 @@ export const actions = {
 		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			result = await createNewLocalScan(cf, lines);
+			result = await createNewLocalScan(lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//
@@ -46,14 +40,14 @@ export const actions = {
 		}
 
 		try {
-			await createNewScan(cf, {
+			await createNewScan({
 				scanGroupId,
 				scanId,
 				is_public,
-				isDirectional
+				type: isDirectional ? 'directional' : 'local',
+				data: result,
+				raw_data: content,
 			});
-
-			await cf.kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
 		} catch (e) {
 			console.error('Failed to store scan data', e);
 			return { status: 500, body: 'Failed to store scan data' };
@@ -65,11 +59,6 @@ export const actions = {
 	update: async ({ request, platform }) => {
 		const data = await request.formData();
 		const content = /** @type {(string | null)} */ (data.get('scan_content'));
-		const cf = {
-			db: drizzle(platform?.env.DB),
-			kv: platform?.env.KV,
-			esi: platform?.env.ESI_CLIENT
-		};
 
 		if (!content) {
 			return { status: 400, body: 'No scan content provided' };
@@ -92,7 +81,7 @@ export const actions = {
 		let result;
 		// LOCAL SCAN
 		if (!isDirectional) {
-			result = await createNewLocalScan(cf, lines);
+			result = await createNewLocalScan(lines);
 		} else {
 			// DIRECTIONAL SCAN
 			//
@@ -100,13 +89,13 @@ export const actions = {
 		}
 
 		try {
-			await updateScan(cf, {
+			await updateScan({
 				scanGroupId,
 				scanId,
-				isDirectional
+				type: isDirectional ? 'directional' : 'local',
+				data: result,
+				raw_data: content,
 			});
-
-			await cf.kv.put(`${scanGroupId}${scanId}`, await compressJson(result));
 		} catch (e) {
 			console.error('Failed to store scan data', e);
 			return { status: 500, body: 'Failed to store scan data' };
