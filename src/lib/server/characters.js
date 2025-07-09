@@ -40,6 +40,7 @@ async function namesToCharacters(names) {
 		});
 
 		if (!response.ok) {
+			const errorText = await response.text();
 			console.error(`Failed to get character ids from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`);
 			return [];
 		}

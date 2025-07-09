@@ -37,7 +37,7 @@ export async function addOrUpdateCharactersDB(data) {
 	const values = data.map(character => ({
 		id: character.id,
 		name: character.name,
-		sec_status: character.sec_status,
+		sec_status: character.security_status,
 		corporation_id: character.corporation_id,
 		alliance_id: character.alliance_id ?? null
 	}));

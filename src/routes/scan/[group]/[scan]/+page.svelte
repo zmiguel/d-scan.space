@@ -257,7 +257,7 @@
 														<div>
 															{pilot.name}
 															<span class="text-primary-700 dark:text-primary-400"
-																>{pilot.sec_status}</span
+																>{pilot.sec_status.toFixed(3)}</span
 															>
 														</div>
 														<div>
