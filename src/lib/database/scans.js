@@ -1,12 +1,12 @@
 /**
  * All DB functions related to scans
  */
-
+import { db } from '$lib/database/client';
 import { scans, scanGroups } from '../database/schema';
 import { eq } from 'drizzle-orm';
 
-export async function getScanByID(db, id) {
-	return await db
+export async function getScanByID(id) {
+	return db
 		.select({
 			id: scans.id,
 			scan_type: scans.scan_type,
@@ -18,52 +18,52 @@ export async function getScanByID(db, id) {
 		.where(eq(scans.id, id));
 }
 
-export async function getScansByGroupID(db, id) {
+export async function getScansByGroupID(id) {
 	return await db.select().from(scans).where(eq(scans.scan_group_id, id)).all();
 }
 
-export async function createNewScan(cf, data) {
-	const timestamp = Math.floor(Date.now() / 1000);
+export async function createNewScan(data) {
+	const timestamp = Math.floor(Date.now());
 
-	await cf.db.insert(scanGroups).values({
+	await db.insert(scanGroups).values({
 		id: data.scanGroupId,
 		system: null,
-		public: data.is_public ? 1 : 0,
+		public: data.is_public,
 		createdAt: timestamp
 	});
 
-	await cf.db.insert(scans).values({
+	await db.insert(scans).values({
 		id: data.scanId,
 		scan_group_id: data.scanGroupId,
-		scan_type: data.isDirectional ? 'directional' : 'local',
+		scan_type: data.type,
 		createdAt: timestamp
 	});
 }
 
-export async function updateScan(cf, data) {
-	const timestamp = Math.floor(Date.now() / 1000);
+export async function updateScan(data) {
+	const timestamp = Math.floor(Date.now());
 
-	await cf.db.insert(scans).values({
+	await db.insert(scans).values({
 		id: data.scanId,
 		scan_group_id: data.scanGroupId,
-		scan_type: data.isDirectional ? 'directional' : 'local',
+		scan_type: data.type,
 		createdAt: timestamp
 	});
 }
 
-export async function getPublicScans(cf) {
-	const db = cf.db;
-	return await db
+export async function getPublicScans() {
+	return db
 		.select({
 			id: scans.id,
 			group_id: scans.scan_group_id,
 			scan_type: scans.scan_type,
+			data: scans.data,
+			raw_data: scans.raw_data,
 			created_at: scans.created_at,
 			system: scanGroups.system
 		})
 		.from(scans)
 		.leftJoin(scanGroups, eq(scanGroups.id, scans.scan_group_id))
-		.where(eq(scanGroups.public, 1))
-		.orderBy(scans.created_at, 'desc')
-		.all();
+		.where(eq(scanGroups.public, true))
+		.orderBy(scans.created_at, 'desc');
 }
