@@ -21,8 +21,6 @@
 	import { onDestroy } from 'svelte';
 	export let data;
 
-	console.log(data);
-
 	// This would come from your data in a real scenario
 	const systemSecurity = 0.8; // Example value
 	const systemName = 'Jita';

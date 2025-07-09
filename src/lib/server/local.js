@@ -42,6 +42,7 @@ async function getCharacters(data) {
 }
 
 export async function createNewLocalScan(data) {
+	data = [...new Set(data)];
 	const allCharacters = await getCharacters(data);
 	updateCharactersLastSeen(allCharacters); // No need for Async here
 
