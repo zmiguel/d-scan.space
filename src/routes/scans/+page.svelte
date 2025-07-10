@@ -10,7 +10,11 @@
 	import { goto } from '$app/navigation';
 
 	let { data } = $props();
-	let items = data.scans;
+	let items = data.scans.map(scan => ({
+		...scan,
+		system: scan.system || 'Unknown' // Ensure system is always defined
+	}));
+	console.log('Scans data:', items);
 
 	function open_item(item) {
 		goto(`/scan/${item.group_id}/${item.id}`);
@@ -49,7 +53,7 @@
 							.replace('T', ' ')
 							.replace(/\.\d+Z$/, '')}</TableBodyCell
 					>
-					<TableBodyCell>{item.system}</TableBodyCell>
+					<TableBodyCell>{item.system ? item.system : 'Unknown'}</TableBodyCell>
 					<TableBodyCell>{item.scan_type}</TableBodyCell>
 					<TableBodyCell>{item.id}</TableBodyCell>
 					<TableBodyCell>{item.group_id}</TableBodyCell>

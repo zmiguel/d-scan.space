@@ -71,8 +71,6 @@ export async function getPublicScans() {
 			id: scans.id,
 			group_id: scans.group_id,
 			scan_type: scans.scan_type,
-			data: scans.data,
-			raw_data: scans.raw_data,
 			created_at: scans.created_at,
 			system: scanGroups.system
 		})
