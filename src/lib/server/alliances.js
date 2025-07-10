@@ -3,14 +3,16 @@
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
 
-
 async function getAllianceFromESI(id) {
-	const allianceData = await fetch(`https://esi.evetech.net/latest/alliances/${id}/?datasource=tranquility`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-	});
+	const allianceData = await fetch(
+		`https://esi.evetech.net/latest/alliances/${id}/?datasource=tranquility`,
+		{
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		}
+	);
 
 	const allianceInfo = await allianceData.json();
 	allianceInfo.id = id;

@@ -20,11 +20,14 @@ export async function getScanByID(id) {
 }
 
 export async function getScansByGroupID(id) {
-	return db.select({
-		id: scans.id,
-		scan_type: scans.scan_type,
-		created_at: scans.created_at
-	}).from(scans).where(eq(scans.group_id, id));
+	return db
+		.select({
+			id: scans.id,
+			scan_type: scans.scan_type,
+			created_at: scans.created_at
+		})
+		.from(scans)
+		.where(eq(scans.group_id, id));
 }
 
 export async function createNewScan(data) {

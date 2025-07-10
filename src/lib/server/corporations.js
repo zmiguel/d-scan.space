@@ -3,14 +3,16 @@
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
 
-
 async function getCorporationFromESI(id) {
-	const corporationData = await fetch(`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-	});
+	const corporationData = await fetch(
+		`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
+		{
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		}
+	);
 
 	const corporationInfo = await corporationData.json();
 	corporationInfo.id = id;

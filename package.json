@@ -19,7 +19,7 @@
 	"devDependencies": {
 		"@popperjs/core": "^2.11.8",
 		"@sveltejs/adapter-node": "^5.2.13",
-		"@sveltejs/kit": "^2.22.3",
+		"@sveltejs/kit": "^2.22.4",
 		"@sveltejs/vite-plugin-svelte": "^4.0.4",
 		"@types/eslint": "9.6.1",
 		"@types/pg": "^8.15.4",

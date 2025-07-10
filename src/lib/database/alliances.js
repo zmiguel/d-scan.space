@@ -6,10 +6,7 @@ import { alliances } from '$lib/database/schema';
 import { inArray, sql } from 'drizzle-orm';
 
 export async function getAlliancesByID(ids) {
-	return db
-		.select()
-		.from(alliances)
-		.where(inArray(alliances.id, ids));
+	return db.select().from(alliances).where(inArray(alliances.id, ids));
 }
 
 export async function addOrUpdateAlliancesDB(data) {
@@ -18,7 +15,7 @@ export async function addOrUpdateAlliancesDB(data) {
 		return;
 	}
 
-	const values = data.map(alliance => ({
+	const values = data.map((alliance) => ({
 		id: alliance.id,
 		name: alliance.name,
 		ticker: alliance.ticker

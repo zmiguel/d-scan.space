@@ -1,4 +1,3 @@
-import { drizzle } from 'drizzle-orm/d1';
 import ShortUniqueId from 'short-unique-id';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
@@ -46,7 +45,7 @@ export const actions = {
 				is_public,
 				type: isDirectional ? 'directional' : 'local',
 				data: result,
-				raw_data: content,
+				raw_data: content
 			});
 		} catch (e) {
 			console.error('Failed to store scan data', e);
@@ -56,7 +55,7 @@ export const actions = {
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 	},
 
-	update: async ({ request, platform }) => {
+	update: async ({ request }) => {
 		const data = await request.formData();
 		const content = /** @type {(string | null)} */ (data.get('scan_content'));
 
@@ -94,7 +93,7 @@ export const actions = {
 				scanId,
 				type: isDirectional ? 'directional' : 'local',
 				data: result,
-				raw_data: content,
+				raw_data: content
 			});
 		} catch (e) {
 			console.error('Failed to store scan data', e);

@@ -6,7 +6,6 @@ import { characters, corporations, alliances } from '../database/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
-
 	return db
 		.select({
 			id: characters.id,
@@ -25,7 +24,6 @@ export async function getCharactersByName(names) {
 		.leftJoin(corporations, eq(characters.corporation_id, corporations.id))
 		.leftJoin(alliances, eq(characters.alliance_id, alliances.id))
 		.where(inArray(characters.name, names));
-
 }
 
 export async function addOrUpdateCharactersDB(data) {
@@ -34,7 +32,7 @@ export async function addOrUpdateCharactersDB(data) {
 		return;
 	}
 
-	const values = data.map(character => ({
+	const values = data.map((character) => ({
 		id: character.id,
 		name: character.name,
 		sec_status: character.security_status,
@@ -58,8 +56,7 @@ export async function addOrUpdateCharactersDB(data) {
 }
 
 export function updateCharactersLastSeen(cf, data) {
-	db
-		.update(characters)
+	db.update(characters)
 		.set({
 			last_seen: Math.floor(Date.now())
 		})

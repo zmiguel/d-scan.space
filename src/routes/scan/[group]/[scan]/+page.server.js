@@ -44,12 +44,8 @@ export async function load({ params }) {
 	return {
 		system: thisScan.system,
 		created_at: thisScan.created_at,
-		local: localScan
-			? thisScan.data
-			: null,
-		directional: directionalScan
-			? thisScan.data
-			: null,
+		local: localScan ? thisScan.data : null,
+		directional: directionalScan ? thisScan.data : null,
 		related: groupScans,
 		params: {
 			group: group,
