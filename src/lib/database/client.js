@@ -2,8 +2,11 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { env } from '$env/dynamic/private';
 
-export const db = drizzle(env.DATABASE_URL);
+export const db = drizzle(env.BUILD ? '' : env.DATABASE_URL);
 
-await migrate(db, {
-	migrationsFolder: './drizzle',
-});
+if(!env.BUILD){
+	await migrate(db, {
+		migrationsFolder: './drizzle',
+	});
+}
+
