@@ -15,7 +15,7 @@ COPY drizzle drizzle/
 COPY drizzle.config.js .
 COPY startup.sh /app/startup.sh
 RUN chmod +x /app/startup.sh
-RUN npm i drizzle-kit
+RUN npm i drizzle-kit pg
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
