@@ -4,13 +4,14 @@
 	import { Spinner } from 'flowbite-svelte';
 	import { enhance } from '$app/forms';
 
-	let isLoading = false;
+	let isLoading = $state(false);
+
 	function handleSubmit() {
 		isLoading = true;
-	}
-
-	function handleComplete() {
-		isLoading = false;
+		return async ({ update }) => {
+			await update();
+			isLoading = false;
+		};
 	}
 </script>
 
@@ -33,10 +34,8 @@
 		<div class="container mx-auto">
 			<form
 				method="POST"
-				use:enhance
-				action="/scan"
-				onsubmit={handleSubmit}
-				onreset={handleComplete}
+				action="/scan?/create"
+				use:enhance={handleSubmit}
 			>
 				<Label for="textarea-id" class="mb-2"
 					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
@@ -54,7 +53,7 @@
 					>Make this Scan public on the site.</Toggle
 				>
 
-				<Button class="mt-4 w-full" color="primary" type="submit" formaction="/scan?/create"
+				<Button class="mt-4 w-full" color="primary" type="submit"
 					>Process</Button
 				>
 			</form>
