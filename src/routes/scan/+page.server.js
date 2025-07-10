@@ -53,6 +53,7 @@ export const actions = {
 			return { status: 500, body: 'Failed to store scan data' };
 		}
 
+		console.log(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 	},
 
@@ -102,6 +103,7 @@ export const actions = {
 			return { status: 500, body: 'Failed to store scan data' };
 		}
 
+		console.log(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
 		return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 	}
 };

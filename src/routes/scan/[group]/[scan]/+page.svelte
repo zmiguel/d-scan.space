@@ -164,6 +164,10 @@
 	);
 </script>
 
+<svelte:head>
+	<title>Scan {data.params.scan} | D-Scan Space!</title>
+</svelte:head>
+
 <div class="container mx-auto">
 	<div class="grid grid-cols-12 gap-4">
 		<!-- Main content area (80-85% width) -->

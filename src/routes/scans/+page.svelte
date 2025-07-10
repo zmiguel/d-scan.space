@@ -14,7 +14,6 @@
 		...scan,
 		system: scan.system || 'Unknown' // Ensure system is always defined
 	}));
-	console.log('Scans data:', items);
 
 	function open_item(item) {
 		goto(`/scan/${item.group_id}/${item.id}`);
@@ -24,6 +23,10 @@
 		return () => open_item(item);
 	}
 </script>
+
+<svelte:head>
+	<title>Public Scans | D-Scan Space!</title>
+</svelte:head>
 
 <div class="container mx-auto">
 	<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded min-h-[500px]">
