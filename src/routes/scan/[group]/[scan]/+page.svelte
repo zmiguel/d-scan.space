@@ -194,13 +194,17 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-2 mt-1 rtl:space-x-reverse">
-													<Avatar rounded />
+													<Avatar rounded src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"/>
 													<div class="font-medium dark:text-white">
 														<div>
-															<span class="text-primary-700 dark:text-primary-400"
-																>[{alliance.ticker}]</span
-															>
-															{alliance.name}
+															{#if alliance.ticker}
+																<span class="text-primary-700 dark:text-primary-400"
+																	>[{alliance.ticker}]</span
+																>
+																{alliance.name}
+															{:else}
+																<span class="italic">No Alliance</span>
+															{/if}
 														</div>
 														<div class="text-pink-600 dark:text-pink-400">
 															{alliance.corporation_count} Corporations
@@ -222,7 +226,7 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
-													<Avatar rounded />
+													<Avatar rounded src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"/>
 													<div class="font-medium dark:text-white">
 														<div>
 															<span class="text-primary-700 dark:text-primary-400"
@@ -230,9 +234,11 @@
 															>
 															{corp.name}
 														</div>
-														<div class="text-pink-600 dark:text-pink-400">
-															[{corp.alliance_ticker}]
-														</div>
+														{#if corp.alliance_ticker}
+															<div class="text-pink-600 dark:text-pink-400">
+																	[{corp.alliance_ticker}]
+															</div>
+														{/if}
 													</div>
 												</div>
 												<div class="text-amber-600 dark:text-amber-400 me-2">
@@ -250,7 +256,7 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
-													<Avatar rounded />
+													<Avatar rounded src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"/>
 													<div class="font-medium dark:text-white">
 														<div>
 															{pilot.name}
