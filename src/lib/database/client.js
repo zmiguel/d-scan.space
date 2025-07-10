@@ -4,4 +4,6 @@ import { env } from '$env/dynamic/private';
 
 export const db = drizzle(env.DATABASE_URL);
 
-await migrate(db);
+await migrate(db, {
+	migrationsFolder: './drizzle',
+});
