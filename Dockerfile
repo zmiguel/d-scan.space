@@ -11,10 +11,11 @@ FROM node:24-alpine
 WORKDIR /app
 COPY --from=builder /app/build build/
 COPY package.json .
-COPY drizzle .
+COPY drizzle drizzle/
 COPY drizzle.config.js .
-COPY startup.sh .
-RUN chmod +x startup.sh
+COPY startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
+RUN npm i drizzle-kit
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
