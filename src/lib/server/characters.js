@@ -24,7 +24,7 @@ async function getCharacterFromESI(id) {
 
 async function namesToCharacters(names) {
 	// Split names into batches of 250
-	const batchSize = 250;
+	const batchSize = 50;
 	const batches = [];
 	for (let i = 0; i < names.length; i += batchSize) {
 		batches.push(names.slice(i, i + batchSize));
