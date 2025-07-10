@@ -15,6 +15,10 @@
 	function open_item(item) {
 		goto(`/scan/${item.group_id}/${item.id}`);
 	}
+
+	function handleRowClick(item) {
+		return () => open_item(item);
+	}
 </script>
 
 <div class="container mx-auto">
@@ -38,7 +42,7 @@
 				<TableHeadCell>Group ID</TableHeadCell>
 			</TableHead>
 			<TableBody tableBodyClass="divide-y">
-				<TableBodyRow slot="row" let:item onclick={() => open_item(item)}>
+				<TableBodyRow slot="row" let:item onclick={handleRowClick(item)}>
 					<TableBodyCell
 						>{new Date(item.created_at)
 							.toISOString()

@@ -90,10 +90,10 @@
 	function handleSubmit() {
 		isLoading = true;
 		formError = '';
-	}
-
-	function handleComplete() {
-		isLoading = false;
+		return async ({ update }) => {
+			await update();
+			isLoading = false;
+		};
 	}
 
 	// Reset loading state when component is destroyed or page changes
@@ -381,10 +381,8 @@
 					<form
 						id="update-scan-form"
 						method="POST"
-						use:enhance
-						onsubmit={handleSubmit}
-						onreset={handleComplete}
-						action="/scan"
+						action="/scan?/update"
+						use:enhance={handleSubmit}
 					>
 						<!-- Hidden input for scan group -->
 						<input type="hidden" name="scan_group" value={data.params.group} />
@@ -404,7 +402,6 @@
 							class="w-full text-sm"
 							color="primary"
 							type="submit"
-							formaction="/scan?/update"
 							size="sm"
 						>
 							Update
