@@ -110,7 +110,7 @@
 			pilots = [...pilots, ...temp];
 		});
 		// sort alpha
-		pilots = pilots.sort((a, b) => b.name - a.name);
+		pilots = pilots.sort((a, b) => a.name.localeCompare(b.name));
 	}
 </script>
 
