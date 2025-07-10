@@ -18,4 +18,4 @@ RUN chmod +x startup.sh
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
-CMD ["/startup.sh"]
+CMD ["/app/startup.sh"]
