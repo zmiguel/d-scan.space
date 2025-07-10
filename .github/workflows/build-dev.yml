@@ -149,18 +149,15 @@ jobs:
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
-        id: manifest
 
-      # Get manifest digest for signing
-      - name: Get manifest digest
-        run: |
-          DIGEST=$(docker buildx imagetools inspect ${{ steps.meta.outputs.tags }} --format '{{.Manifest.Digest}}')
-          echo "DIGEST=$DIGEST" >> $GITHUB_OUTPUT
-        id: digest
+          # Get the digest of the created manifest
+          DIGEST=$(docker buildx imagetools inspect ${{ steps.meta.outputs.tags }} --raw | sha256sum | cut -d' ' -f1)
+          echo "DIGEST=sha256:$DIGEST" >> $GITHUB_OUTPUT
+        id: manifest
 
       # Sign the multi-platform manifest
       - name: Sign the multi-platform manifest
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.digest.outputs.DIGEST }}
+          DIGEST: ${{ steps.manifest.outputs.DIGEST }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
