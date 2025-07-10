@@ -3,7 +3,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ENV DATABASE_URL=postgres://
 RUN npm run build
 RUN npm prune --production
 
