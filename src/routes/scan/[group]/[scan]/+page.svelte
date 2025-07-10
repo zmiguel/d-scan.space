@@ -19,7 +19,45 @@
 	} from 'flowbite-svelte-icons';
 	import { enhance } from '$app/forms';
 	import { onDestroy } from 'svelte';
-	export let data;
+
+	// Define the expected structure for data
+	/**
+	 * @typedef {Object} Alliance
+	 * @property {number} id
+	 * @property {string} ticker
+	 * @property {string} name
+	 * @property {number} corporation_count
+	 * @property {number} character_count
+	 * @property {Array<Corporation>} corporations
+	 *
+	 * @typedef {Object} Corporation
+	 * @property {number} id
+	 * @property {string} ticker
+	 * @property {string} name
+	 * @property {number} character_count
+	 * @property {Array<Character>} characters
+	 * @property {string} [alliance_ticker]
+	 *
+	 * @typedef {Object} Character
+	 * @property {number} id
+	 * @property {string} name
+	 * @property {number} sec_status
+	 * @property {string} corporation_ticker
+	 * @property {string} alliance_ticker
+	 *
+	 * @typedef {Object} Local
+	 * @property {Array<Alliance>} alliances
+	 *
+	 * @typedef {Object} Data
+	 * @property {Local} [local]
+	 * @property {any} [related]
+	 * @property {any} [created_at]
+	 * @property {any} [params]
+	 * @property {any} [system]
+	 */
+
+	/** @type {{ data: Data }} */
+	let { data } = $props();
 
 	// This would come from your data in a real scenario
 	const systemSecurity = 0.8; // Example value
@@ -35,17 +73,19 @@
 	}
 
 	// Format the timestamp using ISO 8601 format with UTC
-	$: formattedTimestamp = data.created_at
-		? new Date(data.created_at)
-				.toISOString()
-				.replace('T', ' ')
-				.replace(/\.\d+Z$/, '')
-		: '';
+	const formattedTimestamp = $derived(
+		data.created_at
+			? new Date(data.created_at)
+					.toISOString()
+					.replace('T', ' ')
+					.replace(/\.\d+Z$/, '')
+			: ''
+	);
 	// This converts "2025-06-15T14:30:00.000Z" to "2025-06-15 14:30:00 UTC"
 
 	// For the sidebar form
-	let isLoading = false;
-	let formError = '';
+	let isLoading = $state(false);
+	let formError = $state('');
 
 	function handleSubmit() {
 		isLoading = true;
@@ -63,15 +103,22 @@
 	});
 
 	// Reset loading state when page data changes (e.g., after navigation)
-	$: if (data && data.params) {
-		isLoading = false;
-		formError = '';
-	}
+	$effect(() => {
+		if (data && data.params) {
+			isLoading = false;
+			formError = '';
+		}
+	});
 
 	// Sort related scans by created_at in descending order (newest first)
-	$: sortedRelatedScans = data.related
-		? [...data.related].sort((a, b) => b.created_at - a.created_at)
-		: [];
+	const sortedRelatedScans = $derived(
+		data.related
+			? [...data.related].sort(
+					(a, b) =>
+						new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+			  )
+			: []
+	);
 
 	// Format timestamp for timeline items
 	function formatTimestamp(timestamp) {
@@ -86,32 +133,35 @@
 		return scanType.charAt(0).toUpperCase() + scanType.slice(1) + ' Scan';
 	}
 
-	let corps = [];
-	let pilots = [];
-	$: if (data.local) {
-		// flatten the list of corps
-		corps = [];
-		data.local.alliances.forEach((alliance) => {
-			let temp = alliance.corporations;
-			temp.forEach((corp) => (corp.alliance_ticker = alliance.ticker));
-			corps = [...corps, ...temp];
-		});
-		// sort by number
-		corps = corps.sort((a, b) => b.character_count - a.character_count);
-
-		// flatten pilots
-		pilots = [];
-		corps.forEach((corp) => {
-			let temp = corp.characters;
-			temp.forEach((character) => {
-				character.corporation_ticker = corp.ticker;
-				character.alliance_ticker = corp.alliance_ticker;
+	// Derive corps and pilots from data to avoid reactive loops
+	const corps = $derived(
+		!data.local || !Array.isArray(data.local.alliances) ? [] : (() => {
+			let allCorps = [];
+			data.local.alliances.forEach((alliance) => {
+				let temp = alliance.corporations;
+				temp.forEach((corp) => (corp.alliance_ticker = alliance.ticker));
+				allCorps = [...allCorps, ...temp];
 			});
-			pilots = [...pilots, ...temp];
-		});
-		// sort alpha
-		pilots = pilots.sort((a, b) => a.name.localeCompare(b.name));
-	}
+			// sort by number
+			return allCorps.sort((a, b) => b.character_count - a.character_count);
+		})()
+	);
+
+	const pilots = $derived(
+		!corps || corps.length === 0 ? [] : (() => {
+			let allPilots = [];
+			corps.forEach((corp) => {
+				let temp = corp.characters;
+				temp.forEach((character) => {
+					character.corporation_ticker = corp.ticker;
+					character.alliance_ticker = corp.alliance_ticker;
+				});
+				allPilots = [...allPilots, ...temp];
+			});
+			// sort alpha
+			return allPilots.sort((a, b) => a.name.localeCompare(b.name));
+		})()
+	);
 </script>
 
 <div class="container mx-auto">
@@ -189,7 +239,7 @@
 								<div class="col-span-1 border-e-2 border-gray-600">
 									<h1 class="font-bold ms-2 text-xl">Alliances</h1>
 									<div class="col-auto mt-2">
-										{#each data.local?.alliances as alliance}
+										{#each data.local?.alliances ?? [] as alliance}
 											<div
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
@@ -332,8 +382,8 @@
 						id="update-scan-form"
 						method="POST"
 						use:enhance
-						on:submit={handleSubmit}
-						on:reset={handleComplete}
+						onsubmit={handleSubmit}
+						onreset={handleComplete}
 						action="/scan"
 					>
 						<!-- Hidden input for scan group -->
@@ -342,7 +392,7 @@
 						<Textarea
 							id="scan-content"
 							placeholder="Paste your data"
-							rows="4"
+							rows={4}
 							name="scan_content"
 							required
 							class="text-sm mb-2"
@@ -374,7 +424,7 @@
 								date={`${formatTimestamp(scan.created_at)}`}
 								classLi="mb-2"
 							>
-								<svelte:fragment slot="icon">
+								{#snippet icon()}
 									<span
 										class="flex absolute -start-3 justify-center items-center w-6 h-6 bg-primary-200 rounded-full dark:bg-primary-900"
 									>
@@ -384,7 +434,7 @@
 											<RocketSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
 										{/if}
 									</span>
-								</svelte:fragment>
+								{/snippet}
 							</HtmlTimelineItem>
 						{/each}
 					</Timeline>

@@ -39,8 +39,7 @@ async function namesToCharacters(names) {
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(batch),
-				timeout: 60000
+				body: JSON.stringify(batch)
 			}
 		);
 

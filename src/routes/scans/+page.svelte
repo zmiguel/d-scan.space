@@ -8,7 +8,8 @@
 		TableHeadCell
 	} from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
-	export let data;
+
+	let { data } = $props();
 	let items = data.scans;
 
 	function open_item(item) {
@@ -37,7 +38,7 @@
 				<TableHeadCell>Group ID</TableHeadCell>
 			</TableHead>
 			<TableBody tableBodyClass="divide-y">
-				<TableBodyRow slot="row" let:item on:click={() => open_item(item)}>
+				<TableBodyRow slot="row" let:item onclick={() => open_item(item)}>
 					<TableBodyCell
 						>{new Date(item.created_at)
 							.toISOString()

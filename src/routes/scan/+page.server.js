@@ -22,6 +22,7 @@ export const actions = {
 		//  - Directional scans start with numbers and have 3 tabs per line
 		const isDirectional = lines.every((line) => {
 			const parts = line.split('\t');
+			// @ts-ignore
 			return parts.length === 4 && !isNaN(parts[0]);
 		});
 
@@ -71,6 +72,7 @@ export const actions = {
 		//  - Directional scans start with numbers and have 3 tabs per line
 		const isDirectional = lines.every((line) => {
 			const parts = line.split('\t');
+			// @ts-ignore
 			return parts.length === 4 && !isNaN(parts[0]);
 		});
 

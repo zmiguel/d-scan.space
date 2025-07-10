@@ -40,7 +40,7 @@ export async function addOrUpdateCorporations(data) {
 
 	// find outdated corporations
 	const outdatedCorporations = corporationsInDB.filter(
-		(a) => a.updated_at < Math.floor(Date.now()) - 86400
+		(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000 // 24 hours
 	);
 
 	// combine missing and outdated corporations

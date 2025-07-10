@@ -3,7 +3,7 @@
  */
 import { db } from '$lib/database/client';
 import { scans, scanGroups } from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export async function getScanByID(id) {
 	return db
@@ -31,14 +31,14 @@ export async function getScansByGroupID(id) {
 }
 
 export async function createNewScan(data) {
-	const timestamp = Math.floor(Date.now());
+	const timestamp = new Date();
 
 	await db.transaction(async (tx) => {
 		await tx.insert(scanGroups).values({
 			id: data.scanGroupId,
 			system: null,
 			public: data.is_public,
-			createdAt: timestamp
+			created_at: timestamp
 		});
 
 		await tx.insert(scans).values({
@@ -47,13 +47,13 @@ export async function createNewScan(data) {
 			scan_type: data.type,
 			data: data.data,
 			raw_data: data.raw_data,
-			createdAt: timestamp
+			created_at: timestamp
 		});
 	});
 }
 
 export async function updateScan(data) {
-	const timestamp = Math.floor(Date.now());
+	const timestamp = new Date();
 
 	await db.insert(scans).values({
 		id: data.scanId,
@@ -61,7 +61,7 @@ export async function updateScan(data) {
 		scan_type: data.type,
 		data: data.data,
 		raw_data: data.raw_data,
-		createdAt: timestamp
+		created_at: timestamp
 	});
 }
 
@@ -79,5 +79,5 @@ export async function getPublicScans() {
 		.from(scans)
 		.leftJoin(scanGroups, eq(scanGroups.id, scans.group_id))
 		.where(eq(scanGroups.public, true))
-		.orderBy(scans.created_at, 'desc');
+		.orderBy(desc(scans.created_at));
 }

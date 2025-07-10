@@ -35,8 +35,8 @@
 				method="POST"
 				use:enhance
 				action="/scan"
-				on:submit={handleSubmit}
-				on:reset={handleComplete}
+				onsubmit={handleSubmit}
+				onreset={handleComplete}
 			>
 				<Label for="textarea-id" class="mb-2"
 					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
@@ -45,7 +45,7 @@
 				<Textarea
 					id="textarea-id"
 					placeholder="Paste your data"
-					rows="16"
+					rows={16}
 					name="scan_content"
 					required
 				/>

@@ -11,10 +11,10 @@ async function getCharacters(data) {
 
 	const missingCharacters = await data.filter((l) => !charactersInDB.some((c) => c.name === l));
 	const outdatedCharacters = await charactersInDB.filter(
-		(c) => c.updated_at < Math.floor(Date.now() / 1000) - 86400
+		(c) => (typeof c.updated_at === 'number' ? c.updated_at : Math.floor(new Date(c.updated_at).getTime() / 1000)) < Math.floor(Date.now() / 1000) - 86400
 	);
 	const goodCharacters = await charactersInDB.filter(
-		(c) => c.updated_at >= Math.floor(Date.now() / 1000) - 86400
+		(c) => (typeof c.updated_at === 'number' ? c.updated_at : Math.floor(new Date(c.updated_at).getTime() / 1000)) >= Math.floor(Date.now() / 1000) - 86400
 	);
 
 	console.log(
@@ -75,6 +75,7 @@ export async function createNewLocalScan(data) {
 	 *  ],
 	 */
 
+	/** @type {{ alliances: Array<any> }} */
 	const formattedData = {
 		alliances: []
 	};

@@ -55,10 +55,10 @@ export async function addOrUpdateCharactersDB(data) {
 		});
 }
 
-export function updateCharactersLastSeen(cf, data) {
+export function updateCharactersLastSeen(data) {
 	db.update(characters)
 		.set({
-			last_seen: Math.floor(Date.now())
+			last_seen: new Date()
 		})
 		.where(inArray(characters.id, data));
 }
