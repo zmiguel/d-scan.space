@@ -30,7 +30,7 @@
 		"eslint-plugin-svelte": "^2.46.1",
 		"espree": "^10.4.0",
 		"flowbite": "^2.5.2",
-		"flowbite-svelte": "^0.47.4",
+		"flowbite-svelte": "^1.10.7",
 		"flowbite-svelte-icons": "^2.2.1",
 		"pg": "^8.16.3",
 		"postcss": "^8.5.6",
