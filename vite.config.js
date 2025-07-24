@@ -5,8 +5,5 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}']
-	},
-    ssr: {
-        noExternal: ['node-cron'] // Force bundling of problematic packages
-    },
+	}
 });
