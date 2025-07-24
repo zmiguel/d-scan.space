@@ -40,7 +40,7 @@
 		"svelte": "^5.36.15",
 		"svelte-check": "^4.3.0",
 		"tailwind-merge": "^3.3.1",
-		"tailwindcss": "^3.4.17",
+		"tailwindcss": "^4.1.11",
 		"typescript": "^5.8.3",
 		"vite": "^5.4.19",
 		"vitest": "^3.2.4",
