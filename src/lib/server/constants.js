@@ -1,5 +1,6 @@
-import { version } from "../../../package.json"
+import pkg from "../../../package.json" with { type: "json" };
 import { env } from '$env/dynamic/private';
 
+const version = pkg.version;
 export const DOOMHEIM_ID = 1000001;
 export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV + ";"}${env.AGENT})`
