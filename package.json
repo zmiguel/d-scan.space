@@ -32,6 +32,7 @@
 		"flowbite": "^2.5.2",
 		"flowbite-svelte": "^0.47.4",
 		"flowbite-svelte-icons": "^2.2.1",
+		"node-cron": "^4.2.1",
 		"pg": "^8.16.3",
 		"postcss": "^8.5.6",
 		"prettier": "^3.6.2",

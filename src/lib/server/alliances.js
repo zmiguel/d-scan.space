@@ -2,6 +2,7 @@
  *  Functions related to alliances
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
+import { USER_AGENT } from './constants';
 
 async function getAllianceFromESI(id) {
 	const allianceData = await fetch(
@@ -9,7 +10,8 @@ async function getAllianceFromESI(id) {
 		{
 			method: 'GET',
 			headers: {
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
+				'User-Agent': USER_AGENT
 			}
 		}
 	);
@@ -19,7 +21,7 @@ async function getAllianceFromESI(id) {
 	return allianceInfo;
 }
 
-async function idsToAlliances(ids) {
+export async function idsToAlliances(ids) {
 	// get all alliances from esi and return them
 	let allianceData = [];
 	const alliancePromises = ids.map(async (id) => {

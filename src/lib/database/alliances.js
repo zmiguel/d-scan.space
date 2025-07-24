@@ -9,6 +9,10 @@ export async function getAlliancesByID(ids) {
 	return db.select().from(alliances).where(inArray(alliances.id, ids));
 }
 
+export async function getAllAlliances() {
+	return db.select().from(alliances);
+}
+
 export async function addOrUpdateAlliancesDB(data) {
 	if (!data || data.length === 0) {
 		console.warn('Tried to add alliances from ESI but alliances array was empty');

@@ -9,6 +9,10 @@ export async function getCorporationsByID(ids) {
 	return db.select().from(corporations).where(inArray(corporations.id, ids));
 }
 
+export async function getAllCorporations() {
+	return db.select().from(corporations);
+}
+
 export async function addOrUpdateCorporationsDB(data) {
 	if (!data || data.length === 0) {
 		console.warn('Tried to add corporations from ESI but corporations array was empty');

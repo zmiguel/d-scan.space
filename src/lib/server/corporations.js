@@ -2,6 +2,7 @@
  *  Functions related to corporations
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
+import { USER_AGENT } from './constants';
 
 async function getCorporationFromESI(id) {
 	const corporationData = await fetch(
@@ -9,7 +10,8 @@ async function getCorporationFromESI(id) {
 		{
 			method: 'GET',
 			headers: {
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
+				'User-Agent': USER_AGENT
 			}
 		}
 	);
@@ -19,7 +21,7 @@ async function getCorporationFromESI(id) {
 	return corporationInfo;
 }
 
-async function idsToCorporations(ids) {
+export async function idsToCorporations(ids) {
 	// get all corporations from esi and return them
 	let corporationData = [];
 	const corporationPromises = ids.map(async (id) => {
