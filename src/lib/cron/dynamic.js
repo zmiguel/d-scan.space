@@ -1,7 +1,9 @@
 import { getAllAlliances, addOrUpdateAlliancesDB } from '$lib/database/alliances';
+import { getAllCharacters, addOrUpdateCharactersDB } from '$lib/database/characters';
 import { addOrUpdateCorporationsDB, getAllCorporations } from '$lib/database/corporations';
 import { idsToAlliances } from '$lib/server/alliances';
 import { idsToCorporations } from '$lib/server/corporations';
+import { idsToCharacters } from '$lib/server/characters';
 
 export async function updateDynamicData() {
 	console.info('[DynUpdater] Updating dynamic data...');
@@ -50,6 +52,7 @@ async function updateAllianceData() {
 
 	// Log completion
 	console.info('[DynUpdater] Alliance data update completed.');
+	return true;
 }
 
 async function updateCorporationData() {
@@ -87,8 +90,40 @@ async function updateCorporationData() {
 	await addOrUpdateCorporationsDB(corporationsData);
 
 	console.info('[DynUpdater] Corporation data update completed.');
+	return true;
 }
 
 async function updateCharacterData() {
 	console.info('[DynUpdater] Updating Character data...');
+
+	// Fetch all from the database
+	const allCharacters = await getAllCharacters();
+	if (!allCharacters || allCharacters.length === 0) {
+		console.warn('[DynUpdater] No characters found to update.');
+		return;
+	}
+
+	// Filter by last seen within the last year
+	// and that have have not been updated in the last 24 hours
+	const yearAgo = new Date();
+	yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+	const twentyFourHoursAgo = new Date();
+	twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+	const charactersToUpdate = allCharacters.filter((character) => {
+		const lastSeen = new Date(character.last_seen);
+		const lastUpdated = new Date(character.updated_at);
+		return lastSeen >= yearAgo && lastUpdated <= twentyFourHoursAgo;
+	});
+	// If no characters to update, exit
+	if (charactersToUpdate.length === 0) {
+		console.info('[DynUpdater] No characters to update at this time.');
+		return;
+	}
+	console.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update`);
+	// convert to array of characterIDs
+	const characterIDs = charactersToUpdate.map((character) => character.id);
+	const charactersData = await idsToCharacters(characterIDs);
+	await addOrUpdateCharactersDB(charactersData);
+	console.info('[DynUpdater] Character data update completed.');
+	return true;
 }

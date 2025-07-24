@@ -80,7 +80,7 @@ async function namesToCharacters(names) {
 	return characterData;
 }
 
-async function idsToCharacters(ids) {
+export async function idsToCharacters(ids) {
 	// get all characters from esi and return them
 	let characterData = [];
 	const characterPromises = ids.map(async (id) => {

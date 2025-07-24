@@ -26,6 +26,10 @@ export async function getCharactersByName(names) {
 		.where(inArray(characters.name, names));
 }
 
+export async function getAllCharacters() {
+	return db.select().from(characters);
+}
+
 export async function addOrUpdateCharactersDB(data) {
 	if (!data || data.length === 0) {
 		console.warn('Tried to add characters from ESI but characters array was empty');
