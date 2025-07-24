@@ -2,18 +2,11 @@
  *  Functions related to corporations
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
-import { USER_AGENT } from './constants';
+import { fetchGET } from './wrappers.js';
 
 async function getCorporationFromESI(id) {
-	const corporationData = await fetch(
-		`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				'User-Agent': USER_AGENT
-			}
-		}
+	const corporationData = await fetchGET(
+		`https://esi.evetech.net/corporations/${id}`
 	);
 
 	const corporationInfo = await corporationData.json();

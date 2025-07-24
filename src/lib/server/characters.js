@@ -4,20 +4,19 @@
 import { addOrUpdateCorporations } from '$lib/server/corporations.js';
 import { addOrUpdateAlliances } from '$lib/server/alliances.js';
 import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/characters.js';
-import { USER_AGENT } from './constants';
+
+import { fetchGET, fetchPOST } from './wrappers.js';
 //import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
-	const characterData = await fetch(
-		`https://esi.evetech.net/latest/characters/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				'User-Agent': USER_AGENT
-			}
-		}
+	const characterData = await fetchGET(
+		`https://esi.evetech.net/characters/${id}`
 	);
+
+	if (!characterData.ok) {
+		console.error(`Failed to fetch character ${id}: ${characterData.statusText}`);
+		return null;
+	}
 
 	const characterInfo = await characterData.json();
 	characterInfo.id = id;
@@ -34,16 +33,9 @@ async function namesToCharacters(names) {
 
 	// Run all batch requests in parallel
 	const batchPromises = batches.map(async (batch) => {
-		const response = await fetch(
-			'https://esi.evetech.net/latest/universe/ids/?datasource=tranquility&language=en',
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'User-Agent': USER_AGENT
-				},
-				body: JSON.stringify(batch)
-			}
+		const response = await fetchPOST(
+			'https://esi.evetech.net/universe/ids',
+			batch
 		);
 
 		if (!response.ok) {

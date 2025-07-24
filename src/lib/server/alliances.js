@@ -2,19 +2,17 @@
  *  Functions related to alliances
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
-import { USER_AGENT } from './constants';
+import { fetchGET } from './wrappers.js';
 
 async function getAllianceFromESI(id) {
-	const allianceData = await fetch(
-		`https://esi.evetech.net/latest/alliances/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				'User-Agent': USER_AGENT
-			}
-		}
+	const allianceData = await fetchGET(
+		`https://esi.evetech.net/alliances/${id}`
 	);
+
+	if (!allianceData.ok) {
+		console.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);
+		return null;
+	}
 
 	const allianceInfo = await allianceData.json();
 	allianceInfo.id = id;
