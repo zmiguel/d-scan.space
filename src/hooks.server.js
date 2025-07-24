@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import { Cron } from 'croner';
 import { updateDynamicData } from '$lib/cron/dynamic';
 import { USER_AGENT } from '$lib/server/constants';
 
@@ -7,7 +7,7 @@ export async function init() {
     console.info("Current User-Agent: " + USER_AGENT);
 
     // update dynamic data once per day, after downtime
-    cron.schedule('30 11 * * *', async () => {
+    new Cron('30 11 * * *', async () => {
         try {
             console.log('[CRON] Updating dynamic data...');
             await updateDynamicData();
