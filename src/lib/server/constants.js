@@ -3,4 +3,4 @@ import { env } from '$env/dynamic/private';
 
 const version = pkg.version;
 export const DOOMHEIM_ID = 1000001;
-export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV + '; '}${env.AGENT})`;
+export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV}; ${env.AGENT}) Node/${process.version} (${process.platform} ${process.arch})`;
