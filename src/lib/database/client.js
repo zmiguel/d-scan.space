@@ -4,9 +4,8 @@ import { env } from '$env/dynamic/private';
 
 export const db = drizzle(env.BUILD ? '' : env.DATABASE_URL);
 
-if(!env.BUILD){
+if (!env.BUILD) {
 	migrate(db, {
-		migrationsFolder: './drizzle',
+		migrationsFolder: './drizzle'
 	});
 }
-

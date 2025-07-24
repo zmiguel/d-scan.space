@@ -114,9 +114,8 @@
 	const sortedRelatedScans = $derived(
 		data.related
 			? [...data.related].sort(
-					(a, b) =>
-						new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-			  )
+					(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+				)
 			: []
 	);
 
@@ -135,32 +134,36 @@
 
 	// Derive corps and pilots from data to avoid reactive loops
 	const corps = $derived(
-		!data.local || !Array.isArray(data.local.alliances) ? [] : (() => {
-			let allCorps = [];
-			data.local.alliances.forEach((alliance) => {
-				let temp = alliance.corporations;
-				temp.forEach((corp) => (corp.alliance_ticker = alliance.ticker));
-				allCorps = [...allCorps, ...temp];
-			});
-			// sort by number
-			return allCorps.sort((a, b) => b.character_count - a.character_count);
-		})()
+		!data.local || !Array.isArray(data.local.alliances)
+			? []
+			: (() => {
+					let allCorps = [];
+					data.local.alliances.forEach((alliance) => {
+						let temp = alliance.corporations;
+						temp.forEach((corp) => (corp.alliance_ticker = alliance.ticker));
+						allCorps = [...allCorps, ...temp];
+					});
+					// sort by number
+					return allCorps.sort((a, b) => b.character_count - a.character_count);
+				})()
 	);
 
 	const pilots = $derived(
-		!corps || corps.length === 0 ? [] : (() => {
-			let allPilots = [];
-			corps.forEach((corp) => {
-				let temp = corp.characters;
-				temp.forEach((character) => {
-					character.corporation_ticker = corp.ticker;
-					character.alliance_ticker = corp.alliance_ticker;
-				});
-				allPilots = [...allPilots, ...temp];
-			});
-			// sort alpha
-			return allPilots.sort((a, b) => a.name.localeCompare(b.name));
-		})()
+		!corps || corps.length === 0
+			? []
+			: (() => {
+					let allPilots = [];
+					corps.forEach((corp) => {
+						let temp = corp.characters;
+						temp.forEach((character) => {
+							character.corporation_ticker = corp.ticker;
+							character.alliance_ticker = corp.alliance_ticker;
+						});
+						allPilots = [...allPilots, ...temp];
+					});
+					// sort alpha
+					return allPilots.sort((a, b) => a.name.localeCompare(b.name));
+				})()
 	);
 </script>
 
@@ -248,7 +251,10 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-2 mt-1 rtl:space-x-reverse">
-													<Avatar rounded src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"/>
+													<Avatar
+														rounded
+														src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
+													/>
 													<div class="font-medium dark:text-white">
 														<div>
 															{#if alliance.ticker}
@@ -280,7 +286,10 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
-													<Avatar rounded src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"/>
+													<Avatar
+														rounded
+														src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"
+													/>
 													<div class="font-medium dark:text-white">
 														<div>
 															<span class="text-primary-700 dark:text-primary-400"
@@ -290,7 +299,7 @@
 														</div>
 														{#if corp.alliance_ticker}
 															<div class="text-pink-600 dark:text-pink-400">
-																	[{corp.alliance_ticker}]
+																[{corp.alliance_ticker}]
 															</div>
 														{/if}
 													</div>
@@ -310,7 +319,10 @@
 												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
 											>
 												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
-													<Avatar rounded src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"/>
+													<Avatar
+														rounded
+														src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"
+													/>
 													<div class="font-medium dark:text-white">
 														<div>
 															{pilot.name}
@@ -402,14 +414,7 @@
 						{#if formError}
 							<div class="text-red-500 text-xs mb-2">{formError}</div>
 						{/if}
-						<Button
-							class="w-full text-sm"
-							color="primary"
-							type="submit"
-							size="sm"
-						>
-							Update
-						</Button>
+						<Button class="w-full text-sm" color="primary" type="submit" size="sm">Update</Button>
 					</form>
 				{/if}
 			</div>

@@ -10,7 +10,7 @@
 	import { goto } from '$app/navigation';
 
 	let { data } = $props();
-	let items = data.scans.map(scan => ({
+	let items = data.scans.map((scan) => ({
 		...scan,
 		system: scan.system || 'Unknown' // Ensure system is always defined
 	}));

@@ -32,11 +32,7 @@
 		</div>
 	{:else}
 		<div class="container mx-auto">
-			<form
-				method="POST"
-				action="/scan?/create"
-				use:enhance={handleSubmit}
-			>
+			<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
 				<Label for="textarea-id" class="mb-2"
 					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
 					<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
@@ -53,9 +49,7 @@
 					>Make this Scan public on the site.</Toggle
 				>
 
-				<Button class="mt-4 w-full" color="primary" type="submit"
-					>Process</Button
-				>
+				<Button class="mt-4 w-full" color="primary" type="submit">Process</Button>
 			</form>
 		</div>
 	{/if}
