@@ -12,8 +12,8 @@ WORKDIR /app
 COPY --from=builder /app/build build/
 COPY --from=builder /app/node_modules node_modules/
 COPY package.json .
-COPY drizzle drizzle/
 COPY instrumentation.mjs .
+COPY drizzle drizzle/
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://

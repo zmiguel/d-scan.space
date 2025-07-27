@@ -3,7 +3,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
-import pkg from 'package.json' with { type: 'json' };
+import pkg from './package.json' with { type: 'json' };
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 
 // Add debugging
