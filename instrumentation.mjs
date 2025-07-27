@@ -3,11 +3,8 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
-import pkg from './package.json' with { type: 'json' };
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
-
-// Add debugging
-console.log('OpenTelemetry instrumentation starting...');
+import pkg from './package.json' with { type: 'json' };
 
 const traceExporter = new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
@@ -49,7 +46,7 @@ const sdk = new NodeSDK({
 try {
     console.info('Starting OpenTelemetry SDK...');
     sdk.start();
-    console.info('OpenTelemetry SDK started successfully');
+    console.info(`OpenTelemetry SDK started successfully\n URL: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`);
 } catch (error) {
     console.error('Failed to start OpenTelemetry SDK:', error);
 }

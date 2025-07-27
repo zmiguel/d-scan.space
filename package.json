@@ -16,6 +16,13 @@
 		"prod": "node build"
 	},
 	"devDependencies": {
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/auto-instrumentations-node": "^0.62.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.203.0",
+		"@opentelemetry/resources": "^2.0.1",
+		"@opentelemetry/sdk-node": "^0.203.0",
+		"@opentelemetry/sdk-trace-node": "^2.0.1",
+		"@opentelemetry/semantic-conventions": "^1.36.0",
 		"@popperjs/core": "^2.11.8",
 		"@sveltejs/adapter-node": "^5.2.13",
 		"@sveltejs/kit": "^2.25.2",
