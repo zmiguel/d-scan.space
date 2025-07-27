@@ -12,8 +12,9 @@ WORKDIR /app
 COPY --from=builder /app/build build/
 COPY package.json .
 COPY drizzle drizzle/
+COPY src/instrumentation.mjs .
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
-CMD [ "node", "build" ]
+CMD [ "node", "--import", "/app/instrumentation.mjs", "build" ]
