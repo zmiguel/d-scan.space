@@ -13,6 +13,7 @@ COPY --from=builder /app/build build/
 COPY package.json .
 COPY drizzle drizzle/
 COPY src/instrumentation.mjs .
+COPY node_modules node_modules/
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
