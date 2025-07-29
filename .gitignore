@@ -11,3 +11,4 @@ vite.config.ts.timestamp-*
 .idea/
 .wrangler/tmp/
 /tools/sde/*
+docker-compose.yaml

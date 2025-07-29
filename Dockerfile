@@ -13,10 +13,9 @@ COPY --from=builder /app/build build/
 COPY --from=builder /app/node_modules node_modules/
 COPY package.json .
 COPY instrumentation.mjs .
-COPY preview.vite.config.js vite.config.js
 COPY drizzle drizzle/
 EXPOSE 4173
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
-CMD [ "npm", "run", "preview" ]
+CMD [ "npm", "run", "prod" ]
