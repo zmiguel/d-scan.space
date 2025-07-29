@@ -16,12 +16,10 @@ const traceExporter = new OTLPTraceExporter({
 // Add error handling for the exporter
 traceExporter.export = ((originalExport) => {
     return function(spans, resultCallback) {
-        console.info(`Attempting to export ${spans.length} spans`);
+        console.info(`Sending ${spans.length} spans`);
         return originalExport.call(this, spans, (result) => {
             if (result.code !== 0) {
-                console.error('Failed to export spans:', result.error);
-            } else {
-                console.info('Successfully exported spans');
+                console.error('Failed to send spans:', result.error);
             }
             resultCallback(result);
         });
@@ -35,7 +33,7 @@ const sdk = new NodeSDK({
     }),
     spanProcessor: new BatchSpanProcessor(traceExporter, {
         // Force faster export for debugging
-        scheduledDelayMillis: 1000,
+        scheduledDelayMillis: 5000,
         exportTimeoutMillis: 30000,
         maxExportBatchSize: 1024,
     }),
