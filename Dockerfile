@@ -14,9 +14,8 @@ COPY --from=builder /app/node_modules node_modules/
 COPY package.json .
 COPY instrumentation.mjs .
 COPY drizzle drizzle/
-EXPOSE 3000
+EXPOSE 4173
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
-ENV NODE_OPTIONS="--import ./instrumentation.mjs"
 CMD [ "npm", "run", "preview" ]
