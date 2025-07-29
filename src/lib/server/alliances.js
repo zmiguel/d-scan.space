@@ -2,9 +2,11 @@
  *  Functions related to alliances
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
+import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 
 async function getAllianceFromESI(id) {
+	// fetchGET has tracing built-in
 	const allianceData = await fetchGET(
 		`https://esi.evetech.net/alliances/${id}`
 	);
@@ -20,16 +22,18 @@ async function getAllianceFromESI(id) {
 }
 
 export async function idsToAlliances(ids) {
-	// get all alliances from esi and return them
-	let allianceData = [];
-	const alliancePromises = ids.map(async (id) => {
-		const allianceInfo = await getAllianceFromESI(id);
-		allianceData.push(allianceInfo);
+	return await withSpan('idsToAlliances', async () => {
+		// get all alliances from esi and return them
+		let allianceData = [];
+		const alliancePromises = ids.map(async (id) => {
+			const allianceInfo = await getAllianceFromESI(id);
+			allianceData.push(allianceInfo);
+		});
+
+		await Promise.all(alliancePromises);
+
+		return allianceData;
 	});
-
-	await Promise.all(alliancePromises);
-
-	return allianceData;
 }
 
 export async function addOrUpdateAlliances(data) {

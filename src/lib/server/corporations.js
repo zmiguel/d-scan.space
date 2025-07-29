@@ -2,9 +2,11 @@
  *  Functions related to corporations
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
+import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 
 async function getCorporationFromESI(id) {
+	// fetchGET has tracing built-in
 	const corporationData = await fetchGET(
 		`https://esi.evetech.net/corporations/${id}`
 	);
@@ -15,16 +17,18 @@ async function getCorporationFromESI(id) {
 }
 
 export async function idsToCorporations(ids) {
-	// get all corporations from esi and return them
-	let corporationData = [];
-	const corporationPromises = ids.map(async (id) => {
-		const corporationInfo = await getCorporationFromESI(id);
-		corporationData.push(corporationInfo);
+	return await withSpan('idsToCorporations', async () => {
+		// get all corporations from esi and return them
+		let corporationData = [];
+		const corporationPromises = ids.map(async (id) => {
+			const corporationInfo = await getCorporationFromESI(id);
+			corporationData.push(corporationInfo);
+		});
+
+		await Promise.all(corporationPromises);
+
+		return corporationData;
 	});
-
-	await Promise.all(corporationPromises);
-
-	return corporationData;
 }
 
 export async function addOrUpdateCorporations(data) {

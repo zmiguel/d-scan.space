@@ -6,6 +6,7 @@ import { addOrUpdateAlliances } from '$lib/server/alliances.js';
 import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/characters.js';
 
 import { fetchGET, fetchPOST } from './wrappers.js';
+import { withSpan } from './tracer.js';
 //import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
@@ -73,16 +74,18 @@ async function namesToCharacters(names) {
 }
 
 export async function idsToCharacters(ids) {
-	// get all characters from esi and return them
-	let characterData = [];
-	const characterPromises = ids.map(async (id) => {
-		const characterInfo = await getCharacterFromESI(id);
-		characterData.push(characterInfo);
+	return await withSpan('idsToCharacters', async () => {
+		// get all characters from esi and return them
+		let characterData = [];
+		const characterPromises = ids.map(async (id) => {
+			const characterInfo = await getCharacterFromESI(id);
+			characterData.push(characterInfo);
+		});
+
+		await Promise.all(characterPromises);
+
+		return characterData;
 	});
-
-	await Promise.all(characterPromises);
-
-	return characterData;
 }
 
 async function addOrUpdateCharacters(data) {

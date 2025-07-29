@@ -2,6 +2,7 @@
  * All DB functions related to corporations
  */
 import { db } from '$lib/database/client';
+import { withSpan } from '$lib/server/tracer';
 import { corporations } from '../database/schema';
 import { inArray, sql } from 'drizzle-orm';
 
@@ -14,28 +15,34 @@ export async function getAllCorporations() {
 }
 
 export async function addOrUpdateCorporationsDB(data) {
-	if (!data || data.length === 0) {
-		console.warn('Tried to add corporations from ESI but corporations array was empty');
-		return;
-	}
+	await withSpan('addOrUpdateCorporationsDB', async (span) => {
+		if (!data || data.length === 0) {
+			console.warn('Tried to add corporations from ESI but corporations array was empty');
+			return;
+		}
 
-	const values = data.map((corporation) => ({
-		id: corporation.id,
-		name: corporation.name,
-		ticker: corporation.ticker,
-		alliance_id: corporation.alliance_id ?? null
-	}));
+		const values = data.map((corporation) => ({
+			id: corporation.id,
+			name: corporation.name,
+			ticker: corporation.ticker,
+			alliance_id: corporation.alliance_id ?? null
+		}));
 
-	await db
-		.insert(corporations)
-		.values(values)
-		.onConflictDoUpdate({
-			target: corporations.id,
-			set: {
-				name: sql`excluded.name`,
-				ticker: sql`excluded.ticker`,
-				alliance_id: sql`excluded.alliance_id`,
-				updated_at: sql`now()`
-			}
+		span.setAttributes({
+			'corporations.data.length': values.length
 		});
+
+		await db
+			.insert(corporations)
+			.values(values)
+			.onConflictDoUpdate({
+				target: corporations.id,
+				set: {
+					name: sql`excluded.name`,
+					ticker: sql`excluded.ticker`,
+					alliance_id: sql`excluded.alliance_id`,
+					updated_at: sql`now()`
+				}
+			});
+	});
 }
