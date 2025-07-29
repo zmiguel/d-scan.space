@@ -18,4 +18,5 @@ EXPOSE 4173
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
+ENV __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS="dev.d-scan.space,d-scan.space,localhost"
 CMD [ "npm", "run", "preview" ]
