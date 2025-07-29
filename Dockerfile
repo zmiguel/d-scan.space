@@ -18,5 +18,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
-ENV NODE_OPTIONS="--import /app/instrumentation.mjs"
+ENV NODE_OPTIONS="--import ./instrumentation.mjs"
 CMD [ "npm", "run", "preview" ]
