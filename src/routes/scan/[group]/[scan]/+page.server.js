@@ -1,4 +1,5 @@
 import { getScanByID, getScansByGroupID } from '$lib/database/scans.js';
+import { addAttributes } from '$lib/server/tracer.js';
 
 export async function load({ params }) {
 	const { group, scan } = params;
@@ -8,6 +9,11 @@ export async function load({ params }) {
 	 * get this scan the scan of the other type before it (local, space)
 	 * return the data for the page to render
 	 */
+
+	addAttributes({
+		'scan.group': group,
+		'scan.id': scan
+	});
 
 	const getScanResult = await getScanByID(scan);
 	if (!getScanResult) {
