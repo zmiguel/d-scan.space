@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" vite dev",
 		"build": "vite build",
 		"preview": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" vite preview --host 0.0.0.0 --port 4173",
 		"prod": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" node build",

@@ -4,7 +4,7 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
-import pkg from './package.json' with { type: 'json' };
+import pkg from './package.json' with { type: 'json' }; // eslint-disable-line
 
 const traceExporter = new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',

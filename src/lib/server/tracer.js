@@ -5,6 +5,19 @@ import pkg from '../../../package.json' with { type: 'json' };
 const tracer = trace.getTracer('d-scan.space', pkg.version);
 
 /**
+ * Check if an error is actually a SvelteKit redirect
+ * @param {any} error - The error/object to check
+ * @returns {boolean} - True if it's a redirect
+ */
+function isRedirect(error) {
+    return error &&
+           typeof error === 'object' &&
+           error.constructor.name === 'Redirect' &&
+           typeof error.status === 'number' &&
+           typeof error.location === 'string';
+}
+
+/**
  * Create and execute a span
  * @param {string} name - The name of the span
  * @param {Function} fn - The function to execute within the span
@@ -29,10 +42,40 @@ export async function withSpan(name, fn, attributes = {}, options = {}) {
         span.setStatus({ code: SpanStatusCode.OK });
         return result;
     } catch (error) {
+        // Check if this is a SvelteKit redirect (not an actual error)
+        if (isRedirect(error)) {
+            // Add redirect information to the span
+            span.setAttributes({
+                'http.response.status_code': error.status,
+                'http.response.redirect.location': error.location,
+                'sveltekit.redirect': true
+            });
+            span.addEvent('redirect', {
+                status: error.status,
+                location: error.location
+            });
+            span.setStatus({ code: SpanStatusCode.OK });
+
+            // Re-throw the redirect to maintain SvelteKit's flow
+            throw error;
+        }
+
+        // Handle actual errors
+        console.error('Error occurred in span:', error);
         span.recordException(error);
         span.setStatus({
             code: SpanStatusCode.ERROR,
             message: error.message,
+        });
+        span.addEvent('error', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code || 'UNKNOWN_ERROR',
+        });
+        span.setAttributes({
+            'error.message': error.message,
+            'error.stack': error.stack,
+            'error.code': error.code || 'UNKNOWN_ERROR',
         });
         throw error;
     } finally {
