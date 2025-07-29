@@ -7,12 +7,12 @@ import { idsToCharacters } from '$lib/server/characters';
 
 export async function updateDynamicData() {
 	console.info('[DynUpdater] Updating dynamic data...');
-	// Update the Alliance data
-	await updateAllianceData();
-	// Update the Corporation data
-	await updateCorporationData();
 	// Update the Character data
 	await updateCharacterData();
+	// Update the Corporation data
+	await updateCorporationData();
+	// Update the Alliance data
+	await updateAllianceData();
 	console.info('[DynUpdater] Dynamic data update completed.');
 	return true;
 }
