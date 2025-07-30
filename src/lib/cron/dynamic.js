@@ -59,6 +59,14 @@ async function updateAllianceData() {
 		const allianceIDs = alliancesToUpdate.map((alliance) => alliance.id);
 		const alliancesData = await idsToAlliances(allianceIDs);
 
+		if (!alliancesData || alliancesData.length === 0) {
+			logger.warn('[DynUpdater] No alliance data fetched from ESI.');
+			span.setAttributes({
+				'cron.task.update_alliances.fetched_data_length': 0
+			});
+			return;
+		}
+
 		await addOrUpdateAlliancesDB(alliancesData);
 
 		// Log completion
@@ -105,6 +113,14 @@ async function updateCorporationData() {
 		// convert to array of corporationIDs
 		const corporationIDs = corporationsToUpdate.map((corporation) => corporation.id);
 		const corporationsData = await idsToCorporations(corporationIDs);
+
+		if (!corporationsData || corporationsData.length === 0) {
+			logger.warn('[DynUpdater] No corporation data fetched from ESI.');
+			span.setAttributes({
+				'cron.task.update_corporations.fetched_data_length': 0
+			});
+			return;
+		}
 
 		// before we can add or update the corps, we need to check if we have alliances for them
 		await withSpan('Fetch Alliances for Corporations', async (span) => {
@@ -176,6 +192,14 @@ async function updateCharacterData() {
 		// convert to array of characterIDs
 		const characterIDs = charactersToUpdate.map((character) => character.id);
 		const charactersData = await idsToCharacters(characterIDs);
+
+		if (!charactersData || charactersData.length === 0) {
+			logger.warn('[DynUpdater] No character data fetched from ESI.');
+			span.setAttributes({
+				'cron.task.update_characters.fetched_data_length': 0
+			});
+			return;
+		}
 
 		// before we can add or update the characters, we need to check if we have alliances for them
 		await withSpan('Fetch Alliances for Characters', async (span) => {

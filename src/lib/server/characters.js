@@ -74,18 +74,34 @@ async function namesToCharacters(names) {
 	return characterData;
 }
 
-export async function idsToCharacters(ids) {
-	return await withSpan('idsToCharacters', async () => {
-		// get all characters from esi and return them
-		let characterData = [];
-		const characterPromises = ids.map(async (id) => {
-			const characterInfo = await getCharacterFromESI(id);
-			characterData.push(characterInfo);
-		});
+export async function idsToCharacters(ids, batchSize = 250) {
+    return await withSpan('idsToCharacters', async () => {
+        // Split ids into batches
+        const batches = [];
+        for (let i = 0; i < ids.length; i += batchSize) {
+            batches.push(ids.slice(i, i + batchSize));
+        }
 
-		await Promise.all(characterPromises);
+        // Process all batches in parallel
+        const batchPromises = batches.map(async (batch) => {
+            const batchData = [];
+            const characterPromises = batch.map(async (id) => {
+                const characterInfo = await getCharacterFromESI(id);
+                batchData.push(characterInfo);
+            });
 
-		return characterData;
+            await Promise.all(characterPromises);
+            return batchData;
+        });
+
+        // Wait for all batches to complete
+        const batchResults = await Promise.all(batchPromises);
+
+        // Flatten the results from all batches
+        return batchResults.flat();
+    },{
+		'idsToCharacters.id.length': ids.length,
+		'idsToCharacters.batchSize': batchSize
 	});
 }
 
