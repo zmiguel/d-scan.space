@@ -202,22 +202,20 @@ async function updateCharacterData() {
 			return;
 		}
 
-		for (const character of charactersData) {
-			// Process each character
-			if (!character) {
-				logger.warn('[DynUpdater] Received an empty character object from ESI.');
-				continue;
-			}
-			if (!character.alliance_id) {
-				logger.warn(`[DynUpdater] Character has no alliance_id.`, { character: character });
-			}
+		// Ensure we have valid character data, an element of charactersData can be null or undefined if the character was deleted
+		// we will deal with deleted characters later, for now we just want to filter out null or undefined values
+		const validCharactersData = charactersData.filter((character) => character !== null && character !== undefined);
+		if (validCharactersData.length === 0) {
+			logger.warn('[DynUpdater] No valid character data fetched from ESI.');
+			span.setAttributes({
+				'cron.task.update_characters.valid_fetched_data_length': 0
+			});
+			return;
 		}
-
-		logger.info(charactersData);
 
 		// before we can add or update the characters, we need to check if we have alliances for them
 		await withSpan('Fetch Alliances for Characters', async (span) => {
-			const allianceIDs = charactersData
+			const allianceIDs = validCharactersData
 				.map((character) => character.alliance_id)
 				.filter((id) => id !== undefined && id !== null);
 
@@ -243,7 +241,7 @@ async function updateCharacterData() {
 
 		// before we can add or update the characters, we need to check if we have corporations for them
 		await withSpan('Fetch Corporations for Characters', async (span) => {
-			const corporationIDs = charactersData
+			const corporationIDs = validCharactersData
 				.map((character) => character.corporation_id)
 				.filter((id) => id !== undefined && id !== null);
 
@@ -268,7 +266,7 @@ async function updateCharacterData() {
 		});
 
 		// Add or update characters in the database
-		await addOrUpdateCharactersDB(charactersData);
+		await addOrUpdateCharactersDB(validCharactersData);
 		logger.info('[DynUpdater] Character data update completed.');
 		return true;
 	}, {
