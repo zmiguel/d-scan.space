@@ -204,12 +204,16 @@ async function updateCharacterData() {
 
 		for (const character of charactersData) {
 			// Process each character
+			if (!character) {
+				logger.warn('[DynUpdater] Received an empty character object from ESI.');
+				continue;
+			}
 			if (!character.alliance_id) {
-				logger.warn(`[DynUpdater] Character ${character.id} has no alliance_id.`);
+				logger.warn(`[DynUpdater] Character has no alliance_id.`, { character: character });
 			}
 		}
 
-		logger.info(JSON.stringify(charactersData));
+		logger.info(charactersData);
 
 		// before we can add or update the characters, we need to check if we have alliances for them
 		await withSpan('Fetch Alliances for Characters', async (span) => {

@@ -32,7 +32,7 @@ export async function fetchGET(url, maxRetries = 3) {
                 }
 
                 span.setAttributes({
-                    'http.response': JSON.stringify({
+                    'http.response': {
                         status: response.status,
                         statusText: response.statusText,
                         headers: Object.fromEntries(response.headers.entries()),
@@ -42,7 +42,7 @@ export async function fetchGET(url, maxRetries = 3) {
                         type: response.type,
                         ok: response.ok,
                         attempt: attempt
-                    })
+                    }
                 });
 
                 // Only set success status here, not error
@@ -100,7 +100,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
                 }
 
                 span.setAttributes({
-                    'http.response': JSON.stringify({
+                    'http.response': {
                         status: response.status,
                         statusText: response.statusText,
                         headers: Object.fromEntries(response.headers.entries()),
@@ -110,7 +110,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
                         type: response.type,
                         ok: response.ok,
                         attempt: attempt
-                    })
+                    }
                 });
 
                 // Only set success status here, not error
