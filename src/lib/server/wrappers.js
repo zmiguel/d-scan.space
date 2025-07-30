@@ -58,8 +58,8 @@ export async function fetchGET(url, maxRetries = 3) {
 
                 // Don't wait after the last attempt
                 if (attempt < maxRetries) {
-                    // Exponential backoff: 1s, 2s, 4s
-                    const delay = Math.pow(2, attempt - 1) * 1000;
+                    // Exponential backoff: 500ms, 1s, 2s
+                    const delay = Math.pow(2, attempt - 1) * 500;
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -126,8 +126,8 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
                 // Don't wait after the last attempt
                 if (attempt < maxRetries) {
-                    // Exponential backoff: 1s, 2s, 4s
-                    const delay = Math.pow(2, attempt - 1) * 1000;
+                    // Exponential backoff: 500ms, 1s, 2s
+                    const delay = Math.pow(2, attempt - 1) * 500;
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }

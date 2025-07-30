@@ -22,6 +22,7 @@ async function getCharacterFromESI(id) {
 
 	const characterInfo = await characterData.json();
 	characterInfo.id = id;
+	delete characterInfo.description;
 	return characterInfo;
 }
 
@@ -84,15 +85,21 @@ export async function idsToCharacters(ids, batchSize = 250) {
 
         // Process all batches in parallel
         const batchPromises = batches.map(async (batch) => {
-            const batchData = [];
-            const characterPromises = batch.map(async (id) => {
-                const characterInfo = await getCharacterFromESI(id);
-                batchData.push(characterInfo);
-            });
+			return await withSpan('idsToCharacters.batch', async () => {
+				const batchData = [];
+				const characterPromises = batch.map(async (id) => {
+					const characterInfo = await getCharacterFromESI(id);
+					batchData.push(characterInfo);
+				});
 
-            await Promise.all(characterPromises);
-            return batchData;
-        });
+				await Promise.all(characterPromises);
+				return batchData;
+			}, {
+				'batch.size': batch.length,
+				'batch.start_id': batch[0],
+				'batch.end_id': batch[batch.length - 1]
+			});
+		});
 
         // Wait for all batches to complete
         const batchResults = await Promise.all(batchPromises);

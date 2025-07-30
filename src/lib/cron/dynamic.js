@@ -6,6 +6,7 @@ import { idsToCorporations } from '$lib/server/corporations';
 import { idsToCharacters } from '$lib/server/characters';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
+import { json } from '@sveltejs/kit';
 
 export async function updateDynamicData() {
 	logger.info('[DynUpdater] Updating dynamic data...');
@@ -200,6 +201,15 @@ async function updateCharacterData() {
 			});
 			return;
 		}
+
+		for (const character of charactersData) {
+			// Process each character
+			if (!character.alliance_id) {
+				logger.warn(`[DynUpdater] Character ${character.id} has no alliance_id.`);
+			}
+		}
+
+		logger.info(JSON.stringify(charactersData));
 
 		// before we can add or update the characters, we need to check if we have alliances for them
 		await withSpan('Fetch Alliances for Characters', async (span) => {
