@@ -13,6 +13,7 @@ COPY --from=builder /app/build build/
 COPY --from=builder /app/node_modules node_modules/
 COPY package.json .
 COPY instrumentation.mjs .
+COPY src/lib/logger.js src/lib/logger.js
 COPY drizzle drizzle/
 EXPOSE 4173
 ENV NODE_ENV=production
