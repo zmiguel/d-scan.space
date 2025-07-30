@@ -2,13 +2,14 @@ import { Cron } from 'croner';
 import { updateDynamicData } from '$lib/cron/dynamic';
 import { USER_AGENT } from '$lib/server/constants';
 import logger from '$lib/logger';
+import { env } from '$env/dynamic/private';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
 	logger.info('Current User-Agent: ' + USER_AGENT);
 
 	// update dynamic data once per day, after downtime
-	new Cron('30 11 * * *', async () => {
+	new Cron(env.DYNAMIC_UPDATE_CRON || '30 11 * * *', async () => {
 		try {
 			logger.info('[CRON] Updating dynamic data...');
 			await updateDynamicData();

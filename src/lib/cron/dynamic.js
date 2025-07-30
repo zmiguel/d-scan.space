@@ -110,7 +110,7 @@ async function updateCorporationData() {
 		await withSpan('Fetch Alliances for Corporations', async (span) => {
 			const allianceIDs = corporationsData
 				.map((corporation) => corporation.alliance_id)
-				.filter((allianceID) => allianceID !== null);
+				.filter((id) => id !== undefined && id !== null);
 
 			// filter out duplicates
 			const uniqueAllianceIDs = [...new Set(allianceIDs)];
@@ -181,7 +181,7 @@ async function updateCharacterData() {
 		await withSpan('Fetch Alliances for Characters', async (span) => {
 			const allianceIDs = charactersData
 				.map((character) => character.alliance_id)
-				.filter((allianceID) => allianceID !== null);
+				.filter((id) => id !== undefined && id !== null);
 
 			// filter out duplicates
 			const uniqueAllianceIDs = [...new Set(allianceIDs)];
@@ -207,7 +207,7 @@ async function updateCharacterData() {
 		await withSpan('Fetch Corporations for Characters', async (span) => {
 			const corporationIDs = charactersData
 				.map((character) => character.corporation_id)
-				.filter((corporationID) => corporationID !== null);
+				.filter((id) => id !== undefined && id !== null);
 
 			// filter out duplicates
 			const uniqueCorporationIDs = [...new Set(corporationIDs)];
