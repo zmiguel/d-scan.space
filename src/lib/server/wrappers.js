@@ -32,7 +32,7 @@ export async function fetchGET(url, maxRetries = 3) {
                 }
 
                 span.setAttributes({
-                    'http.response': {
+                    'http.response': JSON.stringify({
                         status: response.status,
                         statusText: response.statusText,
                         headers: Object.fromEntries(response.headers.entries()),
@@ -42,7 +42,7 @@ export async function fetchGET(url, maxRetries = 3) {
                         type: response.type,
                         ok: response.ok,
                         attempt: attempt
-                    }
+                    })
                 });
 
                 // Only set success status here, not error
@@ -100,7 +100,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
                 }
 
                 span.setAttributes({
-                    'http.response': {
+                    'http.response': JSON.stringify({
                         status: response.status,
                         statusText: response.statusText,
                         headers: Object.fromEntries(response.headers.entries()),
@@ -110,7 +110,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
                         type: response.type,
                         ok: response.ok,
                         attempt: attempt
-                    }
+                    })
                 });
 
                 // Only set success status here, not error
@@ -126,7 +126,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
                 // Don't wait after the last attempt
                 if (attempt < maxRetries) {
-                    // Exponential backoff: 500ms, 1s, 2s
+                    // Exponential backoff: 1s, 2s, 4s
                     const delay = Math.pow(2, attempt - 1) * 500;
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }

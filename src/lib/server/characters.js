@@ -17,6 +17,7 @@ async function getCharacterFromESI(id) {
 
 	if (!characterData.ok) {
 		logger.error(`Failed to fetch character ${id}: ${characterData.statusText}`);
+		// TODO: Handle character not found case (deleted character)
 		return null;
 	}
 

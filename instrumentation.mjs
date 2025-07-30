@@ -14,16 +14,30 @@ const traceExporter = new OTLPTraceExporter({
     },
 });
 
-// Add error handling for the exporter
+// Add error handling for the exporter with retry logic
 traceExporter.export = ((originalExport) => {
     return function(spans, resultCallback) {
         logger.info(`Exporting ${spans.length} spans`);
-        return originalExport.call(this, spans, (result) => {
-            if (result.code !== 0) {
-                logger.error(`Failed to export spans: ${result.error}`);
-            }
-            resultCallback(result);
-        });
+
+        const attemptExport = async (attempt = 1, maxRetries = 3) => {
+            return new Promise((resolve) => {
+                originalExport.call(this, spans, (result) => {
+                    if (result.code !== 0 && attempt < maxRetries) {
+                        logger.warn(`Export attempt ${attempt} failed, retrying... Error: ${result.error}`);
+                        setTimeout(() => {
+                            attemptExport(attempt + 1, maxRetries).then(resolve);
+                        }, Math.pow(2, attempt) * 1000); // Exponential backoff
+                    } else {
+                        if (result.code !== 0) {
+                            logger.error(`Failed to export spans after ${maxRetries} attempts: ${result.error}`);
+                        }
+                        resolve(result);
+                    }
+                });
+            });
+        };
+
+        attemptExport().then(result => resultCallback(result));
     };
 })(traceExporter.export.bind(traceExporter));
 
@@ -34,9 +48,9 @@ const sdk = new NodeSDK({
     }),
     spanProcessor: new BatchSpanProcessor(traceExporter, {
         // Force faster export for debugging
-        scheduledDelayMillis: 1000,
-        exportTimeoutMillis: 60000,
-        maxExportBatchSize: 2048,
+        scheduledDelayMillis: 2500,
+        exportTimeoutMillis: 30000,
+        maxExportBatchSize: 512,
     }),
     instrumentations: [getNodeAutoInstrumentations()],
 });
