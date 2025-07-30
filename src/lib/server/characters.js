@@ -7,6 +7,7 @@ import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/char
 
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
+import logger from '$lib/logger.js';
 //import { DOOMHEIM_ID } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
@@ -15,7 +16,7 @@ async function getCharacterFromESI(id) {
 	);
 
 	if (!characterData.ok) {
-		console.error(`Failed to fetch character ${id}: ${characterData.statusText}`);
+		logger.error(`Failed to fetch character ${id}: ${characterData.statusText}`);
 		return null;
 	}
 
@@ -41,7 +42,7 @@ async function namesToCharacters(names) {
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			console.error(
+			logger.error(
 				`Failed to get character ids from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
 			);
 			return [];
@@ -58,7 +59,7 @@ async function namesToCharacters(names) {
 	const allCharacters = batchResults.flat();
 
 	if (!allCharacters || allCharacters.length === 0) {
-		console.error('Tried to add characters from ESI but charactersIds array was empty');
+		logger.error('Tried to add characters from ESI but charactersIds array was empty');
 		return [];
 	}
 
@@ -115,7 +116,7 @@ async function addOrUpdateCharacters(data) {
 export async function addCharactersFromESI(characters, sanityCheck = false) {
 	// check if characters is empty
 	if (characters.length === 0 || !characters) {
-		console.warn('Tried to add characters from ESI but characters array was empty');
+		logger.warn('Tried to add characters from ESI but characters array was empty');
 		return;
 	}
 
@@ -132,7 +133,7 @@ export async function addCharactersFromESI(characters, sanityCheck = false) {
 
 	// check if charactersIds is empty or if characters is empty
 	if (!charactersData || charactersData.length === 0) {
-		console.error('Tried to add characters from ESI but charactersIds array was empty');
+		logger.error('Tried to add characters from ESI but charactersIds array was empty');
 		return;
 	}
 

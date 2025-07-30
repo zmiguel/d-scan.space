@@ -1,5 +1,6 @@
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
 import pkg from '../../../package.json' with { type: 'json' };
+import logger from '$lib/logger';
 
 // Get a tracer instance for your application
 const tracer = trace.getTracer('d-scan.space', pkg.version);
@@ -61,7 +62,7 @@ export async function withSpan(name, fn, attributes = {}, options = {}) {
         }
 
         // Handle actual errors
-        console.error('Error occurred in span:', error);
+        logger.error('Error occurred in span:', error);
         span.recordException(error);
         span.setStatus({
             code: SpanStatusCode.ERROR,

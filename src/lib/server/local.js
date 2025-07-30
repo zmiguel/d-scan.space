@@ -3,6 +3,7 @@
  */
 
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
+import logger from '$lib/logger';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 
 async function getCharacters(data) {
@@ -25,7 +26,7 @@ async function getCharacters(data) {
 			Math.floor(Date.now() / 1000) - 86400
 	);
 
-	console.log(
+	logger.info(
 		`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`
 	);
 

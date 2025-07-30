@@ -5,6 +5,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import pkg from './package.json' with { type: 'json' }; // eslint-disable-line
+import logger from './src/lib/logger.js';
 
 const traceExporter = new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
@@ -16,10 +17,10 @@ const traceExporter = new OTLPTraceExporter({
 // Add error handling for the exporter
 traceExporter.export = ((originalExport) => {
     return function(spans, resultCallback) {
-        console.info(`Sending ${spans.length} spans`);
+        logger.info(`Exporting ${spans.length} spans`);
         return originalExport.call(this, spans, (result) => {
             if (result.code !== 0) {
-                console.error('Failed to send spans:', result.error);
+                logger.error(`Failed to export spans: ${result.error}`);
             }
             resultCallback(result);
         });
@@ -42,20 +43,20 @@ const sdk = new NodeSDK({
 
 // Start SDK synchronously and handle errors
 try {
-    console.info('Starting OpenTelemetry SDK...');
+    logger.info('Starting OpenTelemetry SDK...');
     sdk.start();
-    console.info(`OpenTelemetry SDK started successfully\n URL: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`);
+    logger.info(`OpenTelemetry SDK started successfully\n URL: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`);
 } catch (error) {
-    console.error('Failed to start OpenTelemetry SDK:', error);
+    logger.error('Failed to start OpenTelemetry SDK:', error);
 }
 
 // Handle process exit to ensure spans are flushed
 process.on('SIGTERM', async () => {
     try {
         await sdk.shutdown();
-        console.info('OpenTelemetry SDK shut down successfully');
+        logger.info('OpenTelemetry SDK shut down successfully');
     } catch (error) {
-        console.error('Error shutting down OpenTelemetry SDK:', error);
+        logger.error('Error shutting down OpenTelemetry SDK:', error);
     }
     process.exit(0);
 });
@@ -63,9 +64,9 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     try {
         await sdk.shutdown();
-        console.info('OpenTelemetry SDK shut down successfully');
+        logger.info('OpenTelemetry SDK shut down successfully');
     } catch (error) {
-        console.error('Error shutting down OpenTelemetry SDK:', error);
+        logger.error('Error shutting down OpenTelemetry SDK:', error);
     }
     process.exit(0);
 });

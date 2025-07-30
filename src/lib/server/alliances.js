@@ -2,6 +2,7 @@
  *  Functions related to alliances
  */
 import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
+import logger from '$lib/logger.js';
 import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 
@@ -12,7 +13,7 @@ async function getAllianceFromESI(id) {
 	);
 
 	if (!allianceData.ok) {
-		console.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);
+		logger.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);
 		return null;
 	}
 

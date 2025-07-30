@@ -5,9 +5,10 @@ import { idsToAlliances } from '$lib/server/alliances';
 import { idsToCorporations } from '$lib/server/corporations';
 import { idsToCharacters } from '$lib/server/characters';
 import { withSpan } from '$lib/server/tracer';
+import logger from '$lib/logger';
 
 export async function updateDynamicData() {
-	console.info('[DynUpdater] Updating dynamic data...');
+	logger.info('[DynUpdater] Updating dynamic data...');
 	await withSpan('CRON Dynamic', async () => {
 		// Update the Character data
 		await updateCharacterData();
@@ -18,16 +19,16 @@ export async function updateDynamicData() {
 		// Update the Alliance data
 		await updateAllianceData();
 	});
-	console.info('[DynUpdater] Dynamic data update completed.');
+	logger.info('[DynUpdater] Dynamic data update completed.');
 	return true;
 }
 
 async function updateAllianceData() {
 	return await withSpan('Update Alliances', async (span) => {
-		console.info('[DynUpdater] Updating Alliance data...');
+		logger.info('[DynUpdater] Updating Alliance data...');
 		const allAlliances = await getAllAlliances();
 		if (!allAlliances || allAlliances.length === 0) {
-			console.warn('[DynUpdater] No alliances found to update.');
+			logger.warn('[DynUpdater] No alliances found to update.');
 			return;
 		}
 
@@ -49,11 +50,11 @@ async function updateAllianceData() {
 
 		// If no alliances to update, exit
 		if (alliancesToUpdate.length === 0) {
-			console.info('[DynUpdater] No alliances to update at this time.');
+			logger.info('[DynUpdater] No alliances to update at this time.');
 			return;
 		}
 
-		console.info(`[DynUpdater] Found ${alliancesToUpdate.length} alliances to update.`);
+		logger.info(`[DynUpdater] Found ${alliancesToUpdate.length} alliances to update.`);
 		// convert to array of allianceIDs
 		const allianceIDs = alliancesToUpdate.map((alliance) => alliance.id);
 		const alliancesData = await idsToAlliances(allianceIDs);
@@ -61,7 +62,7 @@ async function updateAllianceData() {
 		await addOrUpdateAlliancesDB(alliancesData);
 
 		// Log completion
-		console.info('[DynUpdater] Alliance data update completed.');
+		logger.info('[DynUpdater] Alliance data update completed.');
 		return true;
 	}, {
 		'cron.task': 'update_alliances'
@@ -70,11 +71,11 @@ async function updateAllianceData() {
 
 async function updateCorporationData() {
 	return await withSpan('Update Corporations', async (span) => {
-		console.info('[DynUpdater] Updating Corporation data...');
+		logger.info('[DynUpdater] Updating Corporation data...');
 		// Fetch all from the database
 		const allCorporations = await getAllCorporations();
 		if (!allCorporations || allCorporations.length === 0) {
-			console.warn('[DynUpdater] No corporations found to update.');
+			logger.warn('[DynUpdater] No corporations found to update.');
 			return;
 		}
 
@@ -96,11 +97,11 @@ async function updateCorporationData() {
 
 		// If no corporations to update, exit
 		if (corporationsToUpdate.length === 0) {
-			console.info('[DynUpdater] No corporations to update at this time.');
+			logger.info('[DynUpdater] No corporations to update at this time.');
 			return;
 		}
 
-		console.info(`[DynUpdater] Found ${corporationsToUpdate.length} corporations to update`);
+		logger.info(`[DynUpdater] Found ${corporationsToUpdate.length} corporations to update`);
 		// convert to array of corporationIDs
 		const corporationIDs = corporationsToUpdate.map((corporation) => corporation.id);
 		const corporationsData = await idsToCorporations(corporationIDs);
@@ -131,7 +132,7 @@ async function updateCorporationData() {
 
 		await addOrUpdateCorporationsDB(corporationsData);
 
-		console.info('[DynUpdater] Corporation data update completed.');
+		logger.info('[DynUpdater] Corporation data update completed.');
 		return true;
 	}, {
 		'cron.task': 'update_corporations'
@@ -140,12 +141,12 @@ async function updateCorporationData() {
 
 async function updateCharacterData() {
 	return await withSpan('Update Characters', async (span) => {
-		console.info('[DynUpdater] Updating Character data...');
+		logger.info('[DynUpdater] Updating Character data...');
 
 		// Fetch all from the database
 		const allCharacters = await getAllCharacters();
 		if (!allCharacters || allCharacters.length === 0) {
-			console.warn('[DynUpdater] No characters found to update.');
+			logger.warn('[DynUpdater] No characters found to update.');
 			return;
 		}
 
@@ -167,10 +168,10 @@ async function updateCharacterData() {
 
 		// If no characters to update, exit
 		if (charactersToUpdate.length === 0) {
-			console.info('[DynUpdater] No characters to update at this time.');
+			logger.info('[DynUpdater] No characters to update at this time.');
 			return;
 		}
-		console.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update`);
+		logger.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update`);
 
 		// convert to array of characterIDs
 		const characterIDs = charactersToUpdate.map((character) => character.id);
@@ -230,7 +231,7 @@ async function updateCharacterData() {
 
 		// Add or update characters in the database
 		await addOrUpdateCharactersDB(charactersData);
-		console.info('[DynUpdater] Character data update completed.');
+		logger.info('[DynUpdater] Character data update completed.');
 		return true;
 	}, {
 		'cron.task': 'update_characters'

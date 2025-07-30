@@ -41,6 +41,8 @@
 		"flowbite-svelte": "^0.47.4",
 		"flowbite-svelte-icons": "^2.2.1",
 		"pg": "^8.16.3",
+		"pino": "^9.7.0",
+		"pino-pretty": "^13.1.0",
 		"postcss": "^8.5.6",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",

@@ -3,6 +3,7 @@
  */
 import { db } from '$lib/database/client';
 import { alliances } from '$lib/database/schema';
+import logger from '$lib/logger';
 import { withSpan } from '$lib/server/tracer';
 import { inArray, sql } from 'drizzle-orm';
 
@@ -20,7 +21,7 @@ export async function addOrUpdateAlliancesDB(data) {
 			span.setAttributes({
 				'alliances.data.length': 0
 			});
-			console.warn('Tried to add alliances from ESI but alliances array was empty');
+			logger.warn('Tried to add alliances from ESI but alliances array was empty');
 			return;
 		}
 

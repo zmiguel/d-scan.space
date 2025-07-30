@@ -3,6 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 import { addEvent, withSpan } from '$lib/server/tracer';
+import logger from '$lib/logger';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
@@ -70,11 +71,11 @@ export const actions = {
 					"scan.is_public": is_public,
 				});
 			} catch (e) {
-				console.error('Failed to store scan data', e);
+				logger.error('Failed to store scan data', e);
 				return { status: 500, body: 'Failed to store scan data' };
 			}
 
-			console.log(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
+			logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
 			return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 		},
 		{
@@ -147,11 +148,11 @@ export const actions = {
 					"scan.data_lines": lines.length,
 				});
 			} catch (e) {
-				console.error('Failed to store scan data', e);
+				logger.error('Failed to store scan data', e);
 				return { status: 500, body: 'Failed to store scan data' };
 			}
 
-			console.log(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
+			logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
 			return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 		});
 	}

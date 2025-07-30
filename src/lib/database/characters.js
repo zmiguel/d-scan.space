@@ -2,6 +2,7 @@
  * All DB functions related to characters
  */
 import { db } from '$lib/database/client';
+import logger from '$lib/logger';
 import { withSpan } from '$lib/server/tracer';
 import { characters, corporations, alliances } from '../database/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
@@ -34,7 +35,7 @@ export async function getAllCharacters() {
 export async function addOrUpdateCharactersDB(data) {
 	await withSpan('addOrUpdateCharactersDB', async (span) => {
 		if (!data || data.length === 0) {
-			console.warn('Tried to add characters from ESI but characters array was empty');
+			logger.warn('Tried to add characters from ESI but characters array was empty');
 			return;
 		}
 
