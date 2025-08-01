@@ -34,6 +34,7 @@
 		<NavUl {activeUrl}>
 			<NavLi href="/">Home</NavLi>
 			<NavLi href="/scans">Scans</NavLi>
+			<NavLi href="/stats">Stats</NavLi>
 			<NavLi href="/about">About</NavLi>
 			<DarkMode class="p-0" />
 		</NavUl>
@@ -41,7 +42,7 @@
 	<div class="mt-16 mb-8 text-gray-900 dark:text-gray-300">
 		{@render children()}
 	</div>
-	<Footer>
+	<Footer class="pb-4">
 		<FooterCopyright href="/" by="D-Scan" />
 		<FooterLinkGroup
 			ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
@@ -49,6 +50,7 @@
 			<FooterLink href="/about">About</FooterLink>
 			<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
 			<FooterLink href="/contact">Contact</FooterLink>
+			<FooterLink aClass="text-blue-500 dark:text-blue-400 hover:underline" href="https://store.eveonline.com/" target="_blank">Use code <span class="font-bold italic text-red-500 dark:text-red-400">OXED</span> on the EVE Online Store</FooterLink>
 		</FooterLinkGroup>
 	</Footer>
 </div>
