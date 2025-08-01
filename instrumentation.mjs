@@ -17,9 +17,8 @@ const traceExporter = new OTLPTraceExporter({
 // Add error handling for the exporter with retry logic
 traceExporter.export = ((originalExport) => {
     return function(spans, resultCallback) {
-        logger.info(`Exporting ${spans.length} spans`);
-
         const attemptExport = async (attempt = 1, maxRetries = 3) => {
+            logger.info(`Exporting ${spans.length} spans, attempt ${attempt}/${maxRetries}`);
             return new Promise((resolve) => {
                 originalExport.call(this, spans, (result) => {
                     if (result.code !== 0 && attempt < maxRetries) {
