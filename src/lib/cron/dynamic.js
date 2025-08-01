@@ -1,12 +1,11 @@
 import { getAllAlliances, addOrUpdateAlliancesDB, getAlliancesByID } from '$lib/database/alliances';
-import { getAllCharacters, addOrUpdateCharactersDB } from '$lib/database/characters';
+import { getAllCharacters as getAllCharactersDB, addOrUpdateCharactersDB } from '$lib/database/characters';
 import { addOrUpdateCorporationsDB, getAllCorporations } from '$lib/database/corporations';
 import { idsToAlliances } from '$lib/server/alliances';
 import { idsToCorporations } from '$lib/server/corporations';
 import { idsToCharacters } from '$lib/server/characters';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
-import { json } from '@sveltejs/kit';
 
 export async function updateDynamicData() {
 	logger.info('[DynUpdater] Updating dynamic data...');
@@ -38,7 +37,7 @@ async function updateAllianceData() {
 		const yearAgo = new Date();
 		yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 		const twentyFourHoursAgo = new Date();
-		twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+		twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 23);
 		const alliancesToUpdate = allAlliances.filter((alliance) => {
 			const lastSeen = new Date(alliance.last_seen);
 			const lastUpdated = new Date(alliance.updated_at);
@@ -93,7 +92,7 @@ async function updateCorporationData() {
 		const yearAgo = new Date();
 		yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 		const twentyFourHoursAgo = new Date();
-		twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+		twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 23);
 		const corporationsToUpdate = allCorporations.filter((corporation) => {
 			const lastSeen = new Date(corporation.last_seen);
 			const lastUpdated = new Date(corporation.updated_at);
@@ -161,7 +160,7 @@ async function updateCharacterData() {
 		logger.info('[DynUpdater] Updating Character data...');
 
 		// Fetch all from the database
-		const allCharacters = await getAllCharacters();
+		const allCharacters = await getAllCharactersDB();
 		if (!allCharacters || allCharacters.length === 0) {
 			logger.warn('[DynUpdater] No characters found to update.');
 			return;
@@ -171,12 +170,12 @@ async function updateCharacterData() {
 		// and that have have not been updated in the last 24 hours
 		const yearAgo = new Date();
 		yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-		const twentyFourHoursAgo = new Date();
-		twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+		const HoursAgo = new Date();
+		HoursAgo.setHours(HoursAgo.getHours() - 23);
 		const charactersToUpdate = allCharacters.filter((character) => {
 			const lastSeen = new Date(character.last_seen);
 			const lastUpdated = new Date(character.updated_at);
-			return lastSeen >= yearAgo && lastUpdated <= twentyFourHoursAgo;
+			return lastSeen >= yearAgo && lastUpdated <= HoursAgo;
 		});
 
 		span.setAttributes({

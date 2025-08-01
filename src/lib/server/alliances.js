@@ -19,6 +19,7 @@ async function getAllianceFromESI(id) {
 
 	const allianceInfo = await allianceData.json();
 	allianceInfo.id = id;
+	delete allianceInfo.description; // Remove description if it exists
 	return allianceInfo;
 }
 

@@ -13,6 +13,7 @@ async function getCorporationFromESI(id) {
 
 	const corporationInfo = await corporationData.json();
 	corporationInfo.id = id;
+	delete corporationInfo.description; // Remove description if it exists
 	return corporationInfo;
 }
 

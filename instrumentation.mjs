@@ -48,7 +48,7 @@ const sdk = new NodeSDK({
     }),
     spanProcessor: new BatchSpanProcessor(traceExporter, {
         // Force faster export for debugging
-        scheduledDelayMillis: 2500,
+        scheduledDelayMillis: 5000,
         exportTimeoutMillis: 30000,
         maxExportBatchSize: 512,
     }),
