@@ -26,6 +26,8 @@ export async function fetchGET(url, maxRetries = 3) {
 
                 try {
                     fullResponse = await responseClone.json();
+                    delete fullResponse.description;
+                    delete fullResponse.title;
                 } catch (jsonError) {
                     // Fallback to text if JSON parsing fails
                     fullResponse = await response.clone().text();
@@ -94,6 +96,8 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
                 try {
                     fullResponse = await responseClone.json();
+                    delete fullResponse.description;
+                    delete fullResponse.title;
                 } catch (jsonError) {
                     // Fallback to text if JSON parsing fails
                     fullResponse = await response.clone().text();

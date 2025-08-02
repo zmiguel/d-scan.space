@@ -24,6 +24,7 @@ async function getCharacterFromESI(id) {
 	const characterInfo = await characterData.json();
 	characterInfo.id = id;
 	delete characterInfo.description;
+	delete characterInfo.title;
 	return characterInfo;
 }
 

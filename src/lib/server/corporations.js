@@ -53,12 +53,12 @@ export async function addOrUpdateCorporations(data) {
 
 		const corporationData = await idsToCorporations(corporationsToFetch);
 
-		await addOrUpdateCorporationsDB(corporationData);
-
 		span.setAttributes({
 			'scan.corporations.missing': missingCorporations.length,
 			'scan.corporations.outdated': outdatedCorporations.length,
 			'scan.corporations.fetched': corporationData.length
 		});
+
+		await addOrUpdateCorporationsDB(corporationData);
 	});
 }

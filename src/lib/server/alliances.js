@@ -59,11 +59,12 @@ export async function addOrUpdateAlliances(data) {
 
 		const alliancesData = await idsToAlliances(alliancesToFetch);
 
-		await addOrUpdateAlliancesDB(alliancesData);
 		span.setAttributes({
 			'scan.alliances.missing': missingAlliances.length,
 			'scan.alliances.outdated': outdatedAlliances.length,
 			'scan.alliances.fetched': alliancesData.length
 		});
+
+		await addOrUpdateAlliancesDB(alliancesData);
 	});
 }
