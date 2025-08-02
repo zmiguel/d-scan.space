@@ -3,51 +3,65 @@
  */
 
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
-import logger from '$lib/logger';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
+import logger from '$lib/logger';
+import { withSpan } from './tracer';
 
 async function getCharacters(data) {
-	// get characters in the database
-	const charactersInDB = await getCharactersByName(data);
+	return await withSpan('Get Characters', async () => {
+		// get characters in the database
+		const charactersInDB = await getCharactersByName(data);
 
-	const missingCharacters = await data.filter((l) => !charactersInDB.some((c) => c.name === l));
-	const outdatedCharacters = await charactersInDB.filter(
-		(c) =>
-			(typeof c.updated_at === 'number'
-				? c.updated_at
-				: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
-			Math.floor(Date.now() / 1000) - 86400
-	);
-	const goodCharacters = await charactersInDB.filter(
-		(c) =>
-			(typeof c.updated_at === 'number'
-				? c.updated_at
-				: Math.floor(new Date(c.updated_at).getTime() / 1000)) >=
-			Math.floor(Date.now() / 1000) - 86400
-	);
+		const { missingCharacters, outdatedCharacters, goodCharacters } = await withSpan('Filter Characters', async (span) => {
+			const missingCharacters = await data.filter((l) => !charactersInDB.some((c) => c.name === l));
+			const outdatedCharacters = await charactersInDB.filter(
+				(c) =>
+					(typeof c.updated_at === 'number'
+						? c.updated_at
+						: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
+					Math.floor(Date.now() / 1000) - 86400
+			);
+			const goodCharacters = await charactersInDB.filter(
+				(c) =>
+					(typeof c.updated_at === 'number'
+						? c.updated_at
+						: Math.floor(new Date(c.updated_at).getTime() / 1000)) >=
+					Math.floor(Date.now() / 1000) - 86400
+			);
 
-	logger.info(
-		`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`
-	);
+			span.setAttributes({
+				'scan.characters.missing': missingCharacters.length,
+				'scan.characters.outdated': outdatedCharacters.length,
+				'scan.characters.good': goodCharacters.length
+			});
+			return { missingCharacters, outdatedCharacters, goodCharacters };
+		});
 
-	// check if we are missing characters from the database
-	if (missingCharacters.length > 0) {
-		// get missing characters from ESI
-		await addCharactersFromESI(missingCharacters);
-	}
+		logger.info(
+			`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`
+		);
 
-	// check if characters are outdated in database
-	if (outdatedCharacters.length > 0) {
-		// get updated characters from ESI
-		await updateCharactersFromESI(outdatedCharacters);
-	}
+		// check if we are missing characters from the database
+		if (missingCharacters.length > 0) {
+			// get missing characters from ESI
+			await addCharactersFromESI(missingCharacters);
+		}
 
-	// get all outdated and missing characters from db
-	const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map((c) => c.name)];
-	const updatedCharacters = await getCharactersByName(charactersToFetch);
+		// check if characters are outdated in database
+		if (outdatedCharacters.length > 0) {
+			// get updated characters from ESI
+			await updateCharactersFromESI(outdatedCharacters);
+		}
 
-	// merge good with updated
-	return [...goodCharacters, ...updatedCharacters];
+		// get all outdated and missing characters from db
+		const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map((c) => c.name)];
+		const updatedCharacters = await getCharactersByName(charactersToFetch);
+
+		// merge good with updated
+		return [...goodCharacters, ...updatedCharacters];
+	},{
+		'scan.characters.requested': data.length
+	});
 }
 
 export async function createNewLocalScan(data) {

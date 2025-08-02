@@ -114,54 +114,62 @@ export async function idsToCharacters(ids, batchSize = 250) {
 }
 
 async function addOrUpdateCharacters(data) {
-	// get list of all corp ids
-	const corpIDs = data
-		.map((char) => char.corporation_id)
-		.filter((id) => id !== undefined && id !== null);
-	const corpIDsUnique = [...new Set(corpIDs)];
+	await withSpan('addOrUpdateCharacters', async () => {
+		// get list of all corp ids
+		const corpIDs = data
+			.map((char) => char.corporation_id)
+			.filter((id) => id !== undefined && id !== null);
+		const corpIDsUnique = [...new Set(corpIDs)];
 
-	// get list of all alliance ids
-	const allianceIDs = data
-		.map((char) => char.alliance_id)
-		.filter((id) => id !== undefined && id !== null);
-	const allianceIDsUnique = [...new Set(allianceIDs)];
+		// get list of all alliance ids
+		const allianceIDs = data
+			.map((char) => char.alliance_id)
+			.filter((id) => id !== undefined && id !== null);
+		const allianceIDsUnique = [...new Set(allianceIDs)];
 
-	// first we check if we have the alliance info and if the info is updated
-	// if we don't, we get it and update it
-	await addOrUpdateAlliances(allianceIDsUnique);
+		// first we check if we have the alliance info and if the info is updated
+		// if we don't, we get it and update it
+		await addOrUpdateAlliances(allianceIDsUnique);
 
-	// now we can be sure we have all alliances, we can add the corporations
-	await addOrUpdateCorporations(corpIDsUnique);
+		// now we can be sure we have all alliances, we can add the corporations
+		await addOrUpdateCorporations(corpIDsUnique);
 
-	// now we can be sure we have all corporations, we can add the characters
-	await addOrUpdateCharactersDB(data);
+		// now we can be sure we have all corporations, we can add the characters
+		await addOrUpdateCharactersDB(data);
+	});
 }
 
 export async function addCharactersFromESI(characters, sanityCheck = false) {
-	// check if characters is empty
-	if (characters.length === 0 || !characters) {
-		logger.warn('Tried to add characters from ESI but characters array was empty');
-		return;
-	}
-
-	// sanity check if we already have it in the database
-	if (sanityCheck) {
-		const charactersInDB = await getCharactersByName(characters);
-		if (charactersInDB.length === characters.length) {
+	await withSpan('addCharactersFromESI', async () => {
+		// check if characters is empty
+		if (characters.length === 0 || !characters) {
+			logger.warn('Tried to add characters from ESI but characters array was empty');
 			return;
 		}
-	}
 
-	// Get Character IDS
-	const charactersData = await namesToCharacters(characters);
+		// sanity check if we already have it in the database
+		if (sanityCheck) {
+			const charactersInDB = await getCharactersByName(characters);
+			if (charactersInDB.length === characters.length) {
+				return;
+			}
+		}
 
-	// check if charactersIds is empty or if characters is empty
-	if (!charactersData || charactersData.length === 0) {
-		logger.error('Tried to add characters from ESI but charactersIds array was empty');
-		return;
-	}
+		// Get Character IDS
+		const charactersData = await namesToCharacters(characters);
 
-	await addOrUpdateCharacters(charactersData);
+		// check if charactersIds is empty or if characters is empty
+		if (!charactersData || charactersData.length === 0) {
+			logger.error('Tried to add characters from ESI but charactersIds array was empty');
+			return;
+		}
+
+		await addOrUpdateCharacters(charactersData);
+	}, {
+		'characters.add_from_esi': characters.length,
+		'sanity_check': sanityCheck
+	});
+
 }
 
 export async function updateCharactersFromESI(data) {

@@ -51,7 +51,45 @@ const sdk = new NodeSDK({
         exportTimeoutMillis: 30000,
         maxExportBatchSize: 512,
     }),
-    instrumentations: [getNodeAutoInstrumentations()],
+    instrumentations: [getNodeAutoInstrumentations({
+        // Disable the noisiest ones completely
+        '@opentelemetry/instrumentation-dns': { enabled: false },
+        '@opentelemetry/instrumentation-net': { enabled: false },
+        '@opentelemetry/instrumentation-fs': { enabled: false },
+        // Configure HTTP instrumentation to be less noisy
+        '@opentelemetry/instrumentation-http': {
+            enabled: true,
+            ignoreIncomingRequestHook: (req) => {
+                // Filter out health checks, static assets, etc.
+                const url = req.url;
+                return url?.includes('/_app/') ||
+                       url?.includes('/favicon.ico') ||
+                       url?.includes('/robots.txt') ||
+                       url?.endsWith('.css') ||
+                       url?.endsWith('.js') ||
+                       url?.endsWith('.map') ||
+                       url?.startsWith('/static/');
+            },
+            ignoreOutgoingRequestHook: (options) => {
+                // Filter out internal health checks or monitoring requests
+                const hostname = options.hostname || options.host;
+                return hostname === 'localhost' && options.port === 3000;
+            }
+        },
+        '@opentelemetry/instrumentation-fetch': {
+            enabled: true,
+            ignoreUrls: [
+                // Ignore internal requests
+                /\/_app\//,
+                /\/favicon.ico/,
+                /\/robots.txt/,
+                /\.css$/,
+                /\.js$/,
+                /\.map$/
+            ],
+        },
+        '@opentelemetry/instrumentation-pg': { enabled: true }
+    })],
 });
 
 // Start SDK synchronously and handle errors

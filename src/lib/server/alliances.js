@@ -39,24 +39,31 @@ export async function idsToAlliances(ids) {
 }
 
 export async function addOrUpdateAlliances(data) {
-	const alliancesInDB = await getAlliancesByID(data);
+	await withSpan('addOrUpdateAlliances', async (span) => {
+		const alliancesInDB = await getAlliancesByID(data);
 
-	// find missing alliances
-	const missingAlliances = data.filter((id) => !alliancesInDB.some((a) => a.id === id));
+		// find missing alliances
+		const missingAlliances = data.filter((id) => !alliancesInDB.some((a) => a.id === id));
 
-	// find outdated alliances
-	const outdatedAlliances = alliancesInDB.filter(
-		(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000
-	);
+		// find outdated alliances
+		const outdatedAlliances = alliancesInDB.filter(
+			(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000
+		);
 
-	// combine missing and outdated alliances
-	const alliancesToFetch = [...missingAlliances, ...outdatedAlliances.map((a) => a.id)];
+		// combine missing and outdated alliances
+		const alliancesToFetch = [...missingAlliances, ...outdatedAlliances.map((a) => a.id)];
 
-	if (alliancesToFetch.length === 0) {
-		return;
-	}
+		if (alliancesToFetch.length === 0) {
+			return;
+		}
 
-	const alliancesData = await idsToAlliances(alliancesToFetch);
+		const alliancesData = await idsToAlliances(alliancesToFetch);
 
-	await addOrUpdateAlliancesDB(alliancesData);
+		await addOrUpdateAlliancesDB(alliancesData);
+		span.setAttributes({
+			'scan.alliances.missing': missingAlliances.length,
+			'scan.alliances.outdated': outdatedAlliances.length,
+			'scan.alliances.fetched': alliancesData.length
+		});
+	});
 }

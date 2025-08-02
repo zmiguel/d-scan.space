@@ -33,24 +33,32 @@ export async function idsToCorporations(ids) {
 }
 
 export async function addOrUpdateCorporations(data) {
-	const corporationsInDB = await getCorporationsByID(data);
+	await withSpan('addOrUpdateCorporations', async (span) => {
+		const corporationsInDB = await getCorporationsByID(data);
 
-	// find missing corporations
-	const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));
+		// find missing corporations
+		const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));
 
-	// find outdated corporations
-	const outdatedCorporations = corporationsInDB.filter(
-		(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000 // 24 hours
-	);
+		// find outdated corporations
+		const outdatedCorporations = corporationsInDB.filter(
+			(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000 // 24 hours
+		);
 
-	// combine missing and outdated corporations
-	const corporationsToFetch = [...missingCorporations, ...outdatedCorporations.map((a) => a.id)];
+		// combine missing and outdated corporations
+		const corporationsToFetch = [...missingCorporations, ...outdatedCorporations.map((a) => a.id)];
 
-	if (corporationsToFetch.length === 0) {
-		return;
-	}
+		if (corporationsToFetch.length === 0) {
+			return;
+		}
 
-	const corporationData = await idsToCorporations(corporationsToFetch);
+		const corporationData = await idsToCorporations(corporationsToFetch);
 
-	await addOrUpdateCorporationsDB(corporationData);
+		await addOrUpdateCorporationsDB(corporationData);
+
+		span.setAttributes({
+			'scan.corporations.missing': missingCorporations.length,
+			'scan.corporations.outdated': outdatedCorporations.length,
+			'scan.corporations.fetched': corporationData.length
+		});
+	});
 }
