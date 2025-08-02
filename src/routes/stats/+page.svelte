@@ -80,35 +80,35 @@
                     <span class="font-semibold text-gray-800 dark:text-gray-200">{characterStats.totalCharacters.toLocaleString()}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last 24h:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {characterStats.charactersLastSeen24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(characterStats.charactersLastSeen24h, characterStats.totalCharacters)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Week:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Week:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {characterStats.charactersLastSeenWeek.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(characterStats.charactersLastSeenWeek, characterStats.totalCharacters)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Month:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Month:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {characterStats.charactersLastSeenMonth.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(characterStats.charactersLastSeenMonth, characterStats.totalCharacters)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Year:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Year:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {characterStats.charactersLastSeenYear.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(characterStats.charactersLastSeenYear, characterStats.totalCharacters)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Updated 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Updated:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {characterStats.charactersUpdated24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(characterStats.charactersUpdated24h, characterStats.totalCharacters)}%)</span>
@@ -133,35 +133,35 @@
                     <span class="font-semibold text-gray-800 dark:text-gray-200">{corporationStats.totalCorporations.toLocaleString()}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last 24h:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {corporationStats.corporationsLastSeen24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(corporationStats.corporationsLastSeen24h, corporationStats.totalCorporations)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Week:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Week:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {corporationStats.corporationsLastSeenWeek.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(corporationStats.corporationsLastSeenWeek, corporationStats.totalCorporations)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Month:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Month:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {corporationStats.corporationsLastSeenMonth.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(corporationStats.corporationsLastSeenMonth, corporationStats.totalCorporations)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Year:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Year:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {corporationStats.corporationsLastSeenYear.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(corporationStats.corporationsLastSeenYear, corporationStats.totalCorporations)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Updated 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Updated:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {corporationStats.corporationsUpdated24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(corporationStats.corporationsUpdated24h, corporationStats.totalCorporations)}%)</span>
@@ -186,35 +186,35 @@
                     <span class="font-semibold text-gray-800 dark:text-gray-200">{allianceStats.totalAlliances.toLocaleString()}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last 24h:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {allianceStats.alliancesLastSeen24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(allianceStats.alliancesLastSeen24h, allianceStats.totalAlliances)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Week:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Week:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {allianceStats.alliancesLastSeenWeek.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(allianceStats.alliancesLastSeenWeek, allianceStats.totalAlliances)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Month:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Month:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {allianceStats.alliancesLastSeenMonth.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(allianceStats.alliancesLastSeenMonth, allianceStats.totalAlliances)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Seen Year:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Seen Last Year:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {allianceStats.alliancesLastSeenYear.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(allianceStats.alliancesLastSeenYear, allianceStats.totalAlliances)}%)</span>
                     </span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Updated 24h:</span>
+                    <span class="text-gray-600 dark:text-gray-400">Updated:</span>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">
                         {allianceStats.alliancesUpdated24h.toLocaleString()}
                         <span class="text-sm text-gray-500 dark:text-gray-400">({getPercentage(allianceStats.alliancesUpdated24h, allianceStats.totalAlliances)}%)</span>
