@@ -33,11 +33,12 @@ export async function addOrUpdateCorporationsDB(data) {
 			'corporations.data.length': values.length
 		});
 
-		await db
-			.insert(corporations)
-			.values(values)
-			.onConflictDoUpdate({
-				target: corporations.id,
+		try {
+			await db
+				.insert(corporations)
+				.values(values)
+				.onConflictDoUpdate({
+					target: corporations.id,
 				set: {
 					name: sql`excluded.name`,
 					ticker: sql`excluded.ticker`,
@@ -45,5 +46,11 @@ export async function addOrUpdateCorporationsDB(data) {
 					updated_at: sql`now()`
 				}
 			});
+		} catch (error) {
+			span.setAttributes({
+				'corporations.error': error.message,
+				'data': JSON.stringify(data)
+			});
+		}
 	});
 }

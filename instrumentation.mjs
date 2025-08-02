@@ -85,7 +85,11 @@ const sdk = new NodeSDK({
                 /\/robots.txt/,
                 /\.css$/,
                 /\.js$/,
-                /\.map$/
+                /\.map$/,
+                // Filter out esi requests to characters, corporations, alliances
+                /\/esi\.evetech\.net\/characters\//,
+                /\/esi\.evetech\.net\/corporations\//,
+                /\/esi\.evetech\.net\/alliances\//,
             ],
         },
         '@opentelemetry/instrumentation-pg': { enabled: true }

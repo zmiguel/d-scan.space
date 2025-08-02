@@ -55,19 +55,26 @@ export async function addOrUpdateCharactersDB(data) {
 			'db.characters.insert': values.length
 		});
 
-		await db
-			.insert(characters)
-			.values(values)
-			.onConflictDoUpdate({
-				target: characters.id,
-				set: {
-					name: sql`excluded.name`,
-					sec_status: sql`excluded.sec_status`,
-					corporation_id: sql`excluded.corporation_id`,
-					alliance_id: sql`excluded.alliance_id`,
-					updated_at: sql`now()`
-				}
+		try {
+			await db
+				.insert(characters)
+				.values(values)
+				.onConflictDoUpdate({
+					target: characters.id,
+					set: {
+						name: sql`excluded.name`,
+						sec_status: sql`excluded.sec_status`,
+						corporation_id: sql`excluded.corporation_id`,
+						alliance_id: sql`excluded.alliance_id`,
+						updated_at: sql`now()`
+					}
+				});
+		} catch (error) {
+			span.setAttributes({
+				'db.characters.error': error.message,
+				'data': JSON.stringify(data)
 			});
+		}
 	});
 }
 
