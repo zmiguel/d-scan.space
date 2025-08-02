@@ -49,7 +49,7 @@ const sdk = new NodeSDK({
         // Force faster export for debugging
         scheduledDelayMillis: 5000,
         exportTimeoutMillis: 30000,
-        maxExportBatchSize: 512,
+        maxExportBatchSize: 1024,
     }),
     instrumentations: [getNodeAutoInstrumentations({
         // Disable the noisiest ones completely

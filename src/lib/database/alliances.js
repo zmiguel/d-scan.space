@@ -35,23 +35,16 @@ export async function addOrUpdateAlliancesDB(data) {
 			'alliances.data.length': values.length
 		});
 
-		try {
-			await db
-				.insert(alliances)
-				.values(values)
-				.onConflictDoUpdate({
-					target: alliances.id,
-					set: {
-						name: sql`excluded.name`,
-						ticker: sql`excluded.ticker`,
-						updated_at: sql`now()`
-					}
-				});
-		} catch (error) {
-			span.setAttributes({
-				'alliances.error': error.message,
-				'data': JSON.stringify(data)
+		await db
+			.insert(alliances)
+			.values(values)
+			.onConflictDoUpdate({
+				target: alliances.id,
+				set: {
+					name: sql`excluded.name`,
+					ticker: sql`excluded.ticker`,
+					updated_at: sql`now()`
+				}
 			});
-		}
 	});
 }
