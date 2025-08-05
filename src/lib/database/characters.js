@@ -5,7 +5,7 @@ import { db } from '$lib/database/client';
 import logger from '$lib/logger';
 import { withSpan } from '$lib/server/tracer';
 import { characters, corporations, alliances } from '../database/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql, and, lt, gt } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
 	return await withSpan('getCharactersByName', async () => {
@@ -77,4 +77,22 @@ export function updateCharactersLastSeen(data) {
 			last_seen: new Date()
 		})
 		.where(inArray(characters.id, data));
+}
+
+export async function getLeastRecentlyUpdatedCharacters(limit) {
+	// this is used to find characters that haven't been updated in 23.5h
+	// but we only care about the characters seen in the last 1 year
+	return await withSpan('getLeastRecentlyUpdatedCharacters', async () => {
+		return await db
+			.select()
+			.from(characters)
+			.where(
+				and(
+					lt(characters.updated_at, sql`now() - interval '23 hours 30 minutes'`),
+					gt(characters.last_seen, sql`now() - interval '1 year'`)
+				)
+			)
+			.orderBy(asc(characters.updated_at))
+			.limit(limit);
+	});
 }

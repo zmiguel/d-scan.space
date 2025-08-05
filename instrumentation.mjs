@@ -56,6 +56,8 @@ const sdk = new NodeSDK({
         '@opentelemetry/instrumentation-dns': { enabled: false },
         '@opentelemetry/instrumentation-net': { enabled: false },
         '@opentelemetry/instrumentation-fs': { enabled: false },
+        '@opentelemetry/instrumentation-fetch': { enabled: false },
+        '@opentelemetry/instrumentation-undici': { enabled: false },
         // Configure HTTP instrumentation to be less noisy
         '@opentelemetry/instrumentation-http': {
             enabled: true,
@@ -75,22 +77,6 @@ const sdk = new NodeSDK({
                 const hostname = options.hostname || options.host;
                 return hostname === 'localhost' && options.port === 3000;
             }
-        },
-        '@opentelemetry/instrumentation-fetch': {
-            enabled: true,
-            ignoreUrls: [
-                // Ignore internal requests
-                /\/_app\//,
-                /\/favicon.ico/,
-                /\/robots.txt/,
-                /\.css$/,
-                /\.js$/,
-                /\.map$/,
-                // Filter out esi requests to characters, corporations, alliances
-                /\/esi\.evetech\.net\/characters\//,
-                /\/esi\.evetech\.net\/corporations\//,
-                /\/esi\.evetech\.net\/alliances\//,
-            ],
         },
         '@opentelemetry/instrumentation-pg': { enabled: true }
     })],

@@ -62,7 +62,7 @@ export async function withSpan(name, fn, attributes = {}, options = {}) {
         }
 
         // Handle actual errors
-        logger.error('Error occurred in span:', error);
+        logger.error('Error occurred in span: ' + error.message);
         span.recordException(error);
         span.setStatus({
             code: SpanStatusCode.ERROR,

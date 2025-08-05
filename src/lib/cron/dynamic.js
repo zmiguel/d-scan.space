@@ -1,11 +1,12 @@
 import { getAllAlliances, addOrUpdateAlliancesDB, getAlliancesByID } from '$lib/database/alliances';
-import { getAllCharacters as getAllCharactersDB, addOrUpdateCharactersDB } from '$lib/database/characters';
+import { getAllCharacters as getAllCharactersDB, addOrUpdateCharactersDB, getLeastRecentlyUpdatedCharacters } from '$lib/database/characters';
 import { addOrUpdateCorporationsDB, getAllCorporations } from '$lib/database/corporations';
 import { idsToAlliances } from '$lib/server/alliances';
 import { idsToCorporations } from '$lib/server/corporations';
 import { idsToCharacters } from '$lib/server/characters';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
+import { BATCH_CHARACTERS } from '$lib/server/constants';
 
 export async function updateDynamicData() {
 	logger.info('[DynUpdater] Updating dynamic data...');
@@ -158,114 +159,106 @@ async function updateCorporationData() {
 async function updateCharacterData() {
 	return await withSpan('Update Characters', async (span) => {
 		logger.info('[DynUpdater] Updating Character data...');
+		// This is called every minute, we try to update up to 1000 characters every minute
+		// in batches of 100, so we can handle large amounts of characters without overloading the database or ESI
 
-		// Fetch all from the database
-		const allCharacters = await getAllCharactersDB();
-		if (!allCharacters || allCharacters.length === 0) {
+		// Get from DB the least recently updated 1000 characters
+		const charactersToUpdate = await getLeastRecentlyUpdatedCharacters(1000);
+		if (!charactersToUpdate || charactersToUpdate.length === 0) {
 			logger.warn('[DynUpdater] No characters found to update.');
+			span.setAttributes({
+				'cron.task.update_characters.to_update': 0
+			});
 			return;
 		}
-
-		// Filter by last seen within the last year
-		// and that have have not been updated in the last 24 hours
-		const yearAgo = new Date();
-		yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-		const HoursAgo = new Date();
-		HoursAgo.setHours(HoursAgo.getHours() - 23);
-		const charactersToUpdate = allCharacters.filter((character) => {
-			const lastSeen = new Date(character.last_seen);
-			const lastUpdated = new Date(character.updated_at);
-			return lastSeen >= yearAgo && lastUpdated <= HoursAgo;
-		});
 
 		span.setAttributes({
 			'cron.task.update_characters.to_update': charactersToUpdate.length
 		});
 
-		// If no characters to update, exit
-		if (charactersToUpdate.length === 0) {
-			logger.info('[DynUpdater] No characters to update at this time.');
-			return;
-		}
-		logger.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update`);
+		// Now we do multiple smaller batches to avoid overloading ESI, batch size is BATCH_CHARACTERS
+		logger.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update.`);
 
-		// convert to array of characterIDs
-		const characterIDs = charactersToUpdate.map((character) => character.id);
-		const charactersData = await idsToCharacters(characterIDs);
+		await withSpan('Batch Update Characters', async (span) => {
+			for (let i = 0; i < charactersToUpdate.length; i += BATCH_CHARACTERS) {
+				await withSpan(`Batch Update Characters ${i / BATCH_CHARACTERS + 1}`, async (span) => {
+					const batch = charactersToUpdate.slice(i, i + BATCH_CHARACTERS);
+					const characterIDs = batch.map((character) => character.id);
+					const charactersData = await idsToCharacters(characterIDs);
+					// Process charactersData
+					const validCharactersData = charactersData.filter((character) => character !== null && character !== undefined);
+					if (!validCharactersData || validCharactersData.length === 0) {
+						logger.warn(`[DynUpdater] No character data fetched from ESI for batch starting at index ${i}.`);
+						span.setAttributes({
+							'cron.task.update_characters.batch_fetched_data_length': 0
+						});
+						return;
+					}
+					span.setAttributes({
+						'cron.task.update_characters.batch_fetched_data_length': validCharactersData.length
+					});
+					logger.info(`[DynUpdater] Fetched ${validCharactersData.length} characters from ESI for batch starting at index ${i}.`);
 
-		if (!charactersData || charactersData.length === 0) {
-			logger.warn('[DynUpdater] No character data fetched from ESI.');
-			span.setAttributes({
-				'cron.task.update_characters.fetched_data_length': 0
-			});
-			return;
-		}
+					// before we can add or update the characters, we need to check if we have alliances for them
+					await withSpan('Fetch Alliances for Characters', async (span) => {
+						const allianceIDs = validCharactersData
+							.map((character) => character.alliance_id)
+							.filter((id) => id !== undefined && id !== null);
 
-		// Ensure we have valid character data, an element of charactersData can be null or undefined if the character was deleted
-		// we will deal with deleted characters later, for now we just want to filter out null or undefined values
-		const validCharactersData = charactersData.filter((character) => character !== null && character !== undefined);
-		if (validCharactersData.length === 0) {
-			logger.warn('[DynUpdater] No valid character data fetched from ESI.');
-			span.setAttributes({
-				'cron.task.update_characters.valid_fetched_data_length': 0
-			});
-			return;
-		}
+						// filter out duplicates
+						const uniqueAllianceIDs = [...new Set(allianceIDs)];
 
-		// before we can add or update the characters, we need to check if we have alliances for them
-		await withSpan('Fetch Alliances for Characters', async (span) => {
-			const allianceIDs = validCharactersData
-				.map((character) => character.alliance_id)
-				.filter((id) => id !== undefined && id !== null);
+						// filter out alliances that are already in the database
+						const existingAlliances = await getAlliancesByID(uniqueAllianceIDs);
+						const existingAllianceIDs = existingAlliances.map((alliance) => alliance.id);
+						const newAllianceIDs = uniqueAllianceIDs.filter((id) => !existingAllianceIDs.includes(id));
 
-			// filter out duplicates
-			const uniqueAllianceIDs = [...new Set(allianceIDs)];
+						span.setAttributes({
+							'cron.task.update_characters.new_alliances': newAllianceIDs.length
+						});
 
-			// filter out alliances that are already in the database
-			const existingAlliances = await getAlliancesByID(uniqueAllianceIDs);
-			const existingAllianceIDs = existingAlliances.map((alliance) => alliance.id);
-			const newAllianceIDs = uniqueAllianceIDs.filter((id) => !existingAllianceIDs.includes(id));
+						// Fetch alliance data
+						if (newAllianceIDs.length > 0) {
+							const alliancesData = await idsToAlliances(newAllianceIDs);
+							// Add or update alliances in the database
+							await addOrUpdateAlliancesDB(alliancesData);
+						}
+					});
 
-			span.setAttributes({
-				'cron.task.update_characters.new_alliances': newAllianceIDs.length
-			});
+					// before we can add or update the characters, we need to check if we have corporations for them
+					await withSpan('Fetch Corporations for Characters', async (span) => {
+						const corporationIDs = validCharactersData
+							.map((character) => character.corporation_id)
+							.filter((id) => id !== undefined && id !== null);
 
-			// Fetch alliance data
-			if (newAllianceIDs.length > 0) {
-				const alliancesData = await idsToAlliances(newAllianceIDs);
-				// Add or update alliances in the database
-				await addOrUpdateAlliancesDB(alliancesData);
+						// filter out duplicates
+						const uniqueCorporationIDs = [...new Set(corporationIDs)];
+
+						// filter out corporations that are already in the database
+						const existingCorporations = await getAllCorporations();
+						const existingCorporationIDs = existingCorporations.map((corporation) => corporation.id);
+						const newCorporationIDs = uniqueCorporationIDs.filter((id) => !existingCorporationIDs.includes(id));
+
+						span.setAttributes({
+							'cron.task.update_characters.new_corporations': newCorporationIDs.length
+						});
+
+						// Fetch corporation data
+						if (newCorporationIDs.length > 0) {
+							const corporationsData = await idsToCorporations(newCorporationIDs);
+							// Add or update corporations in the database
+							await addOrUpdateCorporationsDB(corporationsData);
+						}
+					});
+
+					// Add or update characters in the database
+					await addOrUpdateCharactersDB(validCharactersData);
+				});
 			}
+		},{
+			'cron.task.update_characters.batch_size': charactersToUpdate.length
 		});
 
-		// before we can add or update the characters, we need to check if we have corporations for them
-		await withSpan('Fetch Corporations for Characters', async (span) => {
-			const corporationIDs = validCharactersData
-				.map((character) => character.corporation_id)
-				.filter((id) => id !== undefined && id !== null);
-
-			// filter out duplicates
-			const uniqueCorporationIDs = [...new Set(corporationIDs)];
-
-			// filter out corporations that are already in the database
-			const existingCorporations = await getAllCorporations();
-			const existingCorporationIDs = existingCorporations.map((corporation) => corporation.id);
-			const newCorporationIDs = uniqueCorporationIDs.filter((id) => !existingCorporationIDs.includes(id));
-
-			span.setAttributes({
-				'cron.task.update_characters.new_corporations': newCorporationIDs.length
-			});
-
-			// Fetch corporation data
-			if (newCorporationIDs.length > 0) {
-				const corporationsData = await idsToCorporations(newCorporationIDs);
-				// Add or update corporations in the database
-				await addOrUpdateCorporationsDB(corporationsData);
-			}
-		});
-
-		// Add or update characters in the database
-		await addOrUpdateCharactersDB(validCharactersData);
 		logger.info('[DynUpdater] Character data update completed.');
 		return true;
 	}, {
