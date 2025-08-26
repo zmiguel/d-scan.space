@@ -72,11 +72,13 @@
 			</svg>
 		</slot>
 	{:else if date}
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		<time class={timeCls}>{@html date}</time>
 	{/if}
 
 	{#if htmlTitle}
 		<h3 class={h3Cls}>
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 			{@html htmlTitle}
 		</h3>
 	{/if}
