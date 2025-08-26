@@ -1,4 +1,5 @@
-import pkg from '../../../package.json' with { type: 'json' };
+import { readFileSync } from 'fs';
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 import { env } from '$env/dynamic/private';
 
 export const version = pkg.version;
@@ -10,4 +11,4 @@ export const BATCH_UNIVERSE = 50;
 export const BATCH_CHARACTERS = 50;
 export const BATCH_CORPORATIONS = 50;
 export const BATCH_ALLIANCES = 50;
-export const CHARACTER_REQUEST_BATCH_SIZE = 100;
+export const CHARACTER_REQUEST_BATCH_SIZE = 250;

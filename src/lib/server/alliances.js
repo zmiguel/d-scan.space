@@ -8,9 +8,7 @@ import { fetchGET } from './wrappers.js';
 
 async function getAllianceFromESI(id) {
 	// fetchGET has tracing built-in
-	const allianceData = await fetchGET(
-		`https://esi.evetech.net/alliances/${id}`
-	);
+	const allianceData = await fetchGET(`https://esi.evetech.net/alliances/${id}`);
 
 	if (!allianceData.ok) {
 		logger.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);

@@ -1,27 +1,16 @@
-<script lang="ts">
+<script>
 	import { twMerge } from 'tailwind-merge';
 	import { getContext } from 'svelte';
-	import type { HTMLLiAttributes } from 'svelte/elements';
 
-	interface $$Props extends HTMLLiAttributes {
-		htmlTitle?: string;
-		date?: string;
-		svgClass?: string;
-		classLi?: string;
-		classDiv?: string;
-		classTime?: string;
-		classH3?: string;
-	}
+	export let htmlTitle = '';
+	export let date = '';
+	export let svgClass = 'w-3 h-3 text-primary-600 dark:text-primary-400';
+	export let classDiv = '';
+	export let classLi = '';
+	export let classTime = '';
+	export let classH3 = '';
 
-	export let htmlTitle: $$Props['htmlTitle'] = '';
-	export let date: $$Props['date'] = '';
-	export let svgClass: $$Props['svgClass'] = 'w-3 h-3 text-primary-600 dark:text-primary-400';
-	export let classDiv: $$Props['classDiv'] = '';
-	export let classLi: $$Props['classLi'] = '';
-	export let classTime: $$Props['classTime'] = '';
-	export let classH3: $$Props['classH3'] = '';
-
-	let order: 'default' | 'vertical' | 'horizontal' | 'activity' | 'group' = 'default';
+	let order = 'default';
 	order = getContext('order');
 
 	const liClasses = {
@@ -52,9 +41,9 @@
 		group: 'text-lg font-semibold text-gray-900 dark:text-white'
 	};
 
-	let liCls: string = twMerge(liClasses[order], classLi);
-	let divCls: string = twMerge(divClasses[order], classDiv);
-	let timeCls: string = twMerge(timeClasses[order], classTime);
+	let liCls = twMerge(liClasses[order], classLi);
+	let divCls = twMerge(divClasses[order], classDiv);
+	let timeCls = twMerge(timeClasses[order], classTime);
 	const h3Cls = twMerge(
 		order === 'vertical'
 			? 'flex items-center mb-1 text-lg font-semibold text-gray-900 dark:text-white'
@@ -83,12 +72,12 @@
 			</svg>
 		</slot>
 	{:else if date}
-		<time class={timeCls}>{@html date}</time>
+		<time class={timeCls}>{date}</time>
 	{/if}
 
 	{#if htmlTitle}
 		<h3 class={h3Cls}>
-			{@html htmlTitle}
+			{htmlTitle}
 		</h3>
 	{/if}
 

@@ -7,9 +7,7 @@ import { fetchGET } from './wrappers.js';
 
 async function getCorporationFromESI(id) {
 	// fetchGET has tracing built-in
-	const corporationData = await fetchGET(
-		`https://esi.evetech.net/corporations/${id}`
-	);
+	const corporationData = await fetchGET(`https://esi.evetech.net/corporations/${id}`);
 
 	const corporationInfo = await corporationData.json();
 	corporationInfo.id = id;

@@ -11,9 +11,7 @@ import logger from '$lib/logger.js';
 import { CHARACTER_REQUEST_BATCH_SIZE } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
-	const characterData = await fetchGET(
-		`https://esi.evetech.net/characters/${id}`
-	);
+	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);
 
 	if (!characterData.ok) {
 		logger.error(`Failed to fetch character ${id}: ${characterData.statusText}`);
@@ -37,29 +35,36 @@ async function namesToCharacters(names) {
 	}
 
 	// Run all batch requests in parallel
-	const batchPromises = batches.map(async (batch) => {
-		const response = await fetchPOST(
-			'https://esi.evetech.net/universe/ids',
-			batch
-		);
+	const allCharacters = await withSpan('namesToCharacters.nameToId', async (span) => {
+		const batchPromises = batches.map(async (batch) => {
+			const response = await fetchPOST('https://esi.evetech.net/universe/ids', batch);
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			logger.error(
-				`Failed to get character ids from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
-			);
-			return [];
-		}
+			if (!response.ok) {
+				const errorText = await response.text();
+				logger.error(
+					`Failed to get character ids from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
+				);
+				return [];
+			}
 
-		const data = await response.json();
-		return data?.characters || [];
+			const data = await response.json();
+			return data?.characters || [];
+		});
+
+		// Wait for all batches to complete
+		const batchResults = await Promise.all(batchPromises);
+
+		// Flatten the results from all batches
+		const flatResults = batchResults.flat();
+
+		span.setAttributes({
+			'batch.total_batches': batches.length,
+			'batch.names_input': names.length,
+			'batch.characters_found': flatResults.length
+		});
+
+		return flatResults;
 	});
-
-	// Wait for all batches to complete
-	const batchResults = await Promise.all(batchPromises);
-
-	// Flatten the results from all batches
-	const allCharacters = batchResults.flat();
 
 	if (!allCharacters || allCharacters.length === 0) {
 		logger.error('Tried to add characters from ESI but charactersIds array was empty');
@@ -67,64 +72,82 @@ async function namesToCharacters(names) {
 	}
 
 	// Process character requests in batches to avoid overwhelming ESI
-	const characterData = [];
-	const characterBatches = [];
-	for (let i = 0; i < allCharacters.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
-		characterBatches.push(allCharacters.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
-	}
+	const characterData = await withSpan('namesToCharacters.fetchCharacterData', async (span) => {
+		const characterBatches = [];
+		for (let i = 0; i < allCharacters.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
+			characterBatches.push(allCharacters.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
+		}
 
-	for (let batchIndex = 0; batchIndex < characterBatches.length; batchIndex++) {
-		const characterBatch = characterBatches[batchIndex];
-		const batchPromises = characterBatch.map(async (character) => {
-			const characterInfo = await getCharacterFromESI(character.id);
-			return characterInfo;
+		const allCharacterData = [];
+		for (let batchIndex = 0; batchIndex < characterBatches.length; batchIndex++) {
+			const characterBatch = characterBatches[batchIndex];
+			const batchPromises = characterBatch.map(async (character) => {
+				const characterInfo = await getCharacterFromESI(character.id);
+				return characterInfo;
+			});
+
+			const batchResults = await Promise.all(batchPromises);
+			allCharacterData.push(...batchResults);
+		}
+
+		span.setAttributes({
+			'batch.character_batches': characterBatches.length,
+			'batch.characters_to_fetch': allCharacters.length,
+			'batch.characters_fetched': allCharacterData.length
 		});
 
-		const batchResults = await Promise.all(batchPromises);
-		characterData.push(...batchResults);
-	}
+		return allCharacterData;
+	});
 
 	return characterData;
 }
 
 export async function idsToCharacters(ids) {
-    return await withSpan('idsToCharacters', async () => {
-        // Split ids into batches
-        const batches = [];
-        for (let i = 0; i < ids.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
-            batches.push(ids.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
-        }
+	return await withSpan(
+		'idsToCharacters',
+		async () => {
+			// Split ids into batches
+			const batches = [];
+			for (let i = 0; i < ids.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
+				batches.push(ids.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
+			}
 
-        // Process batches sequentially to avoid overwhelming ESI
-        const allResults = [];
-        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-            const batch = batches[batchIndex];
-            const batchResult = await withSpan(`idsToCharacters.batch.${batchIndex + 1}`, async () => {
-                const batchData = [];
-                const characterPromises = batch.map(async (id) => {
-                    const characterInfo = await getCharacterFromESI(id);
-                    batchData.push(characterInfo);
-                });
+			// Process batches sequentially to avoid overwhelming ESI
+			const allResults = [];
+			for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+				const batch = batches[batchIndex];
+				const batchResult = await withSpan(
+					`idsToCharacters.batch.${batchIndex + 1}`,
+					async () => {
+						const batchData = [];
+						const characterPromises = batch.map(async (id) => {
+							const characterInfo = await getCharacterFromESI(id);
+							batchData.push(characterInfo);
+						});
 
-                await Promise.all(characterPromises);
-                return batchData;
-            }, {
-                'batch.size': batch.length,
-                'batch.start_id': batch[0],
-                'batch.end_id': batch[batch.length - 1],
-                'batch.index': batchIndex + 1,
-                'batch.total': batches.length
-            });
+						await Promise.all(characterPromises);
+						return batchData;
+					},
+					{
+						'batch.size': batch.length,
+						'batch.start_id': batch[0],
+						'batch.end_id': batch[batch.length - 1],
+						'batch.index': batchIndex + 1,
+						'batch.total': batches.length
+					}
+				);
 
-            allResults.push(...batchResult);
-        }
+				allResults.push(...batchResult);
+			}
 
-        return allResults;
-    },{
-		'idsToCharacters.id.length': ids.length,
-		'idsToCharacters.batchSize': CHARACTER_REQUEST_BATCH_SIZE,
-        'idsToCharacters.total_batches': Math.ceil(ids.length / CHARACTER_REQUEST_BATCH_SIZE)
-	});
+			return allResults;
+		},
+		{
+			'idsToCharacters.id.length': ids.length,
+			'idsToCharacters.batchSize': CHARACTER_REQUEST_BATCH_SIZE,
+			'idsToCharacters.total_batches': Math.ceil(ids.length / CHARACTER_REQUEST_BATCH_SIZE)
+		}
+	);
 }
 
 async function addOrUpdateCharacters(data) {
@@ -154,36 +177,41 @@ async function addOrUpdateCharacters(data) {
 }
 
 export async function addCharactersFromESI(characters, sanityCheck = false) {
-	await withSpan('addCharactersFromESI', async () => {
-		// check if characters is empty
-		if (characters.length === 0 || !characters) {
-			logger.warn('Tried to add characters from ESI but characters array was empty');
-			return;
-		}
-
-		// sanity check if we already have it in the database
-		if (sanityCheck) {
-			const charactersInDB = await getCharactersByName(characters);
-			if (charactersInDB.length === characters.length) {
+	await withSpan(
+		'addCharactersFromESI',
+		async () => {
+			// check if characters is empty
+			if (characters.length === 0 || !characters) {
+				logger.warn('Tried to add characters from ESI but characters array was empty');
 				return;
 			}
+
+			// sanity check if we already have it in the database
+			if (sanityCheck) {
+				const charactersInDB = await getCharactersByName(characters);
+				if (charactersInDB.length === characters.length) {
+					return;
+				}
+			}
+
+			// Get Character IDS
+			const charactersData = await withSpan('namesToCharacters', async () => {
+				return await namesToCharacters(characters);
+			});
+
+			// check if charactersIds is empty or if characters is empty
+			if (!charactersData || charactersData.length === 0) {
+				logger.error('Tried to add characters from ESI but charactersIds array was empty');
+				return;
+			}
+
+			await addOrUpdateCharacters(charactersData);
+		},
+		{
+			'characters.add_from_esi': characters.length,
+			sanity_check: sanityCheck
 		}
-
-		// Get Character IDS
-		const charactersData = await namesToCharacters(characters);
-
-		// check if charactersIds is empty or if characters is empty
-		if (!charactersData || charactersData.length === 0) {
-			logger.error('Tried to add characters from ESI but charactersIds array was empty');
-			return;
-		}
-
-		await addOrUpdateCharacters(charactersData);
-	}, {
-		'characters.add_from_esi': characters.length,
-		'sanity_check': sanityCheck
-	});
-
+	);
 }
 
 export async function updateCharactersFromESI(data) {

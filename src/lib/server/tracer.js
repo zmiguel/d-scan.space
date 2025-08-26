@@ -1,5 +1,6 @@
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
-import pkg from '../../../package.json' with { type: 'json' };
+import { readFileSync } from 'fs';
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 import logger from '$lib/logger';
 
 // Get a tracer instance for your application
@@ -11,11 +12,13 @@ const tracer = trace.getTracer('d-scan.space', pkg.version);
  * @returns {boolean} - True if it's a redirect
  */
 function isRedirect(error) {
-    return error &&
-           typeof error === 'object' &&
-           error.constructor.name === 'Redirect' &&
-           typeof error.status === 'number' &&
-           typeof error.location === 'string';
+	return (
+		error &&
+		typeof error === 'object' &&
+		error.constructor.name === 'Redirect' &&
+		typeof error.status === 'number' &&
+		typeof error.location === 'string'
+	);
 }
 
 /**
@@ -27,61 +30,61 @@ function isRedirect(error) {
  * @returns {Promise} - The result of the function execution
  */
 export async function withSpan(name, fn, attributes = {}, options = {}) {
-    const span = tracer.startSpan(name, options);
+	const span = tracer.startSpan(name, options);
 
-    // Add attributes if provided
-    if (Object.keys(attributes).length > 0) {
-        span.setAttributes(attributes);
-    }
+	// Add attributes if provided
+	if (Object.keys(attributes).length > 0) {
+		span.setAttributes(attributes);
+	}
 
-    try {
-        // Execute the function within the span context
-        const result = await context.with(trace.setSpan(context.active(), span), async () => {
-            return await fn(span);
-        });
+	try {
+		// Execute the function within the span context
+		const result = await context.with(trace.setSpan(context.active(), span), async () => {
+			return await fn(span);
+		});
 
-        span.setStatus({ code: SpanStatusCode.OK });
-        return result;
-    } catch (error) {
-        // Check if this is a SvelteKit redirect (not an actual error)
-        if (isRedirect(error)) {
-            // Add redirect information to the span
-            span.setAttributes({
-                'http.response.status_code': error.status,
-                'http.response.redirect.location': error.location,
-                'sveltekit.redirect': true
-            });
-            span.addEvent('redirect', {
-                status: error.status,
-                location: error.location
-            });
-            span.setStatus({ code: SpanStatusCode.OK });
+		span.setStatus({ code: SpanStatusCode.OK });
+		return result;
+	} catch (error) {
+		// Check if this is a SvelteKit redirect (not an actual error)
+		if (isRedirect(error)) {
+			// Add redirect information to the span
+			span.setAttributes({
+				'http.response.status_code': error.status,
+				'http.response.redirect.location': error.location,
+				'sveltekit.redirect': true
+			});
+			span.addEvent('redirect', {
+				status: error.status,
+				location: error.location
+			});
+			span.setStatus({ code: SpanStatusCode.OK });
 
-            // Re-throw the redirect to maintain SvelteKit's flow
-            throw error;
-        }
+			// Re-throw the redirect to maintain SvelteKit's flow
+			throw error;
+		}
 
-        // Handle actual errors
-        logger.error('Error occurred in span: ' + error.message);
-        span.recordException(error);
-        span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error.message,
-        });
-        span.addEvent('error', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code || 'UNKNOWN_ERROR',
-        });
-        span.setAttributes({
-            'error.message': error.message,
-            'error.stack': error.stack,
-            'error.code': error.code || 'UNKNOWN_ERROR',
-        });
-        throw error;
-    } finally {
-        span.end();
-    }
+		// Handle actual errors
+		logger.error('Error occurred in span: ' + error.message);
+		span.recordException(error);
+		span.setStatus({
+			code: SpanStatusCode.ERROR,
+			message: error.message
+		});
+		span.addEvent('error', {
+			message: error.message,
+			stack: error.stack,
+			code: error.code || 'UNKNOWN_ERROR'
+		});
+		span.setAttributes({
+			'error.message': error.message,
+			'error.stack': error.stack,
+			'error.code': error.code || 'UNKNOWN_ERROR'
+		});
+		throw error;
+	} finally {
+		span.end();
+	}
 }
 
 /**
@@ -92,13 +95,13 @@ export async function withSpan(name, fn, attributes = {}, options = {}) {
  * @returns {Span} - The created span (remember to call span.end())
  */
 export function createSpan(name, attributes = {}, options = {}) {
-    const span = tracer.startSpan(name, options);
+	const span = tracer.startSpan(name, options);
 
-    if (Object.keys(attributes).length > 0) {
-        span.setAttributes(attributes);
-    }
+	if (Object.keys(attributes).length > 0) {
+		span.setAttributes(attributes);
+	}
 
-    return span;
+	return span;
 }
 
 /**
@@ -106,7 +109,7 @@ export function createSpan(name, attributes = {}, options = {}) {
  * @returns {Span|undefined} - The current active span
  */
 export function getCurrentSpan() {
-    return trace.getActiveSpan();
+	return trace.getActiveSpan();
 }
 
 /**
@@ -114,10 +117,10 @@ export function getCurrentSpan() {
  * @param {Object} attributes - Attributes to add
  */
 export function addAttributes(attributes) {
-    const span = getCurrentSpan();
-    if (span) {
-        span.setAttributes(attributes);
-    }
+	const span = getCurrentSpan();
+	if (span) {
+		span.setAttributes(attributes);
+	}
 }
 
 /**
@@ -126,10 +129,10 @@ export function addAttributes(attributes) {
  * @param {Object} attributes - Event attributes
  */
 export function addEvent(name, attributes = {}) {
-    const span = getCurrentSpan();
-    if (span) {
-        span.addEvent(name, attributes);
-    }
+	const span = getCurrentSpan();
+	if (span) {
+		span.addEvent(name, attributes);
+	}
 }
 
 // Export the raw tracer for advanced use cases

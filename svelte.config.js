@@ -9,13 +9,13 @@ const config = {
 		// See https://kit.svelte.dev/docs/adapters for more information about adapters.
 		adapter: adapter({
 			external: [
-				"@opentelemetry/api",
-				"@opentelemetry/auto-instrumentations-node",
-				"@opentelemetry/exporter-trace-otlp-proto",
-				"@opentelemetry/resources",
-				"@opentelemetry/sdk-node",
-				"@opentelemetry/sdk-trace-node",
-				"@opentelemetry/semantic-conventions",
+				'@opentelemetry/api',
+				'@opentelemetry/auto-instrumentations-node',
+				'@opentelemetry/exporter-trace-otlp-proto',
+				'@opentelemetry/resources',
+				'@opentelemetry/sdk-node',
+				'@opentelemetry/sdk-trace-node',
+				'@opentelemetry/semantic-conventions',
 				'shimmer'
 			]
 		})

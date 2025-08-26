@@ -8,28 +8,32 @@ import { characters, corporations, alliances } from '../database/schema';
 import { asc, eq, inArray, sql, and, lt, gt } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
-	return await withSpan('getCharactersByName', async () => {
-		return db
-			.select({
-				id: characters.id,
-				name: characters.name,
-				sec_status: characters.sec_status,
-				corporation_name: corporations.name,
-				corporation_ticker: corporations.ticker,
-				corporation_id: characters.corporation_id,
-				alliance_name: alliances.name,
-				alliance_ticker: alliances.ticker,
-				alliance_id: characters.alliance_id,
-				last_seen: characters.last_seen,
-				updated_at: characters.updated_at
-			})
-			.from(characters)
-			.leftJoin(corporations, eq(characters.corporation_id, corporations.id))
-			.leftJoin(alliances, eq(characters.alliance_id, alliances.id))
-			.where(inArray(characters.name, names));
-	}, {
-		'db.characters.get_by_name': names.length
-	});
+	return await withSpan(
+		'getCharactersByName',
+		async () => {
+			return db
+				.select({
+					id: characters.id,
+					name: characters.name,
+					sec_status: characters.sec_status,
+					corporation_name: corporations.name,
+					corporation_ticker: corporations.ticker,
+					corporation_id: characters.corporation_id,
+					alliance_name: alliances.name,
+					alliance_ticker: alliances.ticker,
+					alliance_id: characters.alliance_id,
+					last_seen: characters.last_seen,
+					updated_at: characters.updated_at
+				})
+				.from(characters)
+				.leftJoin(corporations, eq(characters.corporation_id, corporations.id))
+				.leftJoin(alliances, eq(characters.alliance_id, alliances.id))
+				.where(inArray(characters.name, names));
+		},
+		{
+			'db.characters.get_by_name': names.length
+		}
+	);
 }
 
 export async function getAllCharacters() {

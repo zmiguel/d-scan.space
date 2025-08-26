@@ -47,14 +47,26 @@
 		<FooterCopyright href="/" by="D-Scan" />
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<FooterLinkGroup
-			ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
+				ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
 			>
-			<FooterLink href="/about">About</FooterLink>
-			<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
-			<FooterLink href="/contact">Contact</FooterLink>
-			<FooterLink aClass="text-blue-500 dark:text-blue-400 hover:underline" href="https://store.eveonline.com/" target="_blank">Use code <span class="font-bold italic text-red-500 dark:text-red-400">OXED</span> on the EVE Online Store</FooterLink>
-		</FooterLinkGroup>
-		<FooterBrand imgClass="me-4 w-auto h-16" href="https://www.eveonline.com/partners" target="_blank" src={asset('/PartnerBadge2.png')} alt="Partner Link" />
+				<FooterLink href="/about">About</FooterLink>
+				<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
+				<FooterLink href="/contact">Contact</FooterLink>
+				<FooterLink
+					aClass="text-blue-500 dark:text-blue-400 hover:underline"
+					href="https://store.eveonline.com/"
+					target="_blank"
+					>Use code <span class="font-bold italic text-red-500 dark:text-red-400">OXED</span> on the
+					EVE Online Store</FooterLink
+				>
+			</FooterLinkGroup>
+			<FooterBrand
+				imgClass="me-4 w-auto h-16"
+				href="https://www.eveonline.com/partners"
+				target="_blank"
+				src={asset('/PartnerBadge2.png')}
+				alt="Partner Link"
+			/>
 		</div>
 	</Footer>
 </div>
