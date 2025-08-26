@@ -8,7 +8,7 @@ import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/char
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
 import logger from '$lib/logger.js';
-//import { DOOMHEIM_ID } from '$lib/server/constants.js';
+import { CHARACTER_REQUEST_BATCH_SIZE } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
 	const characterData = await fetchGET(
@@ -66,51 +66,64 @@ async function namesToCharacters(names) {
 		return [];
 	}
 
-	let characterData = [];
-	const characterPromises = allCharacters.map(async (character) => {
-		const characterInfo = await getCharacterFromESI(character.id);
-		characterData.push(characterInfo);
-	});
+	// Process character requests in batches to avoid overwhelming ESI
+	const characterData = [];
+	const characterBatches = [];
+	for (let i = 0; i < allCharacters.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
+		characterBatches.push(allCharacters.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
+	}
 
-	await Promise.all(characterPromises);
+	for (let batchIndex = 0; batchIndex < characterBatches.length; batchIndex++) {
+		const characterBatch = characterBatches[batchIndex];
+		const batchPromises = characterBatch.map(async (character) => {
+			const characterInfo = await getCharacterFromESI(character.id);
+			return characterInfo;
+		});
+
+		const batchResults = await Promise.all(batchPromises);
+		characterData.push(...batchResults);
+	}
 
 	return characterData;
 }
 
-export async function idsToCharacters(ids, batchSize = 250) {
+export async function idsToCharacters(ids) {
     return await withSpan('idsToCharacters', async () => {
         // Split ids into batches
         const batches = [];
-        for (let i = 0; i < ids.length; i += batchSize) {
-            batches.push(ids.slice(i, i + batchSize));
+        for (let i = 0; i < ids.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
+            batches.push(ids.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
         }
 
-        // Process all batches in parallel
-        const batchPromises = batches.map(async (batch) => {
-			return await withSpan('idsToCharacters.batch', async () => {
-				const batchData = [];
-				const characterPromises = batch.map(async (id) => {
-					const characterInfo = await getCharacterFromESI(id);
-					batchData.push(characterInfo);
-				});
+        // Process batches sequentially to avoid overwhelming ESI
+        const allResults = [];
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex];
+            const batchResult = await withSpan(`idsToCharacters.batch.${batchIndex + 1}`, async () => {
+                const batchData = [];
+                const characterPromises = batch.map(async (id) => {
+                    const characterInfo = await getCharacterFromESI(id);
+                    batchData.push(characterInfo);
+                });
 
-				await Promise.all(characterPromises);
-				return batchData;
-			}, {
-				'batch.size': batch.length,
-				'batch.start_id': batch[0],
-				'batch.end_id': batch[batch.length - 1]
-			});
-		});
+                await Promise.all(characterPromises);
+                return batchData;
+            }, {
+                'batch.size': batch.length,
+                'batch.start_id': batch[0],
+                'batch.end_id': batch[batch.length - 1],
+                'batch.index': batchIndex + 1,
+                'batch.total': batches.length
+            });
 
-        // Wait for all batches to complete
-        const batchResults = await Promise.all(batchPromises);
+            allResults.push(...batchResult);
+        }
 
-        // Flatten the results from all batches
-        return batchResults.flat();
+        return allResults;
     },{
 		'idsToCharacters.id.length': ids.length,
-		'idsToCharacters.batchSize': batchSize
+		'idsToCharacters.batchSize': CHARACTER_REQUEST_BATCH_SIZE,
+        'idsToCharacters.total_batches': Math.ceil(ids.length / CHARACTER_REQUEST_BATCH_SIZE)
 	});
 }
 

@@ -65,7 +65,8 @@ export async function addOrUpdateCharactersDB(data) {
 					sec_status: sql`excluded.sec_status`,
 					corporation_id: sql`excluded.corporation_id`,
 					alliance_id: sql`excluded.alliance_id`,
-					updated_at: sql`now()`
+					updated_at: sql`now()`,
+					last_seen: sql`now()`
 				}
 			});
 	});

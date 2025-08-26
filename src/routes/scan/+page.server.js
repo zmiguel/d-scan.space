@@ -2,7 +2,7 @@ import ShortUniqueId from 'short-unique-id';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
-import { addEvent, withSpan } from '$lib/server/tracer';
+import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 
 /** @satisfies {import('./$types').Actions} */

@@ -7,6 +7,7 @@ export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV}; ${env.AGENT
 
 // BATCH SETTINGS
 export const BATCH_UNIVERSE = 50;
-export const BATCH_CHARACTERS = 100;
-export const BATCH_CORPORATIONS = 100;
-export const BATCH_ALLIANCES = 100;
+export const BATCH_CHARACTERS = 50;
+export const BATCH_CORPORATIONS = 50;
+export const BATCH_ALLIANCES = 50;
+export const CHARACTER_REQUEST_BATCH_SIZE = 100;
