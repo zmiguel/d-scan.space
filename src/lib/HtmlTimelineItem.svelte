@@ -72,12 +72,12 @@
 			</svg>
 		</slot>
 	{:else if date}
-		<time class={timeCls}>{date}</time>
+		<time class={timeCls}>{@html date}</time>
 	{/if}
 
 	{#if htmlTitle}
 		<h3 class={h3Cls}>
-			{htmlTitle}
+			{@html htmlTitle}
 		</h3>
 	{/if}
 
