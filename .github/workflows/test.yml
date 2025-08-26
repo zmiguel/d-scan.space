@@ -28,7 +28,7 @@ jobs:
         run: npm run test
 
       - name: Build project
-        run: npm run build
+        run: BUILD=true npm run build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
