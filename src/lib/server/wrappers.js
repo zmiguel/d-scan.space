@@ -70,7 +70,7 @@ export async function fetchGET(url, maxRetries = 3) {
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
-						if (response.status === 404 && fullResponse.includes('deleted')) {
+						if (response.status === 404 && fullResponse.error.includes('deleted')) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
@@ -156,7 +156,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
-						if (response.status === 404 && fullResponse.includes('deleted')) {
+						if (response.status === 404 && fullResponse.error.includes('deleted')) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
