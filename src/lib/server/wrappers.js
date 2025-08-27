@@ -49,6 +49,11 @@ export async function fetchGET(url, maxRetries = 3) {
 						})
 					});
 
+					// Check if response is not ok and throw error
+					if (!response.ok) {
+						throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+					}
+
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
@@ -123,6 +128,11 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 							attempt: attempt
 						})
 					});
+
+					// Check if response is not ok and throw error
+					if (!response.ok) {
+						throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+					}
 
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
