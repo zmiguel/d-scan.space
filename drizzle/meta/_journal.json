@@ -22,6 +22,13 @@
 			"when": 1756307097190,
 			"tag": "0002_romantic_newton_destine",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1756307830732,
+			"tag": "0003_minor_chimera",
+			"breakpoints": true
 		}
 	]
 }
