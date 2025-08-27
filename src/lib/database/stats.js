@@ -69,6 +69,10 @@ export async function getCharacterStats() {
 				charactersWithoutAlliance:
 					sql`COUNT(DISTINCT CASE WHEN ${characters.alliance_id} IS NULL THEN ${characters.id} END)`.mapWith(
 						Number
+					),
+				charactersDeleted:
+					sql`COUNT(DISTINCT CASE WHEN ${characters.deleted_at} IS NOT NULL THEN ${characters.id} END)`.mapWith(
+						Number
 					)
 			})
 			.from(characters);
@@ -104,6 +108,10 @@ export async function getCorporationStats() {
 					),
 				corporationsWithoutAlliance:
 					sql`COUNT(DISTINCT CASE WHEN ${corporations.alliance_id} IS NULL THEN ${corporations.id} END)`.mapWith(
+						Number
+					),
+				npcCorporations:
+					sql`COUNT(DISTINCT CASE WHEN ${corporations.npc} = true THEN ${corporations.id} END)`.mapWith(
 						Number
 					)
 			})

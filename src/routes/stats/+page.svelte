@@ -170,6 +170,18 @@
 						>
 					</span>
 				</div>
+				<div class="flex justify-between">
+					<span class="text-gray-600 dark:text-gray-400">Deleted:</span>
+					<span class="font-semibold text-gray-800 dark:text-gray-200">
+						{characterStats.charactersDeleted.toLocaleString()}
+						<span class="text-sm text-gray-500 dark:text-gray-400"
+							>({getPercentage(
+								characterStats.charactersDeleted,
+								characterStats.totalCharacters
+							)}%)</span
+						>
+					</span>
+				</div>
 			</div>
 		</div>
 
@@ -250,6 +262,18 @@
 						<span class="text-sm text-gray-500 dark:text-gray-400"
 							>({getPercentage(
 								corporationStats.corporationsWithoutAlliance,
+								corporationStats.totalCorporations
+							)}%)</span
+						>
+					</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-gray-600 dark:text-gray-400">NPC Corps:</span>
+					<span class="font-semibold text-gray-800 dark:text-gray-200">
+						{corporationStats.npcCorporations.toLocaleString()}
+						<span class="text-sm text-gray-500 dark:text-gray-400"
+							>({getPercentage(
+								corporationStats.npcCorporations,
 								corporationStats.totalCorporations
 							)}%)</span
 						>
