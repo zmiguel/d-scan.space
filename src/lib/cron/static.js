@@ -17,19 +17,27 @@ export async function updateStaticData() {
 	logger.info('[SDEUpdater] Updating static data...');
 	await withSpan('CRON Static', async () => {
 		// Get SDE checksums and compare them to the last entry in DB
-		const [results, checksums] = await withSpan('SDE Checksum Check', async () => {
-			const dbChecksums = await getLastChecksums();
+		const [results, onlineChecksums] = await withSpan('SDE Checksum Check', async () => {
+			const dbChecksumsArray = await getLastChecksums();
+			const dbChecksums = dbChecksumsArray[0]; // Get first result from array
 			const onlineChecksums = await getOnlineChecksums();
+
+			// If no previous checksums exist, force an update
+			if (!dbChecksums) {
+				logger.info('[SDEUpdater] No previous SDE data found, update needed.');
+				return [1, onlineChecksums];
+			}
+
 			if (
 				dbChecksums.fsd_checksum === onlineChecksums.fsd &&
 				dbChecksums.bsd_checksum === onlineChecksums.bsd &&
 				dbChecksums.universe_checksum === onlineChecksums.universe
 			) {
 				logger.info('[SDEUpdater] Static data is up to date, no update needed.');
-				return { results: 0, onlineChecksums };
+				return [0, onlineChecksums];
 			}
 			logger.info('[SDEUpdater] Static data is out of date, update needed.');
-			return { results: 1, onlineChecksums };
+			return [1, onlineChecksums];
 		});
 
 		// no update needed
@@ -55,9 +63,9 @@ export async function updateStaticData() {
 		});
 		await cleanupTemp();
 
-		if (fsd_status !== 0) {
-			logger.error('[SDEUpdater] FSD Update succeeded.');
-			addSDEDataEntry(checksums);
+		if (fsd_status === 0) {
+			logger.info('[SDEUpdater] FSD Update succeeded.');
+			await addSDEDataEntry(onlineChecksums);
 		}
 	});
 
@@ -249,7 +257,7 @@ async function updateNPCCorps() {
 			span.setStatus({ code: 0, message: 'NPC corporations updated successfully' });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			logger.error('Error updating NPC corporations', { error: errorMessage });
+			logger.error(`Error updating NPC corporations: ${errorMessage}`);
 			span.setStatus({ code: 2, message: errorMessage });
 			throw error;
 		}
