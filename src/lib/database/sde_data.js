@@ -14,14 +14,13 @@ export async function getLastChecksums() {
 	});
 }
 
-
 export async function addSDEDataEntry(checksums) {
-    await withSpan('addSDEDataEntry', async () => {
-        await db.insert(sde_data).values({
-            fsd_checksum: checksums.fsd,
-            bsd_checksum: checksums.bsd,
-            universe_checksum: checksums.universe,
-            success: true
-        });
-    });
+	await withSpan('addSDEDataEntry', async () => {
+		await db.insert(sde_data).values({
+			fsd_checksum: checksums.fsd,
+			bsd_checksum: checksums.bsd,
+			universe_checksum: checksums.universe,
+			success: true
+		});
+	});
 }

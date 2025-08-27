@@ -1,6 +1,6 @@
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
-import { getLastChecksums } from '$lib/database/sde_data';
+import { getLastChecksums, addSDEDataEntry } from '$lib/database/sde_data';
 import {
 	SDE_FSD_CHECKSUM,
 	SDE_BSD_CHECKSUM,
@@ -51,9 +51,9 @@ export async function updateStaticData() {
 		});
 		await cleanupTemp();
 
-		if (fsd_status !== 1) {
-			logger.error('[DynUpdater] FSD Update failed, aborting static update.');
-			return false;
+		if (fsd_status !== 0) {
+			logger.error('[DynUpdater] FSD Update succeeded.');
+			addSDEDataEntry(checksums);
 		}
 	});
 
