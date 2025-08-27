@@ -69,19 +69,24 @@ export async function addOrUpdateCharactersDB(data) {
 					sec_status: sql`excluded.sec_status`,
 					corporation_id: sql`excluded.corporation_id`,
 					alliance_id: sql`excluded.alliance_id`,
-					updated_at: sql`now()`,
-					last_seen: sql`now()`
+					updated_at: sql`now()`
 				}
 			});
 	});
 }
 
 export function updateCharactersLastSeen(data) {
+	if (!data || data.length === 0) {
+		logger.warn('Tried to update characters last seen but characters array was empty');
+		return;
+	}
+	// convert list of characters in list of character ids
+	const characterIds = data.map((character) => character.id);
 	db.update(characters)
 		.set({
 			last_seen: new Date()
 		})
-		.where(inArray(characters.id, data));
+		.where(inArray(characters.id, characterIds));
 }
 
 export async function getLeastRecentlyUpdatedCharacters(limit) {
