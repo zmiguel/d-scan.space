@@ -26,7 +26,8 @@ export async function addOrUpdateCorporationsDB(data) {
 			id: corporation.id,
 			name: corporation.name,
 			ticker: corporation.ticker,
-			alliance_id: corporation.alliance_id ?? null
+			alliance_id: corporation.alliance_id ?? null,
+			npc: corporation.npc ?? false
 		}));
 
 		span.setAttributes({
@@ -42,6 +43,7 @@ export async function addOrUpdateCorporationsDB(data) {
 					name: sql`excluded.name`,
 					ticker: sql`excluded.ticker`,
 					alliance_id: sql`excluded.alliance_id`,
+					npc: sql`excluded.npc`,
 					updated_at: sql`now()`
 				}
 			});

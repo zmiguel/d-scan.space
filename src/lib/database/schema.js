@@ -54,6 +54,7 @@ export const corporations = pgTable('corporations', {
 	name: text().notNull(),
 	ticker: text().notNull(),
 	alliance_id: bigint({ mode: 'number' }).references(() => alliances.id),
+	npc: boolean().notNull().default(false),
 	last_seen: timestamp().defaultNow().notNull(),
 	created_at: timestamp().defaultNow().notNull(),
 	updated_at: timestamp().defaultNow().notNull()
@@ -78,4 +79,15 @@ export const systems = pgTable('systems', {
 	sec_status: doublePrecision().notNull(),
 	last_seen: timestamp(),
 	updated_at: timestamp().defaultNow().notNull()
+});
+
+// STATIC DATA
+
+export const sde_data = pgTable('sde_data', {
+	id: text().primaryKey(),
+	install_date: timestamp().defaultNow().notNull(),
+	fsd_checksum: text().notNull(),
+	bsd_checksum: text().notNull(),
+	universe_checksum: text().notNull(),
+	success: boolean().notNull().default(true)
 });

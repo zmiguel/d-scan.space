@@ -3,6 +3,7 @@
  */
 import { db } from '$lib/database/client';
 import logger from '$lib/logger';
+import { DOOMHEIM_ID } from '$lib/server/constants';
 import { withSpan } from '$lib/server/tracer';
 import { characters, corporations, alliances } from '../database/schema';
 import { asc, eq, inArray, sql, and, lt, gt } from 'drizzle-orm';
@@ -104,5 +105,20 @@ export async function getLeastRecentlyUpdatedCharacters(limit) {
 			)
 			.orderBy(asc(characters.updated_at))
 			.limit(limit);
+	});
+}
+
+export async function biomassCharacter(id) {
+	// When a character is deleted we need to move it to the DOOMHEIM corporation
+	await withSpan('biomassCharacter', async () => {
+		await db
+			.update(characters)
+			.set({
+				corporation_id: DOOMHEIM_ID,
+				alliance_id: null,
+				updated_at: sql`now()`,
+				deleted_at: sql`now()`
+			})
+			.where(eq(characters.id, id));
 	});
 }

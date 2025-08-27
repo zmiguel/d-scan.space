@@ -12,3 +12,17 @@ export const BATCH_CHARACTERS = 50;
 export const BATCH_CORPORATIONS = 50;
 export const BATCH_ALLIANCES = 50;
 export const CHARACTER_REQUEST_BATCH_SIZE = 250;
+
+// SDE LINKS
+export const SDE_FSD_CHECKSUM =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/fsd.zip.checksum';
+export const SDE_FSD =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/fsd.zip';
+export const SDE_BSD_CHECKSUM =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/bsd.zip.checksum';
+export const SDE_BSD =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/bsd.zip';
+export const SDE_UNIVERSE_CHECKSUM =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/universe.zip.checksum';
+export const SDE_UNIVERSE =
+	'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/universe.zip';

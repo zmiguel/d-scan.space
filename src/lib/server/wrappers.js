@@ -1,3 +1,4 @@
+import { biomassCharacter } from '$lib/database/characters';
 import { USER_AGENT } from './constants';
 import { withSpan } from './tracer.js';
 
@@ -9,6 +10,23 @@ const headers = {
 	'X-Tenant': 'tranquility',
 	'User-Agent': USER_AGENT
 };
+
+async function handleDelete(response, span, attempt, fullResponse) {
+	// Handle the deleted edge case
+	span.addEvent('Resource marked as deleted', {
+		url: response.url,
+		attempt: attempt,
+		fullResponse: fullResponse
+	});
+	if (response.url.includes('character')) {
+		const idStr = response.url.split('/').pop();
+		if (typeof idStr === 'string' && idStr.length > 0) {
+			await biomassCharacter(parseInt(idStr));
+		}
+	}
+	span.setStatus({ code: 0 });
+	return;
+}
 
 export async function fetchGET(url, maxRetries = 3) {
 	return await withSpan(
@@ -51,7 +69,13 @@ export async function fetchGET(url, maxRetries = 3) {
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
-						throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+						// deleted edge case
+						if (response.status === 404 && fullResponse.includes('deleted')) {
+							// Handle the deleted edge case
+							await handleDelete(response, span, attempt, fullResponse);
+						} else {
+							throw new Error(`HTTP ${response.status}: ${response.statusText} | ${fullResponse}`);
+						}
 					}
 
 					// Only set success status here, not error
@@ -131,7 +155,13 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
-						throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+						// deleted edge case
+						if (response.status === 404 && fullResponse.includes('deleted')) {
+							// Handle the deleted edge case
+							await handleDelete(response, span, attempt, fullResponse);
+						} else {
+							throw new Error(`HTTP ${response.status}: ${response.statusText} | ${fullResponse}`);
+						}
 					}
 
 					// Only set success status here, not error
