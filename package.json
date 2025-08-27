@@ -4,6 +4,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" vite dev",
+		"dev-win": "vite dev",
 		"build": "vite build",
 		"preview": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" vite preview --host 0.0.0.0 --port 4173",
 		"prod": "NODE_OPTIONS=\"--import ./instrumentation.mjs\" node build",

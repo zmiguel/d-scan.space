@@ -1,5 +1,7 @@
 <script>
 	import {
+		Accordion,
+		AccordionItem,
 		Avatar,
 		Breadcrumb,
 		BreadcrumbItem,
@@ -221,6 +223,7 @@
 				<!-- Second row: Using tabs for scan content -->
 				<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded min-h-[500px]">
 					<Tabs tabStyle="underline" contentClass="p-3">
+						<!-- Tab 1: Overview -->
 						<TabItem
 							open
 							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
@@ -230,10 +233,28 @@
 								<InfoCircleSolid size="md" />
 								Overview
 							</div>
-							<div class="space-y-2">
-								<div class="text-sm">Overview content goes here</div>
+							<div class=" grid grid-cols-3 gap-2">
+								<!-- Local Overview-->
+								<div class="col-span-1 border-e-2 border-gray-600 pe-2">
+									<Accordion flush multiple>
+										<AccordionItem>
+											{#snippet header()}Header 2-1{/snippet}
+											<p class="mb-2 text-gray-500 dark:text-gray-400">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab necessitatibus sint explicabo ...</p>
+										</AccordionItem>
+										<AccordionItem>
+											{#snippet header()}Header 2-2{/snippet}
+											<p class="mb-2 text-gray-500 dark:text-gray-400">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab necessitatibus sint explicabo ...</p>
+										</AccordionItem>
+									</Accordion>
+								</div>
+								<!-- Space Overview-->
+								<div class="col-span-2 border-e-2 border-gray-600">
+									space
+								</div>
 							</div>
 						</TabItem>
+
+						<!-- Tab 2: Local Scan -->
 						<TabItem
 							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
 							inactiveClasses="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
@@ -346,6 +367,8 @@
 								</div>
 							</div>
 						</TabItem>
+
+						<!-- Tab 3: Space Scan -->
 						<TabItem
 							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
 							inactiveClasses="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
