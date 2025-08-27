@@ -47,8 +47,7 @@ export async function updateStaticData() {
 			// 1. Update NPC Corps
 			await updateNPCCorps();
 		});
-        await cleanupTemp();
-
+		await cleanupTemp();
 	});
 
 	logger.info('[DynUpdater] Static data update completed.');
@@ -246,12 +245,11 @@ async function updateNPCCorps() {
 	});
 }
 
-
 async function cleanupTemp() {
-    // cleans up the ./temp directory after tasks are done
-    const tempDir = './temp';
-    if (fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-        logger.info('Temporary files cleaned up');
-    }
+	// cleans up the ./temp directory after tasks are done
+	const tempDir = './temp';
+	if (fs.existsSync(tempDir)) {
+		fs.rmSync(tempDir, { recursive: true, force: true });
+		logger.info('Temporary files cleaned up');
+	}
 }
