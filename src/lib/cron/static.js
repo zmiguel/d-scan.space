@@ -221,7 +221,7 @@ async function updateNPCCorps() {
 
 				// Validate required fields
 				if (!name || !ticker) {
-                    logger.warn(`Skipping NPC corporation ${corpId} due to missing name or ticker`);
+					logger.warn(`Skipping NPC corporation ${corpId} due to missing name or ticker`);
 					span.addEvent('Skipping corporation with missing data', {
 						corpId,
 						hasName: !!name,
