@@ -11,7 +11,7 @@ export const BATCH_UNIVERSE = 50;
 export const BATCH_CHARACTERS = 50;
 export const BATCH_CORPORATIONS = 50;
 export const BATCH_ALLIANCES = 50;
-export const CHARACTER_REQUEST_BATCH_SIZE = 250;
+export const CHARACTER_REQUEST_BATCH_SIZE = 500;
 
 // SDE LINKS
 export const SDE_FSD_CHECKSUM =
