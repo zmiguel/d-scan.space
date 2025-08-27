@@ -1,0 +1,1 @@
+ALTER TABLE "sde_data" ALTER COLUMN "id" SET DATA TYPE serial;

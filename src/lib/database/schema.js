@@ -2,6 +2,7 @@ import {
 	pgTable,
 	text,
 	bigint,
+	serial,
 	doublePrecision,
 	timestamp,
 	json,
@@ -84,7 +85,7 @@ export const systems = pgTable('systems', {
 // STATIC DATA
 
 export const sde_data = pgTable('sde_data', {
-	id: text().primaryKey(),
+	id: serial().primaryKey(),
 	install_date: timestamp().defaultNow().notNull(),
 	fsd_checksum: text().notNull(),
 	bsd_checksum: text().notNull(),

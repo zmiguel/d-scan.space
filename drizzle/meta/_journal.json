@@ -15,6 +15,13 @@
 			"when": 1756306282628,
 			"tag": "0001_mean_rocket_raccoon",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1756307097190,
+			"tag": "0002_romantic_newton_destine",
+			"breakpoints": true
 		}
 	]
 }

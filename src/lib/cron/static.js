@@ -17,7 +17,7 @@ export async function updateStaticData() {
 	logger.info('[DynUpdater] Updating static data...');
 	await withSpan('CRON Static', async () => {
 		// Get SDE checksums and compare them to the last entry in DB
-		const [ results, checksums ] = await withSpan('SDE Checksum Check', async () => {
+		const [results, checksums] = await withSpan('SDE Checksum Check', async () => {
 			const dbChecksums = await getLastChecksums();
 			const onlineChecksums = await getOnlineChecksums();
 			if (
@@ -46,8 +46,15 @@ export async function updateStaticData() {
 
 			// 1. Update NPC Corps
 			await updateNPCCorps();
+
+			return 0;
 		});
 		await cleanupTemp();
+
+		if (fsd_status !== 1) {
+			logger.error('[DynUpdater] FSD Update failed, aborting static update.');
+			return false;
+		}
 	});
 
 	logger.info('[DynUpdater] Static data update completed.');
