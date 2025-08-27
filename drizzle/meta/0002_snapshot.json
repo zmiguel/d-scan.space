@@ -1,6 +1,6 @@
 {
-	"id": "3c2d05e7-08a3-4bd7-905f-a56c8d62565c",
-	"prevId": "02466e29-5c00-45d7-8361-e5b094643158",
+	"id": "ccb33e83-8881-4954-bc97-d72f21b6307a",
+	"prevId": "3c2d05e7-08a3-4bd7-905f-a56c8d62565c",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -337,9 +337,20 @@
 			"columns": {
 				"id": {
 					"name": "id",
-					"type": "serial",
+					"type": "integer",
 					"primaryKey": true,
-					"notNull": true
+					"notNull": true,
+					"identity": {
+						"type": "always",
+						"name": "sde_data_id_seq",
+						"schema": "public",
+						"increment": "1",
+						"startWith": "1",
+						"minValue": "1",
+						"maxValue": "2147483647",
+						"cache": "1",
+						"cycle": false
+					}
 				},
 				"install_date": {
 					"name": "install_date",
