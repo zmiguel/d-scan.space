@@ -6,7 +6,7 @@ import logger from '$lib/logger';
 import { DOOMHEIM_ID } from '$lib/server/constants';
 import { withSpan } from '$lib/server/tracer';
 import { characters, corporations, alliances } from '../database/schema';
-import { asc, eq, inArray, sql, and, lt, gt } from 'drizzle-orm';
+import { asc, eq, inArray, sql, and, lt, gt, isNull } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
 	return await withSpan(
@@ -100,7 +100,8 @@ export async function getLeastRecentlyUpdatedCharacters(limit) {
 			.where(
 				and(
 					lt(characters.updated_at, sql`now() - interval '23 hours 30 minutes'`),
-					gt(characters.last_seen, sql`now() - interval '1 year'`)
+					gt(characters.last_seen, sql`now() - interval '1 year'`),
+					isNull(characters.deleted_at)
 				)
 			)
 			.orderBy(asc(characters.updated_at))
