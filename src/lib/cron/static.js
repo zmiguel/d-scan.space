@@ -17,7 +17,7 @@ export async function updateStaticData() {
 	logger.info('[DynUpdater] Updating static data...');
 	await withSpan('CRON Static', async () => {
 		// Get SDE checksums and compare them to the last entry in DB
-		const { results, checksums } = await withSpan('SDE Checksum Check', async () => {
+		const [ results, checksums ] = await withSpan('SDE Checksum Check', async () => {
 			const dbChecksums = await getLastChecksums();
 			const onlineChecksums = await getOnlineChecksums();
 			if (
