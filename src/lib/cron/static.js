@@ -14,7 +14,7 @@ import yaml from 'js-yaml';
 import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
 
 export async function updateStaticData() {
-	logger.info('[DynUpdater] Updating static data...');
+	logger.info('[SDEUpdater] Updating static data...');
 	await withSpan('CRON Static', async () => {
 		// Get SDE checksums and compare them to the last entry in DB
 		const [results, checksums] = await withSpan('SDE Checksum Check', async () => {
@@ -25,9 +25,11 @@ export async function updateStaticData() {
 				dbChecksums.bsd_checksum === onlineChecksums.bsd &&
 				dbChecksums.universe_checksum === onlineChecksums.universe
 			) {
-				logger.info('[DynUpdater] Static data is up to date, no update needed.');
+				logger.info('[SDEUpdater] Static data is up to date, no update needed.');
 				return { results: 0, onlineChecksums };
 			}
+			logger.info('[SDEUpdater] Static data is out of date, update needed.');
+			return { results: 1, onlineChecksums };
 		});
 
 		// no update needed
@@ -42,9 +44,11 @@ export async function updateStaticData() {
 			// Download and extract the need files from FSD
 			// Needed file are:
 			// - npcCorporations.yaml
+			logger.info('[SDEUpdater] Downloading and extracting FSD SDE...');
 			await downloadAndExtractSDE(SDE_FSD, ['npcCorporations.yaml']);
 
 			// 1. Update NPC Corps
+			logger.info('[SDEUpdater] Updating NPC Corporations...');
 			await updateNPCCorps();
 
 			return 0;
@@ -52,12 +56,12 @@ export async function updateStaticData() {
 		await cleanupTemp();
 
 		if (fsd_status !== 0) {
-			logger.error('[DynUpdater] FSD Update succeeded.');
+			logger.error('[SDEUpdater] FSD Update succeeded.');
 			addSDEDataEntry(checksums);
 		}
 	});
 
-	logger.info('[DynUpdater] Static data update completed.');
+	logger.info('[SDEUpdater] Static data update completed.');
 	return true;
 }
 
