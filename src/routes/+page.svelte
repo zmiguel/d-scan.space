@@ -21,9 +21,9 @@
 
 <div class="content-center">
 	{#if isLoading}
-		<div class="flex flex-col items-center justify-center min-h-[60vh] py-12">
+		<div class="flex min-h-[60vh] flex-col items-center justify-center py-12">
 			<Spinner size="12" class="mb-4" color="blue" />
-			<h2 class="text-2xl font-semibold mb-2 text-primary-700 dark:text-primary-400">
+			<h2 class="mb-2 text-2xl font-semibold text-primary-700 dark:text-primary-400">
 				... Processing ...
 			</h2>
 			<p class="text-gray-600 dark:text-gray-400">

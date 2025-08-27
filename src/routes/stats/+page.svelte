@@ -20,10 +20,10 @@
 	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Stats</h1>
 	<br />
 
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+	<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
 		<!-- Scans Stats -->
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-			<h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Scans</h2>
+		<div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
+			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Scans</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total Scans:</span>
@@ -89,8 +89,8 @@
 		</div>
 
 		<!-- Characters Stats -->
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-			<h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Characters</h2>
+		<div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
+			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Characters</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>
@@ -186,8 +186,8 @@
 		</div>
 
 		<!-- Corporations Stats -->
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-			<h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Corporations</h2>
+		<div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
+			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Corporations</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>
@@ -283,8 +283,8 @@
 		</div>
 
 		<!-- Alliances Stats -->
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-			<h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Alliances</h2>
+		<div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
+			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Alliances</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>

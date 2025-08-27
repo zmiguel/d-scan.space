@@ -176,14 +176,14 @@
 <div class="container mx-auto">
 	<div class="grid grid-cols-12 gap-4">
 		<!-- Main content area (80-85% width) -->
-		<div class="col-span-12 md:col-span-10 p-2 bg-white dark:bg-gray-800 rounded-lg">
+		<div class="col-span-12 rounded-lg bg-white p-2 md:col-span-10 dark:bg-gray-800">
 			<div class="min-h-[600px]">
 				<!-- First row: Breadcrumbs and timestamp -->
 				<div
-					class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-2 border-b-2 dark:border-gray-600"
+					class="mb-4 flex flex-col items-start justify-between border-b-2 pb-2 sm:flex-row sm:items-center dark:border-gray-600"
 				>
-					<div class="flex items-center gap-2 mb-2 sm:mb-0">
-						<Breadcrumb aria-label="System location" class="bg-transparent p-0 mb-0">
+					<div class="mb-2 flex items-center gap-2 sm:mb-0">
+						<Breadcrumb aria-label="System location" class="mb-0 bg-transparent p-0">
 							{#if data.system}
 								<BreadcrumbItem>
 									<svelte:fragment slot="icon">
@@ -195,13 +195,13 @@
 								</BreadcrumbItem>
 								<BreadcrumbItem>
 									<svelte:fragment slot="icon">
-										<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
+										<ChevronLeftOutline class="h-5 w-5 dark:text-gray-200" />
 									</svelte:fragment>
 									{constellation}
 								</BreadcrumbItem>
 								<BreadcrumbItem>
 									<svelte:fragment slot="icon">
-										<ChevronLeftOutline class="w-5 h-5 dark:text-gray-200" />
+										<ChevronLeftOutline class="h-5 w-5 dark:text-gray-200" />
 									</svelte:fragment>
 									<span class="align-text-top">{region}</span>
 								</BreadcrumbItem>
@@ -221,7 +221,7 @@
 				</div>
 
 				<!-- Second row: Using tabs for scan content -->
-				<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded-sm min-h-[500px]">
+				<div class="min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
 					<Tabs tabStyle="underline" contentClass="p-3">
 						<!-- Tab 1: Overview -->
 						<TabItem
@@ -239,18 +239,22 @@
 									<Accordion flush multiple>
 										<AccordionItem>
 											{#snippet header()}Header 2-1{/snippet}
-											<p class="mb-2 text-gray-500 dark:text-gray-400">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab necessitatibus sint explicabo ...</p>
+											<p class="mb-2 text-gray-500 dark:text-gray-400">
+												Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab
+												necessitatibus sint explicabo ...
+											</p>
 										</AccordionItem>
 										<AccordionItem>
 											{#snippet header()}Header 2-2{/snippet}
-											<p class="mb-2 text-gray-500 dark:text-gray-400">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab necessitatibus sint explicabo ...</p>
+											<p class="mb-2 text-gray-500 dark:text-gray-400">
+												Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab
+												necessitatibus sint explicabo ...
+											</p>
 										</AccordionItem>
 									</Accordion>
 								</div>
 								<!-- Space Overview-->
-								<div class="col-span-2 border-e-2 border-gray-600">
-									space
-								</div>
+								<div class="col-span-2 border-e-2 border-gray-600">space</div>
 							</div>
 						</TabItem>
 
@@ -265,13 +269,13 @@
 							</div>
 							<div class=" grid grid-cols-3 gap-2">
 								<div class="col-span-1 border-e-2 border-gray-600">
-									<h1 class="font-bold ms-2 text-xl">Alliances</h1>
+									<h1 class="ms-2 text-xl font-bold">Alliances</h1>
 									<div class="col-auto mt-2">
 										{#each data.local?.alliances ?? [] as alliance}
 											<div
-												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
-												<div class="flex items-center space-x-2 mt-1 rtl:space-x-reverse">
+												<div class="mt-1 flex items-center space-x-2 rtl:space-x-reverse">
 													<Avatar
 														rounded
 														src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
@@ -292,7 +296,7 @@
 														</div>
 													</div>
 												</div>
-												<div class="text-amber-600 dark:text-amber-400 me-3">
+												<div class="me-3 text-amber-600 dark:text-amber-400">
 													{alliance.character_count}
 												</div>
 											</div>
@@ -300,13 +304,13 @@
 									</div>
 								</div>
 								<div class="col-span-1 border-e-2 border-gray-600">
-									<h1 class="font-bold ms-2 text-xl">Corporations</h1>
+									<h1 class="ms-2 text-xl font-bold">Corporations</h1>
 									<div class="col-auto mt-2">
 										{#each corps as corp}
 											<div
-												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
-												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
+												<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 													<Avatar
 														rounded
 														src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"
@@ -325,7 +329,7 @@
 														{/if}
 													</div>
 												</div>
-												<div class="text-amber-600 dark:text-amber-400 me-2">
+												<div class="me-2 text-amber-600 dark:text-amber-400">
 													{corp.character_count}
 												</div>
 											</div>
@@ -333,13 +337,13 @@
 									</div>
 								</div>
 								<div class="col-span-1">
-									<h1 class="font-bold ms-2 text-xl">Pilots</h1>
+									<h1 class="ms-2 text-xl font-bold">Pilots</h1>
 									<div class="col-auto mt-2">
 										{#each pilots as pilot}
 											<div
-												class="flex flex-col sm:flex-row justify-between items-start sm:items-center"
+												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
-												<div class="flex items-center space-x-4 mt-1 rtl:space-x-reverse">
+												<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 													<Avatar
 														rounded
 														src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"
@@ -384,16 +388,16 @@
 		</div>
 
 		<!-- Sidebar (15-20% width) -->
-		<div class="col-span-12 md:col-span-2 bg-white dark:bg-gray-800 rounded-lg p-2">
+		<div class="col-span-12 rounded-lg bg-white p-2 md:col-span-2 dark:bg-gray-800">
 			<!-- Row 1: Update current scan -->
 			<div class="mb-3">
-				<h3 class="text-lg font-semibold mb-3 border-b pb-2">Update Scan</h3>
+				<h3 class="mb-3 border-b pb-2 text-lg font-semibold">Update Scan</h3>
 				{#if isLoading}
 					<div class="flex flex-col items-center justify-center py-4">
 						<div class="text-center">
 							<div class="inline-block">
 								<svg
-									class="animate-spin h-7 w-7 text-primary-600"
+									class="h-7 w-7 animate-spin text-primary-600"
 									xmlns="http://www.w3.org/2000/svg"
 									fill="none"
 									viewBox="0 0 24 24"
@@ -413,7 +417,7 @@
 									></path>
 								</svg>
 							</div>
-							<p class="text-base mt-2 text-gray-600 dark:text-gray-400">Processing...</p>
+							<p class="mt-2 text-base text-gray-600 dark:text-gray-400">Processing...</p>
 						</div>
 					</div>
 				{:else}
@@ -432,10 +436,10 @@
 							rows={4}
 							name="scan_content"
 							required
-							class="text-sm mb-2"
+							class="mb-2 text-sm"
 						/>
 						{#if formError}
-							<div class="text-red-500 text-xs mb-2">{formError}</div>
+							<div class="mb-2 text-xs text-red-500">{formError}</div>
 						{/if}
 						<Button class="w-full text-sm" color="primary" type="submit" size="sm">Update</Button>
 					</form>
@@ -444,7 +448,7 @@
 
 			<!-- Row 2: Timeline of related scans -->
 			<div>
-				<h3 class="text-lg font-semibold mb-3 border-b pb-2">Related Scans</h3>
+				<h3 class="mb-3 border-b pb-2 text-lg font-semibold">Related Scans</h3>
 				{#if sortedRelatedScans.length > 0}
 					<Timeline order="vertical">
 						{#each sortedRelatedScans as scan}
@@ -455,12 +459,12 @@
 							>
 								{#snippet icon()}
 									<span
-										class="flex absolute -start-3 justify-center items-center w-6 h-6 bg-primary-200 rounded-full dark:bg-primary-900"
+										class="absolute -start-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary-200 dark:bg-primary-900"
 									>
 										{#if scan.scan_type === 'local'}
-											<UsersGroupSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+											<UsersGroupSolid class="h-4 w-4 text-primary-600 dark:text-primary-400" />
 										{:else}
-											<RocketSolid class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+											<RocketSolid class="h-4 w-4 text-primary-600 dark:text-primary-400" />
 										{/if}
 									</span>
 								{/snippet}
