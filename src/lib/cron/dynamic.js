@@ -232,7 +232,7 @@ async function updateCharacterData() {
 			// Get from DB the least recently updated 1000 characters
 			const charactersToUpdate = await getLeastRecentlyUpdatedCharacters(1000);
 			if (!charactersToUpdate || charactersToUpdate.length === 0) {
-				logger.warn('[DynUpdater] No characters found to update.');
+				logger.info('[DynUpdater] No characters found to update.');
 				span.setAttributes({
 					'cron.task.update_characters.to_update': 0
 				});
