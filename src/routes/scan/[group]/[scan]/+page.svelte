@@ -221,7 +221,7 @@
 				</div>
 
 				<!-- Second row: Using tabs for scan content -->
-				<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded min-h-[500px]">
+				<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded-sm min-h-[500px]">
 					<Tabs tabStyle="underline" contentClass="p-3">
 						<!-- Tab 1: Overview -->
 						<TabItem

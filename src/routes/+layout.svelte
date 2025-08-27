@@ -53,7 +53,7 @@
 				<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
 				<FooterLink href="/contact">Contact</FooterLink>
 				<FooterLink
-					aClass="text-blue-500 dark:text-blue-400 hover:underline"
+					classes="text-blue-500 dark:text-blue-400 hover:underline"
 					href="https://store.eveonline.com/"
 					target="_blank"
 					>Use code <span class="font-bold italic text-red-500 dark:text-red-400">OXED</span> on the

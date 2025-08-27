@@ -29,7 +29,7 @@
 </svelte:head>
 
 <div class="container mx-auto">
-	<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded min-h-[500px]">
+	<div class="bg-gray-100 dark:bg-gray-700 p-0 rounded-sm min-h-[500px]">
 		<Table
 			{items}
 			placeholder="Search by System"

@@ -1,13 +1,12 @@
-/**
- * @type {import('drizzle-kit').Config}
- */
-const Config = {
+import { defineConfig } from 'drizzle-kit';
+
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+
+export default defineConfig({
+	schema: './src/lib/database/schema.js',
 	dialect: 'postgresql',
 	out: './drizzle',
-	schema: './src/lib/database/schema.js',
-	dbCredentials: {
-		url: process.env.DATABASE_URL
-	}
-};
-
-module.exports = Config;
+	dbCredentials: { url: process.env.DATABASE_URL },
+	verbose: true,
+	strict: true
+});

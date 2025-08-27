@@ -42,6 +42,7 @@
 					placeholder="Paste your data"
 					rows={16}
 					name="scan_content"
+					class="block w-full"
 					required
 				/>
 
