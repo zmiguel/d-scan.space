@@ -76,13 +76,13 @@ export async function addOrUpdateCharactersDB(data) {
 	});
 }
 
-export function updateCharactersLastSeen(characterIDs) {
+export async function updateCharactersLastSeen(characterIDs) {
 	if (!characterIDs || characterIDs.length === 0) {
 		logger.warn('Tried to update characters last seen but characters array was empty');
 		return;
 	}
 
-	db.update(characters)
+	await db.update(characters)
 		.set({
 			last_seen: new Date()
 		})

@@ -49,13 +49,13 @@ export async function addOrUpdateAlliancesDB(data) {
 	});
 }
 
-export function updateAlliancesLastSeen(allianceIDs) {
+export async function updateAlliancesLastSeen(allianceIDs) {
 	if (!allianceIDs || allianceIDs.length === 0) {
 		logger.warn('Tried to update alliances last seen but alliances array was empty');
 		return;
 	}
 
-	db.update(alliances)
+	await db.update(alliances)
 		.set({
 			last_seen: new Date()
 		})

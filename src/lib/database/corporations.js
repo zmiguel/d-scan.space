@@ -50,13 +50,13 @@ export async function addOrUpdateCorporationsDB(data) {
 	});
 }
 
-export function updateCorporationsLastSeen(corporationsIDs) {
+export async function updateCorporationsLastSeen(corporationsIDs) {
 	if (!corporationsIDs || corporationsIDs.length === 0) {
 		logger.warn('Tried to update corporations last seen but corporations array was empty');
 		return;
 	}
 
-	db.update(corporations)
+	await db.update(corporations)
 		.set({
 			last_seen: new Date()
 		})

@@ -171,11 +171,19 @@ export async function createNewLocalScan(data) {
 
 async function updateLastSeen(characters) {
 	// extract all character ids, corp ids and alliance ids to update the last seen timestamp
-	const characterIDs = characters.map((c) => c.id);
-	const uniqueCorporationIDs = [...new Set(characters.map((c) => c.corporation_id))];
-	const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];
+	await withSpan('updateLastSeen', async (span) => {
+		const characterIDs = characters.map((c) => c.id);
+		const uniqueCorporationIDs = [...new Set(characters.map((c) => c.corporation_id))];
+		const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];
 
-	updateCharactersLastSeen(characterIDs);
-	updateCorporationsLastSeen(uniqueCorporationIDs);
-	updateAlliancesLastSeen(uniqueAllianceIDs);
+		span.addAttributes({
+			'scan.characters.updated': characterIDs.length,
+			'scan.corporations.updated': uniqueCorporationIDs.length,
+			'scan.alliances.updated': uniqueAllianceIDs.length
+		});
+
+		await updateCharactersLastSeen(characterIDs);
+		await updateCorporationsLastSeen(uniqueCorporationIDs);
+		await updateAlliancesLastSeen(uniqueAllianceIDs);
+	});
 }
