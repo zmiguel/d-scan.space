@@ -1,8 +1,12 @@
 <script>
 	import { Table } from '@flowbite-svelte-plugins/datatable';
+	import { ListPlaceholder } from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
 
 	let { data } = $props();
+
+	// Loading state to prevent flash of unformatted content
+	let isTableLoading = $state(true);
 
 	// Simple items approach - transform data to array of objects
 	const items = (data?.scans || []).map((scan) => ({
@@ -38,8 +42,6 @@
 		}
 	};
 
-	let tableInstance;
-
 	// Handle row clicks using event delegation
 	function handleRowClick(event) {
 		const target = event.target.closest('tr[data-row-index]');
@@ -65,7 +67,7 @@
 
 	// Initialize table events after component mounts
 	function onInitComplete(dataTable) {
-		tableInstance = dataTable;
+		isTableLoading = false; // Hide loading state when table is ready
 		attachEventListeners(dataTable);
 	}
 
@@ -96,7 +98,17 @@
 		{#if items.length === 0}
 			<p class="p-4">No scans available</p>
 		{:else}
-			<Table {items} {dataTableOptions} {onInitComplete} {onUpdate} {onPage} {onSearch} {onSort} />
+			<!-- Loading skeleton overlay -->
+			{#if isTableLoading}
+				<div class="flex items-center justify-center p-4">
+					<ListPlaceholder class="mb-4 w-full max-w-4xl" />
+				</div>
+			{/if}
+
+			<!-- Table - always rendered but hidden until ready -->
+			<div class:opacity-0={isTableLoading} class:invisible={isTableLoading} class="transition-opacity duration-300">
+				<Table {items} {dataTableOptions} {onInitComplete} {onUpdate} {onPage} {onSearch} {onSort} />
+			</div>
 		{/if}
 	</div>
 </div>

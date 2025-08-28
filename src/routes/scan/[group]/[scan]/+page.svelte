@@ -275,7 +275,7 @@
 								<div class="col-span-1 border-e-2 border-gray-600">
 									<h1 class="ms-2 text-xl font-bold">Alliances</h1>
 									<div class="col-auto mt-2">
-										{#each data.local?.alliances ?? [] as alliance}
+										{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 											<div
 												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
@@ -310,7 +310,7 @@
 								<div class="col-span-1 border-e-2 border-gray-600">
 									<h1 class="ms-2 text-xl font-bold">Corporations</h1>
 									<div class="col-auto mt-2">
-										{#each corps as corp}
+										{#each corps as corp (corp.id)}
 											<div
 												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
@@ -343,7 +343,7 @@
 								<div class="col-span-1">
 									<h1 class="ms-2 text-xl font-bold">Pilots</h1>
 									<div class="col-auto mt-2">
-										{#each pilots as pilot}
+										{#each pilots as pilot (pilot.id)}
 											<div
 												class="flex flex-col items-start justify-between sm:flex-row sm:items-center"
 											>
@@ -360,9 +360,11 @@
 															>
 														</div>
 														<div>
-															<span class="text-pink-600 dark:text-pink-400"
-																>[{pilot.alliance_ticker}]</span
-															>
+															{#if pilot.alliance_ticker}
+																<span class="text-pink-600 dark:text-pink-400"
+																	>[{pilot.alliance_ticker}]</span
+																>
+															{/if}
 															<span class="text-amber-600 dark:text-amber-400"
 																>{'<' + pilot.corporation_ticker + '>'}</span
 															>
@@ -459,7 +461,7 @@
 				<h3 class="mb-3 border-b pb-2 text-lg font-semibold">Related Scans</h3>
 				{#if sortedRelatedScans.length > 0}
 					<Timeline order="vertical">
-						{#each sortedRelatedScans as scan}
+						{#each sortedRelatedScans as scan (scan.id)}
 							<HtmlTimelineItem
 								htmlTitle={`<a href="/scan/${data.params?.group}/${scan.id}" class="text-primary-600 dark:text-primary-400 hover:underline text-sm">${formatScanType(scan.scan_type)}</a> ${scan.id === data.params?.scan ? '<span class="ms-1 text-gray-400 text-sm italic">(here)</span>' : ''}`}
 								date={`${formatTimestamp(scan.created_at)}`}
