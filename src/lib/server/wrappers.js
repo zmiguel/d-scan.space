@@ -72,13 +72,17 @@ export async function fetchGET(url, maxRetries = 3) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
-							const error = new Error(`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`);
+							const error = new Error(
+								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+							);
 							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
 									'http.response.status': response.status,
 									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+									'http.response.headers': JSON.stringify(
+										Object.fromEntries(response.headers.entries())
+									),
 									'http.response.body': JSON.stringify(fullResponse),
 									'http.response.url': response.url,
 									'http.response.redirected': response.redirected,
@@ -97,18 +101,16 @@ export async function fetchGET(url, maxRetries = 3) {
 				} catch (error) {
 					lastError = error;
 
-					// Create base event attributes
-					const eventAttributes = {
-						error: error.message || String(error),
-						attempt: attempt
-					};
-
-					// Add detailed response information if available
+					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
-						Object.assign(eventAttributes, error.responseDetails);
+						span.addEvent('Fetch Failed', error.responseDetails);
+					} else {
+						// Fallback for other types of errors (network, parsing, etc.)
+						span.addEvent('Fetch Failed', {
+							error: error.message || String(error),
+							attempt: attempt
+						});
 					}
-
-					span.addEvent('Fetch Failed', eventAttributes);
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
@@ -180,13 +182,17 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
-							const error = new Error(`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`);
+							const error = new Error(
+								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+							);
 							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
 									'http.response.status': response.status,
 									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+									'http.response.headers': JSON.stringify(
+										Object.fromEntries(response.headers.entries())
+									),
 									'http.response.body': JSON.stringify(fullResponse),
 									'http.response.url': response.url,
 									'http.response.redirected': response.redirected,
@@ -205,18 +211,16 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 				} catch (error) {
 					lastError = error;
 
-					// Create base event attributes
-					const eventAttributes = {
-						error: error.message || String(error),
-						attempt: attempt
-					};
-
-					// Add detailed response information if available
+					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
-						Object.assign(eventAttributes, error.responseDetails);
+						span.addEvent('Fetch Failed', error.responseDetails);
+					} else {
+						// Fallback for other types of errors (network, parsing, etc.)
+						span.addEvent('Fetch Failed', {
+							error: error.message || String(error),
+							attempt: attempt
+						});
 					}
-
-					span.addEvent('Fetch Failed', eventAttributes);
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
