@@ -1,7 +1,5 @@
 <script>
 	import {
-		Accordion,
-		AccordionItem,
 		Avatar,
 		Breadcrumb,
 		BreadcrumbItem,
@@ -237,24 +235,7 @@
 							{/snippet}
 							<div class=" grid grid-cols-3 gap-2">
 								<!-- Local Overview-->
-								<div class="col-span-1 border-e-2 border-gray-600 pe-2">
-									<Accordion flush multiple>
-										<AccordionItem>
-											{#snippet header()}Header 2-1{/snippet}
-											<p class="mb-2 text-gray-500 dark:text-gray-400">
-												Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab
-												necessitatibus sint explicabo ...
-											</p>
-										</AccordionItem>
-										<AccordionItem>
-											{#snippet header()}Header 2-2{/snippet}
-											<p class="mb-2 text-gray-500 dark:text-gray-400">
-												Lorem ipsum dolor sit amet, consectetur adipisicing elit. Illo ab
-												necessitatibus sint explicabo ...
-											</p>
-										</AccordionItem>
-									</Accordion>
-								</div>
+								<div class="col-span-1 border-e-2 border-gray-600 pe-2">local</div>
 								<!-- Space Overview-->
 								<div class="col-span-2 border-e-2 border-gray-600">space</div>
 							</div>

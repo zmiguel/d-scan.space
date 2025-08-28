@@ -106,8 +106,20 @@
 			{/if}
 
 			<!-- Table - always rendered but hidden until ready -->
-			<div class:opacity-0={isTableLoading} class:invisible={isTableLoading} class="transition-opacity duration-300">
-				<Table {items} {dataTableOptions} {onInitComplete} {onUpdate} {onPage} {onSearch} {onSort} />
+			<div
+				class:opacity-0={isTableLoading}
+				class:invisible={isTableLoading}
+				class="transition-opacity duration-300"
+			>
+				<Table
+					{items}
+					{dataTableOptions}
+					{onInitComplete}
+					{onUpdate}
+					{onPage}
+					{onSearch}
+					{onSort}
+				/>
 			</div>
 		{/if}
 	</div>
