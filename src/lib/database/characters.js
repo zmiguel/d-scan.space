@@ -85,7 +85,7 @@ export async function updateCharactersLastSeen(characterIDs) {
 	await db
 		.update(characters)
 		.set({
-			last_seen: new Date()
+			last_seen: sql`now()`
 		})
 		.where(inArray(characters.id, characterIDs));
 }

@@ -58,7 +58,7 @@ export async function updateAlliancesLastSeen(allianceIDs) {
 	await db
 		.update(alliances)
 		.set({
-			last_seen: new Date()
+			last_seen: sql`now()`
 		})
 		.where(inArray(alliances.id, allianceIDs));
 }

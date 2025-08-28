@@ -27,7 +27,7 @@ export async function addOrUpdateCorporationsDB(data) {
 			name: corporation.name,
 			ticker: corporation.ticker,
 			alliance_id: corporation.alliance_id ?? null,
-			npc: corporation.npc ?? false
+			...(corporation.npc !== undefined && { npc: corporation.npc })
 		}));
 
 		span.setAttributes({
@@ -59,7 +59,7 @@ export async function updateCorporationsLastSeen(corporationsIDs) {
 	await db
 		.update(corporations)
 		.set({
-			last_seen: new Date()
+			last_seen: sql`now()`
 		})
 		.where(inArray(corporations.id, corporationsIDs));
 }
