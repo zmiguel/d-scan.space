@@ -177,9 +177,9 @@ async function updateLastSeen(characters) {
 		const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];
 
 		span.setAttributes({
-			'scan.characters.updated': characterIDs.length,
-			'scan.corporations.updated': uniqueCorporationIDs.length,
-			'scan.alliances.updated': uniqueAllianceIDs.length
+			characters: characterIDs.length,
+			corporations: uniqueCorporationIDs.length,
+			alliances: uniqueAllianceIDs.length
 		});
 
 		await updateCharactersLastSeen(characterIDs);
