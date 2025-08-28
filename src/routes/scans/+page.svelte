@@ -8,18 +8,6 @@
 	// Loading state to prevent flash of unformatted content
 	let isTableLoading = $state(true);
 
-	// Simple items approach - transform data to array of objects
-	const items = (data?.scans || []).map((scan) => ({
-		Time: new Date(scan.created_at)
-			.toISOString()
-			.replace('T', ' ')
-			.replace(/\.\d+Z$/, ''),
-		System: scan.system || 'Unknown',
-		Type: scan.scan_type,
-		ID: scan.id,
-		'Group ID': scan.group_id
-	}));
-
 	// Alternative data format for better search functionality
 	const tableData = {
 		headings: ['Time', 'System', 'Type', 'ID', 'Group ID'],
