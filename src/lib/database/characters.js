@@ -76,18 +76,17 @@ export async function addOrUpdateCharactersDB(data) {
 	});
 }
 
-export function updateCharactersLastSeen(data) {
-	if (!data || data.length === 0) {
+export function updateCharactersLastSeen(characterIDs) {
+	if (!characterIDs || characterIDs.length === 0) {
 		logger.warn('Tried to update characters last seen but characters array was empty');
 		return;
 	}
-	// convert list of characters in list of character ids
-	const characterIds = data.map((character) => character.id);
+
 	db.update(characters)
 		.set({
 			last_seen: new Date()
 		})
-		.where(inArray(characters.id, characterIds));
+		.where(inArray(characters.id, characterIDs));
 }
 
 export async function getLeastRecentlyUpdatedCharacters(limit) {

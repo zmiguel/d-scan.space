@@ -3,6 +3,8 @@
  */
 
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
+import { updateCorporationsLastSeen } from '$lib/database/corporations.js';
+import { updateAlliancesLastSeen } from '$lib/database/alliances.js';
 import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
 import logger from '$lib/logger';
 import { withSpan } from './tracer';
@@ -76,7 +78,7 @@ async function getCharacters(data) {
 export async function createNewLocalScan(data) {
 	data = [...new Set(data)];
 	const allCharacters = await getCharacters(data);
-	updateCharactersLastSeen(allCharacters); // No need for Async here
+	updateLastSeen(allCharacters); // No need for Async here
 
 	/* process scan data & build scan json
 	 *
@@ -165,4 +167,15 @@ export async function createNewLocalScan(data) {
 
 	formattedData.alliances.sort((a, b) => b.character_count - a.character_count);
 	return formattedData;
+}
+
+async function updateLastSeen(characters) {
+	// extract all character ids, corp ids and alliance ids to update the last seen timestamp
+	const characterIDs = characters.map((c) => c.id);
+	const uniqueCorporationIDs = [...new Set(characters.map((c) => c.corporation_id))];
+	const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];
+
+	updateCharactersLastSeen(characterIDs);
+	updateCorporationsLastSeen(uniqueCorporationIDs);
+	updateAlliancesLastSeen(uniqueAllianceIDs);
 }
