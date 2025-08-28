@@ -54,17 +54,15 @@ export async function fetchGET(url, maxRetries = 3) {
 					}
 
 					span.setAttributes({
-						'http.response': JSON.stringify({
-							status: response.status,
-							statusText: response.statusText,
-							headers: Object.fromEntries(response.headers.entries()),
-							body: fullResponse,
-							url: response.url,
-							redirected: response.redirected,
-							type: response.type,
-							ok: response.ok,
-							attempt: attempt
-						})
+						'http.response.status': response.status,
+						'http.response.status_text': response.statusText,
+						'http.response.headers': Object.fromEntries(response.headers.entries()),
+						'http.response.body': fullResponse,
+						'http.response.url': response.url,
+						'http.response.redirected': response.redirected,
+						'http.response.type': response.type,
+						'http.response.ok': response.ok,
+						attempt: attempt
 					});
 
 					// Check if response is not ok and throw error
@@ -140,17 +138,15 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					}
 
 					span.setAttributes({
-						'http.response': JSON.stringify({
-							status: response.status,
-							statusText: response.statusText,
-							headers: Object.fromEntries(response.headers.entries()),
-							body: fullResponse,
-							url: response.url,
-							redirected: response.redirected,
-							type: response.type,
-							ok: response.ok,
-							attempt: attempt
-						})
+						'http.response.status': response.status,
+						'http.response.status_text': response.statusText,
+						'http.response.headers': Object.fromEntries(response.headers.entries()),
+						'http.response.body': fullResponse,
+						'http.response.url': response.url,
+						'http.response.redirected': response.redirected,
+						'http.response.type': response.type,
+						'http.response.ok': response.ok,
+						attempt: attempt
 					});
 
 					// Check if response is not ok and throw error
