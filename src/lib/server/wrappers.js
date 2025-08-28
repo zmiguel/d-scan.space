@@ -56,8 +56,8 @@ export async function fetchGET(url, maxRetries = 3) {
 					span.setAttributes({
 						'http.response.status': response.status,
 						'http.response.status_text': response.statusText,
-						'http.response.headers': Object.fromEntries(response.headers.entries()),
-						'http.response.body': fullResponse,
+						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+						'http.response.body': JSON.stringify(fullResponse),
 						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
@@ -72,7 +72,22 @@ export async function fetchGET(url, maxRetries = 3) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
-							throw new Error(`HTTP ${response.status}: ${response.statusText} | ${fullResponse}`);
+							const error = new Error(`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`);
+							// Attach response details to error for catch block using Object.assign
+							Object.assign(error, {
+								responseDetails: {
+									'http.response.status': response.status,
+									'http.response.status_text': response.statusText,
+									'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+									'http.response.body': JSON.stringify(fullResponse),
+									'http.response.url': response.url,
+									'http.response.redirected': response.redirected,
+									'http.response.type': response.type,
+									'http.response.ok': response.ok,
+									attempt: attempt
+								}
+							});
+							throw error;
 						}
 					}
 
@@ -81,10 +96,19 @@ export async function fetchGET(url, maxRetries = 3) {
 					return response;
 				} catch (error) {
 					lastError = error;
-					span.addEvent(`Attempt ${attempt} failed`, {
-						error: error.message,
+
+					// Create base event attributes
+					const eventAttributes = {
+						error: error.message || String(error),
 						attempt: attempt
-					});
+					};
+
+					// Add detailed response information if available
+					if (error.responseDetails) {
+						Object.assign(eventAttributes, error.responseDetails);
+					}
+
+					span.addEvent('Fetch Failed', eventAttributes);
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
@@ -140,8 +164,8 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					span.setAttributes({
 						'http.response.status': response.status,
 						'http.response.status_text': response.statusText,
-						'http.response.headers': Object.fromEntries(response.headers.entries()),
-						'http.response.body': fullResponse,
+						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+						'http.response.body': JSON.stringify(fullResponse),
 						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
@@ -156,7 +180,22 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
-							throw new Error(`HTTP ${response.status}: ${response.statusText} | ${fullResponse}`);
+							const error = new Error(`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`);
+							// Attach response details to error for catch block using Object.assign
+							Object.assign(error, {
+								responseDetails: {
+									'http.response.status': response.status,
+									'http.response.status_text': response.statusText,
+									'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
+									'http.response.body': JSON.stringify(fullResponse),
+									'http.response.url': response.url,
+									'http.response.redirected': response.redirected,
+									'http.response.type': response.type,
+									'http.response.ok': response.ok,
+									attempt: attempt
+								}
+							});
+							throw error;
 						}
 					}
 
@@ -165,10 +204,19 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					return response;
 				} catch (error) {
 					lastError = error;
-					span.addEvent(`Attempt ${attempt} failed`, {
-						error: error.message,
+
+					// Create base event attributes
+					const eventAttributes = {
+						error: error.message || String(error),
 						attempt: attempt
-					});
+					};
+
+					// Add detailed response information if available
+					if (error.responseDetails) {
+						Object.assign(eventAttributes, error.responseDetails);
+					}
+
+					span.addEvent('Fetch Failed', eventAttributes);
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
