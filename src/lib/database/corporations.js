@@ -56,7 +56,8 @@ export async function updateCorporationsLastSeen(corporationsIDs) {
 		return;
 	}
 
-	await db.update(corporations)
+	await db
+		.update(corporations)
 		.set({
 			last_seen: new Date()
 		})

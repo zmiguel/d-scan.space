@@ -82,7 +82,8 @@ export async function updateCharactersLastSeen(characterIDs) {
 		return;
 	}
 
-	await db.update(characters)
+	await db
+		.update(characters)
 		.set({
 			last_seen: new Date()
 		})

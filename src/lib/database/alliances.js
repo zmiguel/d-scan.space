@@ -55,7 +55,8 @@ export async function updateAlliancesLastSeen(allianceIDs) {
 		return;
 	}
 
-	await db.update(alliances)
+	await db
+		.update(alliances)
 		.set({
 			last_seen: new Date()
 		})
