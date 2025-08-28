@@ -1,3 +1,88 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'flowbite/plugin';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--color-primary-50: #f0f9ff;
+	--color-primary-100: #e0f2fe;
+	--color-primary-200: #bae6fd;
+	--color-primary-300: #7dd3fc;
+	--color-primary-400: #38bdf8;
+	--color-primary-500: #0ea5e9;
+	--color-primary-600: #0284c7;
+	--color-primary-700: #0369a1;
+	--color-primary-800: #075985;
+	--color-primary-900: #0c4a6e;
+}
+
+@source "../node_modules/flowbite-svelte/dist";
+@source "../node_modules/flowbite-svelte-icons/dist";
+
+@layer base {
+	/* disable chrome cancel button */
+	input[type='search']::-webkit-search-cancel-button {
+		display: none;
+	}
+}
+
+/****************************************
+**              Data tables            **
+****************************************/
+
+@source "../node_modules/simple-datatables/dist";
+@source "../node_modules/@flowbite-svelte-plugins/datatable/dist";
+
+.dark .datatable-pagination-list-item-link:hover,
+.datatable-pagination-list-item-link:hover {
+	cursor: pointer !important;
+}
+
+/* Light mode datatable styles */
+.datatable-pagination .datatable-active a,
+.datatable-pagination .datatable-active a:focus,
+.datatable-pagination .datatable-active a:hover,
+.datatable-pagination .datatable-active button,
+.datatable-pagination .datatable-active button:focus,
+.datatable-pagination .datatable-active button:hover {
+	background-color: var(--color-primary-500);
+	color: white;
+	cursor: pointer !important;
+}
+
+.datatable-wrapper .datatable-table tbody tr.selected {
+	background-color: var(--color-primary-100) !important;
+}
+
+.datatable-wrapper .datatable-table tbody tr:hover {
+	background-color: rgb(249 250 251 / 1); /* gray-50 for light mode */
+}
+
+/* Dark mode datatable styles */
+.dark .datatable-pagination .datatable-active a,
+.dark .datatable-pagination .datatable-active a:focus,
+.dark .datatable-pagination .datatable-active a:hover,
+.dark .datatable-pagination .datatable-active button,
+.dark .datatable-pagination .datatable-active button:focus,
+.dark .datatable-pagination .datatable-active button:hover {
+	background-color: var(--color-primary-500);
+	color: var(--color-primary-900);
+	cursor: pointer !important;
+}
+
+.dark .datatable-wrapper .datatable-table tbody tr.selected {
+	background-color: var(--color-primary-900) !important;
+}
+
+.dark .datatable-wrapper .datatable-table tbody tr:hover {
+	background-color: rgb(55 65 81 / 1); /* gray-700 for dark mode */
+}
+
+/****************************************
+**           Custom user styles        **
+****************************************/
+
+.cursor-pointer {
+	cursor: pointer !important;
+}

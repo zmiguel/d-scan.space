@@ -49,3 +49,16 @@ export async function addOrUpdateCorporationsDB(data) {
 			});
 	});
 }
+
+export function updateCorporationsLastSeen(corporationsIDs) {
+	if (!corporationsIDs || corporationsIDs.length === 0) {
+		logger.warn('Tried to update corporations last seen but corporations array was empty');
+		return;
+	}
+
+	db.update(corporations)
+		.set({
+			last_seen: new Date()
+		})
+		.where(inArray(corporations.id, corporationsIDs));
+}
