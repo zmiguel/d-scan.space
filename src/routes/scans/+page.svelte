@@ -20,12 +20,28 @@
 		'Group ID': scan.group_id
 	}));
 
+	// Alternative data format for better search functionality
+	const tableData = {
+		headings: ['Time', 'System', 'Type', 'ID', 'Group ID'],
+		data: (data?.scans || []).map((scan) => [
+			new Date(scan.created_at)
+				.toISOString()
+				.replace('T', ' ')
+				.replace(/\.\d+Z$/, ''),
+			scan.system || 'Unknown',
+			scan.scan_type,
+			scan.id,
+			scan.group_id
+		])
+	};
+
 	function open_item(scan) {
 		goto(`/scan/${scan.group_id}/${scan.id}`);
 	}
 
-	// Basic datatable options for simple items approach
+	// Basic datatable options for better search functionality
 	const dataTableOptions = {
+		data: tableData,
 		searchable: true,
 		sortable: true,
 		perPage: 25,
@@ -95,7 +111,7 @@
 
 <div class="container mx-auto">
 	<div class="min-h-[500px] rounded-sm">
-		{#if items.length === 0}
+		{#if !tableData.data || tableData.data.length === 0}
 			<p class="p-4">No scans available</p>
 		{:else}
 			<!-- Loading skeleton overlay -->
@@ -111,15 +127,7 @@
 				class:invisible={isTableLoading}
 				class="transition-opacity duration-300"
 			>
-				<Table
-					{items}
-					{dataTableOptions}
-					{onInitComplete}
-					{onUpdate}
-					{onPage}
-					{onSearch}
-					{onSort}
-				/>
+				<Table {dataTableOptions} {onInitComplete} {onUpdate} {onPage} {onSearch} {onSort} />
 			</div>
 		{/if}
 	</div>
