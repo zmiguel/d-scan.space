@@ -26,3 +26,63 @@
 		display: none;
 	}
 }
+
+/****************************************
+**              Data tables            **
+****************************************/
+
+@source "../node_modules/simple-datatables/dist";
+@source "../node_modules/@flowbite-svelte-plugins/datatable/dist";
+
+.dark .datatable-pagination-list-item-link:hover,
+.datatable-pagination-list-item-link:hover {
+	cursor: pointer !important;
+}
+
+/* Light mode datatable styles */
+.datatable-pagination .datatable-active a,
+.datatable-pagination .datatable-active a:focus,
+.datatable-pagination .datatable-active a:hover,
+.datatable-pagination .datatable-active button,
+.datatable-pagination .datatable-active button:focus,
+.datatable-pagination .datatable-active button:hover {
+	background-color: var(--color-primary-500);
+	color: white;
+	cursor: pointer !important;
+}
+
+.datatable-wrapper .datatable-table tbody tr.selected {
+	background-color: var(--color-primary-100) !important;
+}
+
+.datatable-wrapper .datatable-table tbody tr:hover {
+	background-color: rgb(249 250 251 / 1); /* gray-50 for light mode */
+}
+
+/* Dark mode datatable styles */
+.dark .datatable-pagination .datatable-active a,
+.dark .datatable-pagination .datatable-active a:focus,
+.dark .datatable-pagination .datatable-active a:hover,
+.dark .datatable-pagination .datatable-active button,
+.dark .datatable-pagination .datatable-active button:focus,
+.dark .datatable-pagination .datatable-active button:hover {
+	background-color: var(--color-primary-500);
+	color: var(--color-primary-900);
+	cursor: pointer !important;
+}
+
+.dark .datatable-wrapper .datatable-table tbody tr.selected {
+	background-color: var(--color-primary-900) !important;
+}
+
+.dark .datatable-wrapper .datatable-table tbody tr:hover {
+	background-color: rgb(55 65 81 / 1); /* gray-700 for dark mode */
+}
+
+/****************************************
+**           Custom user styles        **
+****************************************/
+
+.cursor-pointer {
+	cursor: pointer !important;
+}

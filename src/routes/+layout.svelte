@@ -4,7 +4,7 @@
 	import { asset } from '$app/paths';
 	let { children } = $props();
 	import { Navbar, NavBrand, NavLi, NavUl, NavHamburger, FooterBrand } from 'flowbite-svelte';
-	import { Footer, FooterCopyright, FooterLink, FooterLinkGroup } from 'flowbite-svelte';
+	import { Footer, FooterLink, FooterLinkGroup } from 'flowbite-svelte';
 	import { DarkMode } from 'flowbite-svelte';
 	const activeUrl = $derived(page.url.pathname);
 </script>
@@ -32,28 +32,27 @@
 			>
 		</NavBrand>
 		<NavHamburger />
-		<NavUl {activeUrl}>
-			<NavLi href="/">Home</NavLi>
-			<NavLi href="/scans">Scans</NavLi>
-			<NavLi href="/stats">Stats</NavLi>
-			<NavLi href="/about">About</NavLi>
-			<DarkMode class="p-0" />
+		<NavUl {activeUrl} classes={{ ul: 'md:space-x-8' }}>
+			<NavLi class="p-0 md:p-0" href="/">Home</NavLi>
+			<NavLi class="p-0 md:p-0" href="/scans">Scans</NavLi>
+			<NavLi class="p-0 md:p-0" href="/stats">Stats</NavLi>
+			<NavLi class="p-0 md:p-0" href="/about">About</NavLi>
+			<DarkMode class="cursor-pointer p-0" />
 		</NavUl>
 	</Navbar>
 	<div class="mt-16 mb-8 text-gray-900 dark:text-gray-300">
 		{@render children()}
 	</div>
-	<Footer class="logo">
-		<FooterCopyright href="/" by="D-Scan" />
+	<Footer footerType="logo" class="p-0 shadow-none md:p-0 md:px-0 md:py-2">
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<FooterLinkGroup
-				ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0"
+				class="mt-3 flex flex-wrap items-center text-sm text-gray-500 sm:mt-0 dark:text-gray-400"
 			>
 				<FooterLink href="/about">About</FooterLink>
 				<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
 				<FooterLink href="/contact">Contact</FooterLink>
 				<FooterLink
-					classes="text-blue-500 dark:text-blue-400 hover:underline"
+					class="text-blue-500 hover:underline dark:text-blue-400"
 					href="https://store.eveonline.com/"
 					target="_blank"
 					>Use code <span class="font-bold text-red-500 italic dark:text-red-400">OXED</span> on the

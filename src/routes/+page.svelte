@@ -46,11 +46,11 @@
 					required
 				/>
 
-				<Toggle class="mt-2" checked={false} name="is_public"
+				<Toggle class="mt-3 cursor-pointer" checked={false} name="is_public"
 					>Make this Scan public on the site.</Toggle
 				>
 
-				<Button class="mt-4 w-full" color="primary" type="submit">Process</Button>
+				<Button class="mt-4 w-full cursor-pointer" color="primary" type="submit">Process</Button>
 			</form>
 		</div>
 	{/if}

@@ -185,31 +185,31 @@
 					<div class="mb-2 flex items-center gap-2 sm:mb-0">
 						<Breadcrumb aria-label="System location" class="mb-0 bg-transparent p-0">
 							{#if data.system}
-								<BreadcrumbItem>
-									<svelte:fragment slot="icon">
-										<Badge class="me-2" color={getSecurityClass(systemSecurity)}
+								<BreadcrumbItem class="ms-0 md:ms-0">
+									{#snippet icon()}
+										<Badge color={getSecurityClass(systemSecurity)}
 											>{systemSecurity.toFixed(1)}</Badge
 										>
-									</svelte:fragment>
+									{/snippet}
 									{systemName}
 								</BreadcrumbItem>
 								<BreadcrumbItem>
-									<svelte:fragment slot="icon">
+									{#snippet icon()}
 										<ChevronLeftOutline class="h-5 w-5 dark:text-gray-200" />
-									</svelte:fragment>
+									{/snippet}
 									{constellation}
 								</BreadcrumbItem>
 								<BreadcrumbItem>
-									<svelte:fragment slot="icon">
+									{#snippet icon()}
 										<ChevronLeftOutline class="h-5 w-5 dark:text-gray-200" />
-									</svelte:fragment>
+									{/snippet}
 									<span class="align-text-top">{region}</span>
 								</BreadcrumbItem>
 							{:else}
-								<BreadcrumbItem>
-									<svelte:fragment slot="icon">
-										<Badge class="me-2" color="purple">?</Badge>
-									</svelte:fragment>
+								<BreadcrumbItem class="ms-0 md:ms-0">
+									{#snippet icon()}
+										<Badge color="purple">?</Badge>
+									{/snippet}
 									<span class="italic">Unknown System</span>
 								</BreadcrumbItem>
 							{/if}
@@ -222,17 +222,19 @@
 
 				<!-- Second row: Using tabs for scan content -->
 				<div class="min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
-					<Tabs tabStyle="underline" contentClass="p-3">
+					<Tabs tabStyle="underline" classes={{ content: 'p-3 bg-gray-100 dark:bg-gray-700 mt-0' }}>
 						<!-- Tab 1: Overview -->
 						<TabItem
 							open
-							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-							inactiveClasses="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+							activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
+							inactiveClass="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
 						>
-							<div slot="title" class="flex items-center gap-2">
-								<InfoCircleSolid size="md" />
-								Overview
-							</div>
+							{#snippet titleSlot()}
+								<div class="flex cursor-pointer items-center gap-2">
+									<InfoCircleSolid size="md" />
+									Overview
+								</div>
+							{/snippet}
 							<div class=" grid grid-cols-3 gap-2">
 								<!-- Local Overview-->
 								<div class="col-span-1 border-e-2 border-gray-600 pe-2">
@@ -260,13 +262,15 @@
 
 						<!-- Tab 2: Local Scan -->
 						<TabItem
-							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-							inactiveClasses="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+							activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
+							inactiveClass="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
 						>
-							<div slot="title" class="flex items-center gap-2">
-								<UsersGroupSolid size="md" />
-								Local
-							</div>
+							{#snippet titleSlot()}
+								<div class="flex cursor-pointer items-center gap-2">
+									<UsersGroupSolid size="md" />
+									Local
+								</div>
+							{/snippet}
 							<div class=" grid grid-cols-3 gap-2">
 								<div class="col-span-1 border-e-2 border-gray-600">
 									<h1 class="ms-2 text-xl font-bold">Alliances</h1>
@@ -277,7 +281,7 @@
 											>
 												<div class="mt-1 flex items-center space-x-2 rtl:space-x-reverse">
 													<Avatar
-														rounded
+														cornerStyle="rounded"
 														src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
 													/>
 													<div class="font-medium dark:text-white">
@@ -312,7 +316,7 @@
 											>
 												<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 													<Avatar
-														rounded
+														cornerStyle="rounded"
 														src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"
 													/>
 													<div class="font-medium dark:text-white">
@@ -345,7 +349,7 @@
 											>
 												<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 													<Avatar
-														rounded
+														cornerStyle="rounded"
 														src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"
 													/>
 													<div class="font-medium dark:text-white">
@@ -374,13 +378,15 @@
 
 						<!-- Tab 3: Space Scan -->
 						<TabItem
-							activeClasses="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-							inactiveClasses="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+							activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
+							inactiveClass="inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
 						>
-							<div slot="title" class="flex items-center gap-2">
-								<RocketSolid size="md" />
-								Space
-							</div>
+							{#snippet titleSlot()}
+								<div class="flex cursor-pointer items-center gap-2">
+									<RocketSolid size="md" />
+									Space
+								</div>
+							{/snippet}
 						</TabItem>
 					</Tabs>
 				</div>
@@ -436,12 +442,14 @@
 							rows={4}
 							name="scan_content"
 							required
-							class="mb-2 text-sm"
+							class="mb-2 w-full text-sm"
 						/>
 						{#if formError}
 							<div class="mb-2 text-xs text-red-500">{formError}</div>
 						{/if}
-						<Button class="w-full text-sm" color="primary" type="submit" size="sm">Update</Button>
+						<Button class="w-full cursor-pointer text-sm" color="primary" type="submit" size="sm"
+							>Update</Button
+						>
 					</form>
 				{/if}
 			</div>
