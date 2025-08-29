@@ -6,9 +6,7 @@
 	let truncatedElements = $state({});
 
 	onMount(() => {
-		// Use a timeout to ensure DOM is fully rendered
 		setTimeout(checkTruncation, 100);
-		// Also check when accordion items are clicked/expanded
 		document.addEventListener('click', () => {
 			setTimeout(checkTruncation, 100);
 		});
@@ -19,15 +17,35 @@
 		const newTruncated = {};
 
 		elements.forEach((element) => {
-			const isTruncated = element.scrollWidth > element.clientWidth;
+			// Check if element is visible (skip hidden accordion items)
+			const rect = element.getBoundingClientRect();
+			const isVisible =
+				rect.width > 0 &&
+				rect.height > 0 &&
+				window.getComputedStyle(element).visibility !== 'hidden' &&
+				window.getComputedStyle(element).display !== 'none';
+
+			if (!isVisible) return;
+
+			// Measure text width using canvas
+			const computedStyle = window.getComputedStyle(element);
+			const canvas = document.createElement('canvas');
+			const context = canvas.getContext('2d');
+			context.font = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+
+			const textContent = element.textContent || element.innerText || '';
+			const textWidth = context.measureText(textContent).width;
+
+			// Get available space in the flex container
+			const flexParent = element.closest('.flex');
+			const parentWidth = flexParent ? flexParent.clientWidth : element.parentElement.clientWidth;
+			const avatarAndSpacing = 40; // Avatar (32px) + spacing
+			const availableTextSpace = parentWidth - avatarAndSpacing;
+
+			const isTruncated = Math.ceil(textWidth) >= Math.floor(availableTextSpace);
+
 			if (isTruncated) {
 				newTruncated[element.id] = true;
-			}
-			// Debug only for the specific element you mentioned
-			if (element.id === 'alliance-99008228') {
-				console.log(
-					`Debug ${element.id}: scrollWidth=${element.scrollWidth}, clientWidth=${element.clientWidth}, truncated=${isTruncated}, will be in object=${!!newTruncated[element.id]}`
-				);
 			}
 		});
 
@@ -47,7 +65,7 @@
 							size="sm"
 						/>
 						<div
-							class="truncate font-medium dark:text-white"
+							class="min-w-0 truncate font-medium dark:text-white"
 							id="alliance-{alliance.id}"
 							data-truncate-check
 						>
@@ -81,19 +99,20 @@
 			{#each alliance.corporations as corp (corp.id)}
 				<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
 					{#snippet header()}
-						<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
-							<div class="mt-1 flex min-w-0 flex-1 items-center space-x-4 rtl:space-x-reverse">
+						<div class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2">
+							<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
 								<Avatar
 									cornerStyle="rounded"
 									src="https://images.evetech.net/corporations/{corp.id}/logo?size=32"
 									size="sm"
+									class="mr-2"
 								/>
 								<div
-									class="truncate font-medium dark:text-white"
+									class="min-w-0 truncate font-medium dark:text-white"
 									id="corp-{corp.id}"
 									data-truncate-check
 								>
-									<div>
+									<div class="truncate">
 										<span class="text-primary-700 dark:text-primary-400"
 											>{'<' + corp.ticker + '>'}</span
 										>
@@ -107,7 +126,7 @@
 									</Tooltip>
 								{/if}
 							</div>
-							<div class="me-2 flex-shrink-0 text-amber-600 dark:text-amber-400">
+							<div class="text-amber-600 dark:text-amber-400">
 								{corp.character_count}
 							</div>
 						</div>
