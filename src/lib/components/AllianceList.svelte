@@ -9,10 +9,12 @@
 	{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 		<div class="flex flex-col items-start justify-between sm:flex-row sm:items-center">
 			<div class="mt-1 flex items-center space-x-2 rtl:space-x-reverse">
-				<Avatar
-					cornerStyle="rounded"
-					src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
-				/>
+				{#if alliance.ticker}
+					<Avatar
+						cornerStyle="rounded"
+						src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
+					/>
+				{/if}
 				<div class="font-medium dark:text-white">
 					<div>
 						{#if alliance.ticker}
