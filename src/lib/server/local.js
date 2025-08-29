@@ -161,6 +161,9 @@ export async function createNewLocalScan(data) {
 
 	formattedData.alliances = Array.from(alliancesMap.values()).map((alliance) => {
 		alliance.corporations = Array.from(alliance.corporations.values());
+		alliance.corporations.forEach((corporation) => {
+			corporation.characters.sort((a, b) => a.name.localeCompare(b.name));
+		});
 		alliance.corporations.sort((a, b) => b.character_count - a.character_count);
 		return alliance;
 	});
