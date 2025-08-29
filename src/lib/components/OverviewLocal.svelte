@@ -57,12 +57,13 @@
 	{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 		<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
 			{#snippet header()}
-				<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
-					<div class="mt-1 flex min-w-0 flex-1 items-center space-x-2 rtl:space-x-reverse">
+				<div class="grid grid-cols-[1fr_auto_auto] items-center gap-2 w-full">
+					<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
 						<Avatar
 							cornerStyle="rounded"
 							src="https://images.evetech.net/alliances/{alliance.id}/logo?size=32"
 							size="sm"
+							class="mr-2"
 						/>
 						<div
 							class="min-w-0 truncate font-medium dark:text-white"
@@ -86,13 +87,11 @@
 							</Tooltip>
 						{/if}
 					</div>
-					<div class="flex-shrink-0">
-						<span class="me-1 text-primary-700 dark:text-primary-400">
-							{'<' + alliance.corporation_count + '>'}
-						</span>
-						<span class="me-2 text-amber-600 dark:text-amber-400">
-							{alliance.character_count}
-						</span>
+					<div class="text-primary-700 dark:text-primary-400">
+						{'<' + alliance.corporation_count + '>'}
+					</div>
+					<div class="text-amber-600 dark:text-amber-400 me-2">
+						{alliance.character_count}
 					</div>
 				</div>
 			{/snippet}
