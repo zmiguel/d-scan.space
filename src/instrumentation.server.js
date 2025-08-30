@@ -9,7 +9,7 @@ import { register } from 'node:module';
 import { readFileSync } from 'fs';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 import { env } from '$env/dynamic/private';
-import logger from './src/lib/logger.js';
+import logger from '$lib/logger.js';
 
 // Set up import-in-the-middle for better instrumentation
 const { registerOptions } = createAddHookMessageChannel();
