@@ -1,16 +1,18 @@
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
-import { getLastChecksums, addSDEDataEntry } from '$lib/database/sde_data';
+import { getLastChecksums, addSDEDataEntry, addOrUpdateSystemsDB } from '$lib/database/sde_data';
 import {
 	SDE_FSD_CHECKSUM,
 	SDE_BSD_CHECKSUM,
 	SDE_UNIVERSE_CHECKSUM,
-	SDE_FSD
+	SDE_FSD,
+	SDE_BSD,
+	SDE_UNIVERSE
 } from '$lib/server/constants';
 import fs from 'fs';
 import path from 'path';
-import AdmZip from 'adm-zip';
 import yaml from 'js-yaml';
+import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
 import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
 
 export async function updateStaticData() {
@@ -63,8 +65,25 @@ export async function updateStaticData() {
 		});
 		await cleanupTemp();
 
-		if (fsd_status === 0) {
-			logger.info('[SDEUpdater] FSD Update succeeded.');
+		// UNIVERSE SDE Update
+		const universe_status = await withSpan('UNIVERSE Update', async () => {
+			// Download and extract the need files from UNIVERSE
+			// We need all files
+			logger.info('[SDEUpdater] Downloading and extracting UNIVERSE SDE...');
+			await downloadAndExtractSDE(SDE_UNIVERSE, []);
+			logger.info('[SDEUpdater] Downloading and extracting BSD SDE...');
+			await downloadAndExtractSDE(SDE_BSD, ['invNames.yaml']);
+
+			// 1. Update NPC Corps
+			logger.info('[SDEUpdater] Updating UNIVERSE...');
+			await updateUniverse();
+
+			return 0;
+		});
+		await cleanupTemp();
+
+		if (fsd_status === 0 && universe_status === 0) {
+			logger.info('[SDEUpdater] Update succeeded.');
 			await addSDEDataEntry(onlineChecksums);
 		}
 	});
@@ -110,7 +129,7 @@ async function downloadAndExtractSDE(url, files = []) {
 				fs.mkdirSync(tempDir, { recursive: true });
 			}
 
-			// Download the zip file
+			// Download the zip file using streaming to avoid blocking
 			span.addEvent('Downloading SDE zip file');
 			const response = await fetch(url);
 			if (!response.ok) {
@@ -118,53 +137,50 @@ async function downloadAndExtractSDE(url, files = []) {
 				throw new Error(`Failed to download SDE: HTTP ${response.status} ${response.statusText}`);
 			}
 
-			// Get response as array buffer and write to file
-			const arrayBuffer = await response.arrayBuffer();
-			const buffer = Buffer.from(arrayBuffer);
-			fs.writeFileSync(zipPath, buffer);
+			// Stream the download to avoid blocking the event loop
+			const fileStream = fs.createWriteStream(zipPath);
+			const reader = response.body.getReader();
+			let downloadedBytes = 0;
+			const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
 
-			span.addEvent('SDE zip file downloaded', { size: buffer.length });
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
 
-			// Extract the zip file
-			span.addEvent('Extracting zip file');
-			const zip = new AdmZip(zipPath);
-			const zipEntries = zip.getEntries();
+					fileStream.write(value);
+					downloadedBytes += value.length;
 
-			if (files.length === 0) {
-				// Extract all files if no specific files requested
-				zip.extractAllTo(tempDir, true);
-				span.addEvent('Extracted all files', { totalFiles: zipEntries.length });
-			} else {
-				// Extract only specified files
-				let extractedCount = 0;
-				for (const fileName of files) {
-					const entry = zipEntries.find(
-						(e) => e.entryName === fileName || e.entryName.endsWith(`/${fileName}`)
-					);
-					if (entry) {
-						zip.extractEntryTo(entry, tempDir, false, true);
-						extractedCount++;
-						span.addEvent('File extracted', { fileName: fileName });
-					} else {
-						span.setStatus({ code: 2, message: `Missing file in zip: ${fileName}` });
-						throw new Error(`Missing file in zip: ${fileName}`);
+					// Yield control periodically during download (every ~1MB)
+					if (downloadedBytes % (1024 * 1024) === 0) {
+						await new Promise((resolve) => setImmediate(resolve));
+						span.addEvent('Download progress', {
+							downloadedBytes,
+							totalBytes: contentLength,
+							progress: contentLength > 0 ? Math.round((downloadedBytes / contentLength) * 100) : 0
+						});
 					}
 				}
-
-				// Verify that all requested files were extracted
-				for (const fileName of files) {
-					const extractedPath = path.join(tempDir, fileName);
-					if (!fs.existsSync(extractedPath)) {
-						span.setStatus({ code: 2, message: `Failed to extract file: ${fileName}` });
-						throw new Error(`Failed to extract file: ${fileName}`);
-					}
-				}
-
-				span.addEvent('Extraction completed', {
-					requestedFiles: files.length,
-					extractedFiles: extractedCount
-				});
+			} finally {
+				reader.releaseLock();
+				fileStream.end();
 			}
+
+			// Wait for the file to be fully written
+			await new Promise((resolve, reject) => {
+				fileStream.on('finish', resolve);
+				fileStream.on('error', reject);
+			});
+
+			span.addEvent('SDE zip file downloaded', { size: downloadedBytes });
+
+			// Extract the zip file using non-blocking extraction with fallback
+			span.addEvent('Extracting zip file');
+			const extractionResult = await extractZipNonBlocking(zipPath, tempDir, files);
+			span.addEvent('Extraction completed', {
+				...extractionResult,
+				message: `Extracted ${extractionResult.extractedFiles} files using ${extractionResult.method}`
+			});
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			span.setStatus({ code: 2, message: errorMessage });
@@ -181,10 +197,21 @@ async function downloadAndExtractSDE(url, files = []) {
 	});
 }
 
+async function cleanupTemp() {
+	// cleans up the ./temp directory after tasks are done
+	const tempDir = './temp';
+	if (fs.existsSync(tempDir)) {
+		fs.rmSync(tempDir, { recursive: true, force: true });
+		logger.info('Temporary files cleaned up');
+	}
+}
+
 async function updateNPCCorps() {
 	await withSpan('Update NPC Corps', async (span) => {
 		try {
 			const yamlFilePath = path.join('./temp', 'npcCorporations.yaml');
+
+			span.addEvent('Reading npcCorporations.yaml file');
 
 			// Check if the file exists
 			if (!fs.existsSync(yamlFilePath)) {
@@ -192,7 +219,7 @@ async function updateNPCCorps() {
 				throw new Error('npcCorporations.yaml file not found in temp directory');
 			}
 
-			span.addEvent('Reading npcCorporations.yaml file');
+			span.addEvent('Parsing NPC corporations data');
 
 			// Read and parse the YAML file
 			const yamlContent = fs.readFileSync(yamlFilePath, 'utf8');
@@ -202,8 +229,6 @@ async function updateNPCCorps() {
 				span.setStatus({ code: 2, message: 'Invalid YAML format in npcCorporations.yaml' });
 				throw new Error('Invalid YAML format in npcCorporations.yaml');
 			}
-
-			span.addEvent('Parsing NPC corporations data');
 
 			// Transform the data to match our database schema
 			const corporationsData = [];
@@ -265,11 +290,196 @@ async function updateNPCCorps() {
 	});
 }
 
-async function cleanupTemp() {
-	// cleans up the ./temp directory after tasks are done
-	const tempDir = './temp';
-	if (fs.existsSync(tempDir)) {
-		fs.rmSync(tempDir, { recursive: true, force: true });
-		logger.info('Temporary files cleaned up');
-	}
+async function updateUniverse() {
+	await withSpan('Update Universe', async (span) => {
+		try {
+			const tempDir = './temp';
+			const systemsData = [];
+			let constellationCount = 0;
+
+			span.addEvent('Starting universe data processing');
+
+			// Load the invNames.yaml file to get proper names
+			const invNamesPath = path.join(tempDir, 'invNames.yaml');
+			let nameMap = new Map();
+
+			if (fs.existsSync(invNamesPath)) {
+				span.addEvent('Loading invNames.yaml file');
+				const invNamesContent = fs.readFileSync(invNamesPath, 'utf8');
+				const invNames = yaml.load(invNamesContent);
+
+				// Create a map of itemID -> itemName for quick lookup
+				if (Array.isArray(invNames)) {
+					for (const item of invNames) {
+						if (item.itemID && item.itemName) {
+							nameMap.set(item.itemID, item.itemName);
+						}
+					}
+				}
+
+				span.addEvent('Loaded names', { totalNames: nameMap.size });
+			} else {
+				logger.warn('invNames.yaml not found, using folder names as fallback');
+			}
+
+			// Read all directories in temp (these are the universe type folders like "eve")
+			const universeTypes = fs
+				.readdirSync(tempDir, { withFileTypes: true })
+				.filter((dirent) => dirent.isDirectory())
+				.map((dirent) => dirent.name);
+
+			for (const universeType of universeTypes) {
+				const universeTypePath = path.join(tempDir, universeType);
+
+				// Read all region folders
+				const regions = fs
+					.readdirSync(universeTypePath, { withFileTypes: true })
+					.filter((dirent) => dirent.isDirectory())
+					.map((dirent) => dirent.name);
+
+				span.addEvent(`Processing universe type: ${universeType}`, {
+					regionCount: regions.length
+				});
+
+				for (const regionName of regions) {
+					const regionPath = path.join(universeTypePath, regionName);
+
+					// Try to get region ID from region.yaml
+					let regionId = null;
+					let regionDisplayName = regionName;
+					const regionYamlPath = path.join(regionPath, 'region.yaml');
+					if (fs.existsSync(regionYamlPath)) {
+						try {
+							const regionYaml = yaml.load(fs.readFileSync(regionYamlPath, 'utf8'));
+							if (regionYaml && regionYaml.regionID) {
+								regionId = regionYaml.regionID;
+								regionDisplayName = nameMap.get(regionId) || regionName;
+							}
+						} catch (error) {
+							logger.warn(`Failed to parse ${regionYamlPath}: ${error.message}`);
+						}
+					}
+					if (!regionDisplayName || regionDisplayName === regionName) {
+						regionDisplayName = regionName;
+					}
+
+					// Read all constellation folders
+					const constellations = fs
+						.readdirSync(regionPath, { withFileTypes: true })
+						.filter((dirent) => dirent.isDirectory())
+						.map((dirent) => dirent.name);
+
+					constellationCount += constellations.length;
+
+					for (const constellationName of constellations) {
+						const constellationPath = path.join(regionPath, constellationName);
+
+						// Try to get constellation ID from constellation.yaml
+						let constellationId = null;
+						let constellationDisplayName = constellationName;
+						const constellationYamlPath = path.join(constellationPath, 'constellation.yaml');
+						if (fs.existsSync(constellationYamlPath)) {
+							try {
+								const constellationYaml = yaml.load(fs.readFileSync(constellationYamlPath, 'utf8'));
+								if (constellationYaml && constellationYaml.constellationID) {
+									constellationId = constellationYaml.constellationID;
+									constellationDisplayName = nameMap.get(constellationId) || constellationName;
+								}
+							} catch (error) {
+								logger.warn(`Failed to parse ${constellationYamlPath}: ${error.message}`);
+							}
+						}
+						if (!constellationDisplayName || constellationDisplayName === constellationName) {
+							constellationDisplayName = constellationName;
+						}
+
+						// Read all system folders
+						const systems = fs
+							.readdirSync(constellationPath, { withFileTypes: true })
+							.filter((dirent) => dirent.isDirectory())
+							.map((dirent) => dirent.name);
+
+						for (const systemName of systems) {
+							const systemPath = path.join(constellationPath, systemName);
+							const solarSystemYamlPath = path.join(systemPath, 'solarsystem.yaml');
+
+							// Check if solarsystem.yaml exists
+							if (fs.existsSync(solarSystemYamlPath)) {
+								try {
+									// Read and parse the YAML file
+									const yamlContent = fs.readFileSync(solarSystemYamlPath, 'utf8');
+									const systemData = yaml.load(yamlContent);
+
+									if (systemData && systemData.solarSystemID && systemData.security !== undefined) {
+										// Get the proper system name from invNames
+										const systemId = parseInt(systemData.solarSystemID, 10);
+										const systemDisplayName = nameMap.get(systemId) || systemName;
+
+										systemsData.push({
+											id: systemId,
+											name: systemDisplayName,
+											constellation: constellationDisplayName,
+											region: regionDisplayName,
+											sec_status: parseFloat(systemData.security)
+										});
+									} else {
+										logger.warn(
+											`Invalid system data in ${solarSystemYamlPath}: missing solarSystemID or security`
+										);
+									}
+								} catch (parseError) {
+									logger.warn(`Failed to parse ${solarSystemYamlPath}: ${parseError.message}`);
+								}
+							} else {
+								logger.warn(`Missing solarsystem.yaml in ${systemPath}`);
+							}
+
+							// Yield control every 100 systems to prevent blocking the event loop
+							if (systemsData.length % 100 === 0) {
+								await new Promise((resolve) => setImmediate(resolve));
+							}
+						}
+
+						// Yield control after each constellation to prevent blocking
+						await new Promise((resolve) => setImmediate(resolve));
+					}
+
+					// Log progress every 100 regions
+					if (systemsData.length % 1000 === 0 && systemsData.length > 0) {
+						span.addEvent('Processing progress', {
+							systemsProcessed: systemsData.length,
+							currentRegion: regionName
+						});
+					}
+				}
+			}
+
+			span.setAttributes({
+				'universe.regions_processed': universeTypes.length,
+				'universe.constellations_found': constellationCount,
+				'universe.systems_found': systemsData.length
+			});
+
+			span.addEvent('Updating systems in database', {
+				systemsCount: systemsData.length
+			});
+
+			// Update the database with systems data
+			if (systemsData.length > 0) {
+				await addOrUpdateSystemsDB(systemsData);
+				span.addEvent('Systems updated successfully', {
+					updatedCount: systemsData.length
+				});
+			} else {
+				span.addEvent('No systems found to update');
+			}
+
+			span.setStatus({ code: 0, message: 'Universe data updated successfully' });
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			logger.error(`Error updating Universe: ${errorMessage}`);
+			span.setStatus({ code: 2, message: errorMessage });
+			throw error;
+		}
+	});
 }

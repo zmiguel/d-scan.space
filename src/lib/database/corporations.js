@@ -34,19 +34,25 @@ export async function addOrUpdateCorporationsDB(data) {
 			'corporations.data.length': values.length
 		});
 
-		await db
-			.insert(corporations)
-			.values(values)
-			.onConflictDoUpdate({
-				target: corporations.id,
-				set: {
-					name: sql`excluded.name`,
-					ticker: sql`excluded.ticker`,
-					alliance_id: sql`excluded.alliance_id`,
-					npc: sql`excluded.npc`,
-					updated_at: sql`now()`
-				}
-			});
+		// Determine if any of the records have npc field
+		const hasNpcData = values.some((corp) => corp.npc !== undefined);
+
+		const updateSet = {
+			name: sql`excluded.name`,
+			ticker: sql`excluded.ticker`,
+			alliance_id: sql`excluded.alliance_id`,
+			updated_at: sql`now()`
+		};
+
+		// Only update npc if the data contains npc values
+		if (hasNpcData) {
+			updateSet.npc = sql`excluded.npc`;
+		}
+
+		await db.insert(corporations).values(values).onConflictDoUpdate({
+			target: corporations.id,
+			set: updateSet
+		});
 	});
 }
 
