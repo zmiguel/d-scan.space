@@ -11,13 +11,18 @@ import { withSpan } from './tracer';
 
 async function getCharacters(data) {
 	return await withSpan(
-		'Get Characters',
-		async () => {
+		'local_scan.get_characters',
+		async (span) => {
+			span.setAttributes({
+				'characters.requested_count': data.length,
+				'operation.type': 'character_resolution'
+			});
+
 			// get characters in the database
 			const charactersInDB = await getCharactersByName(data);
 
 			const { missingCharacters, outdatedCharacters, goodCharacters } = await withSpan(
-				'Filter Characters',
+				'local_scan.filter_characters',
 				async (span) => {
 					const missingCharacters = await data.filter(
 						(l) => !charactersInDB.some((c) => c.name === l)
@@ -38,9 +43,10 @@ async function getCharacters(data) {
 					);
 
 					span.setAttributes({
-						'scan.characters.missing': missingCharacters.length,
-						'scan.characters.outdated': outdatedCharacters.length,
-						'scan.characters.good': goodCharacters.length
+						'characters.missing_count': missingCharacters.length,
+						'characters.outdated_count': outdatedCharacters.length,
+						'characters.good_count': goodCharacters.length,
+						'characters.cache_hit_rate': ((goodCharacters.length / data.length) * 100).toFixed(2)
 					});
 					return { missingCharacters, outdatedCharacters, goodCharacters };
 				}
@@ -67,7 +73,14 @@ async function getCharacters(data) {
 			const updatedCharacters = await getCharactersByName(charactersToFetch);
 
 			// merge good with updated
-			return [...goodCharacters, ...updatedCharacters];
+			const finalCharacters = [...goodCharacters, ...updatedCharacters];
+
+			span.setAttributes({
+				'characters.final_count': finalCharacters.length,
+				'characters.esi_calls_made': missingCharacters.length + outdatedCharacters.length
+			});
+
+			return finalCharacters;
 		},
 		{
 			'scan.characters.requested': data.length
@@ -76,102 +89,126 @@ async function getCharacters(data) {
 }
 
 export async function createNewLocalScan(data) {
-	data = [...new Set(data)];
-	const allCharacters = await getCharacters(data);
-	updateLastSeen(allCharacters); // No need for Async here
+	return await withSpan(
+		'local_scan.create_new',
+		async (span) => {
+			// Remove duplicates
+			data = [...new Set(data)];
 
-	/* process scan data & build scan json
-	 *
-	 * Format:
-	 * {
-	 *   alliances: [
-	 * 	 {
-	 * 		 name: "Alliance Name",
-	 *      ticker: "ABC",
-	 * 		 corporations: [
-	 * 			 {
-	 * 				 name: "Corp Name",
-	 *          ticker: "DEF",
-	 * 				 characters: [
-	 * 					 {
-	 *              name: "Character Name",
-	 *              sec_status: 0.0,
-	 *            },
-	 * 				 ],
-	 * 			 character_count: 0
-	 * 			 },
-	 * 			 ...
-	 * 		 ],
-	 *    corporation_count: 0
-	 * 	 character_count: 0
-	 * 	 },
-	 * 	 ...
-	 *  ],
-	 */
-
-	/** @type {{ alliances: Array<any> }} */
-	const formattedData = {
-		alliances: []
-	};
-
-	const alliancesMap = new Map();
-
-	allCharacters.forEach((character) => {
-		const {
-			alliance_id,
-			alliance_name,
-			alliance_ticker,
-			corporation_id,
-			corporation_name,
-			corporation_ticker,
-			id,
-			name,
-			sec_status
-		} = character;
-
-		if (!alliancesMap.has(alliance_name)) {
-			alliancesMap.set(alliance_name, {
-				id: alliance_id,
-				name: alliance_name,
-				ticker: alliance_ticker,
-				corporations: new Map(),
-				corporation_count: 0,
-				character_count: 0
+			span.setAttributes({
+				'scan.type': 'local',
+				'scan.raw_character_count': data.length
 			});
-		}
 
-		const alliance = alliancesMap.get(alliance_name);
+			const allCharacters = await getCharacters(data);
+			await updateLastSeen(allCharacters);
 
-		if (!alliance.corporations.has(corporation_name)) {
-			alliance.corporations.set(corporation_name, {
-				id: corporation_id,
-				name: corporation_name,
-				ticker: corporation_ticker,
-				characters: [],
-				character_count: 0
+			/* process scan data & build scan json
+			 *
+			 * Format:
+			 * {
+			 *   alliances: [
+			 * 	 {
+			 * 		 name: "Alliance Name",
+			 *      ticker: "ABC",
+			 * 		 corporations: [
+			 * 			 {
+			 * 				 name: "Corp Name",
+			 *          ticker: "DEF",
+			 * 				 characters: [
+			 * 					 {
+			 *              name: "Character Name",
+			 *              sec_status: 0.0,
+			 *            },
+			 * 				 ],
+			 * 			 character_count: 0
+			 * 			 },
+			 * 			 ...
+			 * 		 ],
+			 *    corporation_count: 0
+			 * 	 character_count: 0
+			 * 	 },
+			 * 	 ...
+			 *  ],
+			 */
+
+			/** @type {{ alliances: Array<any> }} */
+			const formattedData = {
+				alliances: []
+			};
+
+			const alliancesMap = new Map();
+
+			allCharacters.forEach((character) => {
+				const {
+					alliance_id,
+					alliance_name,
+					alliance_ticker,
+					corporation_id,
+					corporation_name,
+					corporation_ticker,
+					id,
+					name,
+					sec_status
+				} = character;
+
+				if (!alliancesMap.has(alliance_name)) {
+					alliancesMap.set(alliance_name, {
+						id: alliance_id,
+						name: alliance_name,
+						ticker: alliance_ticker,
+						corporations: new Map(),
+						corporation_count: 0,
+						character_count: 0
+					});
+				}
+
+				const alliance = alliancesMap.get(alliance_name);
+
+				if (!alliance.corporations.has(corporation_name)) {
+					alliance.corporations.set(corporation_name, {
+						id: corporation_id,
+						name: corporation_name,
+						ticker: corporation_ticker,
+						characters: [],
+						character_count: 0
+					});
+					alliance.corporation_count++;
+				}
+
+				const corporation = alliance.corporations.get(corporation_name);
+				corporation.characters.push({ id, name, sec_status });
+				corporation.character_count++;
+				alliance.character_count++;
 			});
-			alliance.corporation_count++;
+
+			formattedData.alliances = Array.from(alliancesMap.values()).map((alliance) => {
+				alliance.corporations = Array.from(alliance.corporations.values());
+				alliance.corporations.forEach((corporation) => {
+					corporation.characters.sort((a, b) => a.name.localeCompare(b.name));
+				});
+				alliance.corporations.sort((a, b) => b.character_count - a.character_count);
+				return alliance;
+			});
+
+			formattedData.alliances.sort((a, b) => b.character_count - a.character_count);
+
+			span.setAttributes({
+				'scan.processed_characters': allCharacters.length,
+				'scan.alliances_count': formattedData.alliances.length,
+				'scan.corporations_count': formattedData.alliances.reduce(
+					(acc, alliance) => acc + alliance.corporation_count,
+					0
+				)
+			});
+
+			return formattedData;
+		},
+		{
+			'operation.type': 'local_scan_creation'
 		}
-
-		const corporation = alliance.corporations.get(corporation_name);
-		corporation.characters.push({ id, name, sec_status });
-		corporation.character_count++;
-		alliance.character_count++;
-	});
-
-	formattedData.alliances = Array.from(alliancesMap.values()).map((alliance) => {
-		alliance.corporations = Array.from(alliance.corporations.values());
-		alliance.corporations.forEach((corporation) => {
-			corporation.characters.sort((a, b) => a.name.localeCompare(b.name));
-		});
-		alliance.corporations.sort((a, b) => b.character_count - a.character_count);
-		return alliance;
-	});
-
-	formattedData.alliances.sort((a, b) => b.character_count - a.character_count);
-	return formattedData;
+	);
 }
-
 async function updateLastSeen(characters) {
 	// extract all character ids, corp ids and alliance ids to update the last seen timestamp
 	await withSpan('updateLastSeen', async (span) => {

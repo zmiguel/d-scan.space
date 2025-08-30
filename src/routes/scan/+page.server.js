@@ -46,9 +46,7 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
-					result = await withSpan('Create Local Scan', async () => {
-						return await createNewLocalScan(lines);
-					});
+					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
 					//
@@ -57,7 +55,7 @@ export const actions = {
 
 				try {
 					await withSpan(
-						'Create Scan',
+						'Create New Scan',
 						async () => {
 							return await createNewScan({
 								scanGroupId,
@@ -127,18 +125,7 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
-					result = await withSpan(
-						'Create Local Scan',
-						async () => {
-							return await createNewLocalScan(lines);
-						},
-						{
-							'scan.group_id': scanGroupId,
-							'scan.id': scanId,
-							'scan.type': 'local',
-							'scan.data_lines': lines.length
-						}
-					);
+					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
 					//
