@@ -17,7 +17,10 @@ register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
 
 // Create trace exporter with retry logic
 const traceExporter = new OTLPTraceExporter({
-	url: env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+	url:
+		env.OTEL_EXPORTER_OTLP_ENDPOINT ||
+		process.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
+		'http://localhost:4318/v1/traces',
 	headers: {
 		Authorization: `${env.OTEL_EXPORTER_OTLP_AUTHORIZATION || process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
 	}
