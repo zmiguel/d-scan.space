@@ -17,9 +17,9 @@ register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
 
 // Create trace exporter with retry logic
 const traceExporter = new OTLPTraceExporter({
-	url: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+	url: env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
 	headers: {
-		Authorization: `${env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
+		Authorization: `${env.OTEL_EXPORTER_OTLP_AUTHORIZATION || process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
 	}
 });
 
@@ -83,7 +83,7 @@ try {
 	logger.info('Starting OpenTelemetry SDK...');
 	sdk.start();
 	logger.info(
-		`OpenTelemetry SDK started successfully\n URL: ${env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`
+		`OpenTelemetry SDK started successfully\n URL: ${env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces'}\n Authorization: ${env.OTEL_EXPORTER_OTLP_AUTHORIZATION || process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
 	);
 } catch (error) {
 	logger.error('Failed to start OpenTelemetry SDK:', error);
