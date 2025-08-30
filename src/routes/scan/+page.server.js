@@ -64,7 +64,8 @@ export const actions = {
 								scanId,
 								is_public,
 								type: isDirectional ? 'directional' : 'local',
-								data: result
+								data: result,
+								raw_data: content
 							});
 						},
 						{
