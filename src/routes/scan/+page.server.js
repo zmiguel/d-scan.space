@@ -7,7 +7,7 @@ import logger from '$lib/logger';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
-	create: async ({ request }) => {
+	create: async ({ request, event }) => {
 		return await withSpan(
 			'Create Scan',
 			async (span) => {
@@ -84,89 +84,97 @@ export const actions = {
 				logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
-			{}
+			{},
+			{},
+			event
 		);
 	},
 
-	update: async ({ request }) => {
-		return await withSpan('Update Scan', async (span) => {
-			const data = await request.formData();
-			const content = /** @type {(string | null)} */ (data.get('scan_content'));
+	update: async ({ request, event }) => {
+		return await withSpan(
+			'Update Scan',
+			async (span) => {
+				const data = await request.formData();
+				const content = /** @type {(string | null)} */ (data.get('scan_content'));
 
-			if (!content) {
-				return { status: 400, body: 'No scan content provided' };
-			}
+				if (!content) {
+					return { status: 400, body: 'No scan content provided' };
+				}
 
-			let lines = content.split('\n');
-			// remove empty lines
-			lines = lines.filter((line) => line.trim().length > 0);
+				let lines = content.split('\n');
+				// remove empty lines
+				lines = lines.filter((line) => line.trim().length > 0);
 
-			// Figure out if local or directional scan
-			//  - Directional scans start with numbers and have 3 tabs per line
-			const isDirectional = lines.every((line) => {
-				const parts = line.split('\t');
-				// @ts-ignore
-				return parts.length === 4 && !isNaN(parts[0]);
-			});
+				// Figure out if local or directional scan
+				//  - Directional scans start with numbers and have 3 tabs per line
+				const isDirectional = lines.every((line) => {
+					const parts = line.split('\t');
+					// @ts-ignore
+					return parts.length === 4 && !isNaN(parts[0]);
+				});
 
-			const uid = new ShortUniqueId();
-			const scanGroupId = data.get('scan_group');
-			const scanId = uid.randomUUID(12);
+				const uid = new ShortUniqueId();
+				const scanGroupId = data.get('scan_group');
+				const scanId = uid.randomUUID(12);
 
-			span.setAttributes({
-				'scan.content_lines': lines.length,
-				'scan.type': isDirectional ? 'directional' : 'local',
-				'scan.group_id': scanGroupId,
-				'scan.id': scanId
-			});
+				span.setAttributes({
+					'scan.content_lines': lines.length,
+					'scan.type': isDirectional ? 'directional' : 'local',
+					'scan.group_id': scanGroupId,
+					'scan.id': scanId
+				});
 
-			let result;
-			// LOCAL SCAN
-			if (!isDirectional) {
-				result = await withSpan(
-					'Create Local Scan',
-					async () => {
-						return await createNewLocalScan(lines);
-					},
-					{
-						'scan.group_id': scanGroupId,
-						'scan.id': scanId,
-						'scan.type': 'local',
-						'scan.data_lines': lines.length
-					}
-				);
-			} else {
-				// DIRECTIONAL SCAN
-				//
-				// TBD.
-			}
+				let result;
+				// LOCAL SCAN
+				if (!isDirectional) {
+					result = await withSpan(
+						'Create Local Scan',
+						async () => {
+							return await createNewLocalScan(lines);
+						},
+						{
+							'scan.group_id': scanGroupId,
+							'scan.id': scanId,
+							'scan.type': 'local',
+							'scan.data_lines': lines.length
+						}
+					);
+				} else {
+					// DIRECTIONAL SCAN
+					//
+					// TBD.
+				}
 
-			try {
-				await withSpan(
-					'Update Scan',
-					async () => {
-						return await updateScan({
-							scanGroupId,
-							scanId,
-							type: isDirectional ? 'directional' : 'local',
-							data: result,
-							raw_data: content
-						});
-					},
-					{
-						'scan.group_id': scanGroupId,
-						'scan.id': scanId,
-						'scan.type': isDirectional ? 'directional' : 'local',
-						'scan.data_lines': lines.length
-					}
-				);
-			} catch (e) {
-				logger.error('Failed to store scan data', e);
-				return { status: 500, body: 'Failed to store scan data' };
-			}
+				try {
+					await withSpan(
+						'Update Scan',
+						async () => {
+							return await updateScan({
+								scanGroupId,
+								scanId,
+								type: isDirectional ? 'directional' : 'local',
+								data: result,
+								raw_data: content
+							});
+						},
+						{
+							'scan.group_id': scanGroupId,
+							'scan.id': scanId,
+							'scan.type': isDirectional ? 'directional' : 'local',
+							'scan.data_lines': lines.length
+						}
+					);
+				} catch (e) {
+					logger.error('Failed to store scan data', e);
+					return { status: 500, body: 'Failed to store scan data' };
+				}
 
-			logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
-			return redirect(303, `/scan/${scanGroupId}/${scanId}`);
-		});
+				logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
+				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
+			},
+			{},
+			{},
+			event
+		);
 	}
 };

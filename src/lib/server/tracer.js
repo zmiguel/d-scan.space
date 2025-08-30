@@ -22,19 +22,59 @@ function isRedirect(error) {
 }
 
 /**
- * Create and execute a span
+ * Get SvelteKit's current span from request event if available
+ * @param {import('$app/server').RequestEvent | undefined} event - SvelteKit request event
+ * @returns {import('@opentelemetry/api').Span | undefined} - The current span
+ */
+function getSvelteKitSpan(event) {
+	if (event?.tracing?.current) {
+		return event.tracing.current;
+	}
+	return trace.getActiveSpan();
+}
+
+/**
+ * Get SvelteKit's root span from request event if available
+ * @param {import('$app/server').RequestEvent | undefined} event - SvelteKit request event
+ * @returns {import('@opentelemetry/api').Span | undefined} - The root span
+ */
+function getSvelteKitRootSpan(event) {
+	if (event?.tracing?.root) {
+		return event.tracing.root;
+	}
+	return trace.getActiveSpan();
+}
+
+/**
+ * Create and execute a span, with optional SvelteKit integration
  * @param {string} name - The name of the span
  * @param {Function} fn - The function to execute within the span
  * @param {Object} attributes - Optional attributes to add to the span
  * @param {Object} options - Optional span options
+ * @param {import('$app/server').RequestEvent | undefined} event - Optional SvelteKit request event
  * @returns {Promise} - The result of the function execution
  */
-export async function withSpan(name, fn, attributes = {}, options = {}) {
+export async function withSpan(name, fn, attributes = {}, options = {}, event = undefined) {
+	// Try to use SvelteKit's current span as parent if available
+	let parentSpan = undefined;
+	if (event?.tracing?.current) {
+		parentSpan = event.tracing.current;
+		options.parent = trace.setSpan(context.active(), parentSpan);
+	}
+
 	const span = tracer.startSpan(name, options);
 
 	// Add attributes if provided
 	if (Object.keys(attributes).length > 0) {
 		span.setAttributes(attributes);
+	}
+
+	// If we have a SvelteKit event, add some context
+	if (event) {
+		span.setAttributes({
+			'sveltekit.route.id': event.route?.id || 'unknown',
+			'sveltekit.url.pathname': event.url?.pathname || 'unknown'
+		});
 	}
 
 	try {
@@ -113,27 +153,32 @@ export function getCurrentSpan() {
 }
 
 /**
- * Add attributes to the current active span
+ * Add attributes to SvelteKit's current span if available, fallback to active span
  * @param {Object} attributes - Attributes to add
+ * @param {import('$app/server').RequestEvent | undefined} event - Optional SvelteKit request event
  */
-export function addAttributes(attributes) {
-	const span = getCurrentSpan();
+export function addAttributes(attributes, event = undefined) {
+	const span = getSvelteKitSpan(event);
 	if (span) {
 		span.setAttributes(attributes);
 	}
 }
 
 /**
- * Add an event to the current active span
+ * Add an event to SvelteKit's current span if available, fallback to active span
  * @param {string} name - Event name
  * @param {Object} attributes - Event attributes
+ * @param {import('$app/server').RequestEvent | undefined} event - Optional SvelteKit request event
  */
-export function addEvent(name, attributes = {}) {
-	const span = getCurrentSpan();
+export function addEvent(name, attributes = {}, event = undefined) {
+	const span = getSvelteKitSpan(event);
 	if (span) {
 		span.addEvent(name, attributes);
 	}
 }
+
+// Export the helper functions
+export { getSvelteKitSpan, getSvelteKitRootSpan };
 
 // Export the raw tracer for advanced use cases
 export { tracer };

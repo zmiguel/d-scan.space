@@ -4,14 +4,22 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { createAddHookMessageChannel } from 'import-in-the-middle';
+import { register } from 'node:module';
 import { readFileSync } from 'fs';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+import { env } from '$env/dynamic/private';
 import logger from './src/lib/logger.js';
 
+// Set up import-in-the-middle for better instrumentation
+const { registerOptions } = createAddHookMessageChannel();
+register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
+
+// Create trace exporter with retry logic
 const traceExporter = new OTLPTraceExporter({
-	url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
+	url: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
 	headers: {
-		Authorization: `${process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
+		Authorization: `${env.OTEL_EXPORTER_OTLP_AUTHORIZATION || ''}`
 	}
 });
 
@@ -51,9 +59,9 @@ const sdk = new NodeSDK({
 	}),
 	spanProcessor: new BatchSpanProcessor(traceExporter, {
 		// Force faster export for debugging
-		scheduledDelayMillis: 5000,
+		scheduledDelayMillis: 1000,
 		exportTimeoutMillis: 30000,
-		maxExportBatchSize: 1024
+		maxExportBatchSize: 1000
 	}),
 	instrumentations: [
 		getNodeAutoInstrumentations({
@@ -63,28 +71,8 @@ const sdk = new NodeSDK({
 			'@opentelemetry/instrumentation-fs': { enabled: false },
 			'@opentelemetry/instrumentation-fetch': { enabled: false },
 			'@opentelemetry/instrumentation-undici': { enabled: false },
-			// Configure HTTP instrumentation to be less noisy
-			'@opentelemetry/instrumentation-http': {
-				enabled: true,
-				ignoreIncomingRequestHook: (req) => {
-					// Filter out health checks, static assets, etc.
-					const url = req.url;
-					return (
-						url?.includes('/_app/') ||
-						url?.includes('/favicon.ico') ||
-						url?.includes('/robots.txt') ||
-						url?.endsWith('.css') ||
-						url?.endsWith('.js') ||
-						url?.endsWith('.map') ||
-						url?.startsWith('/static/')
-					);
-				},
-				ignoreOutgoingRequestHook: (options) => {
-					// Filter out internal health checks or monitoring requests
-					const hostname = options.hostname || options.host;
-					return hostname === 'localhost' && options.port === 3000;
-				}
-			},
+			'@opentelemetry/instrumentation-http': { enabled: false },
+			// Enable PostgreSQL instrumentation
 			'@opentelemetry/instrumentation-pg': { enabled: true }
 		})
 	]
@@ -95,7 +83,7 @@ try {
 	logger.info('Starting OpenTelemetry SDK...');
 	sdk.start();
 	logger.info(
-		`OpenTelemetry SDK started successfully\n URL: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${process.env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`
+		`OpenTelemetry SDK started successfully\n URL: ${env.OTEL_EXPORTER_OTLP_ENDPOINT}\n Authorization: ${env.OTEL_EXPORTER_OTLP_AUTHORIZATION}`
 	);
 } catch (error) {
 	logger.error('Failed to start OpenTelemetry SDK:', error);

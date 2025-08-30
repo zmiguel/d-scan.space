@@ -17,7 +17,15 @@ const config = {
 				'@opentelemetry/semantic-conventions',
 				'shimmer'
 			]
-		})
+		}),
+		experimental: {
+			tracing: {
+				server: true
+			},
+			instrumentation: {
+				server: true
+			}
+		}
 	}
 };
 
