@@ -24,7 +24,8 @@ export async function getCharactersByName(names) {
 					alliance_ticker: alliances.ticker,
 					alliance_id: characters.alliance_id,
 					last_seen: characters.last_seen,
-					updated_at: characters.updated_at
+					updated_at: characters.updated_at,
+					esi_cache_expires: characters.esi_cache_expires
 				})
 				.from(characters)
 				.leftJoin(corporations, eq(characters.corporation_id, corporations.id))
@@ -53,7 +54,8 @@ export async function addOrUpdateCharactersDB(data) {
 			name: character.name,
 			sec_status: character.security_status,
 			corporation_id: character.corporation_id,
-			alliance_id: character.alliance_id ?? null
+			alliance_id: character.alliance_id ?? null,
+			esi_cache_expires: character.esi_cache_expires ?? null
 		}));
 
 		span.setAttributes({
@@ -70,6 +72,7 @@ export async function addOrUpdateCharactersDB(data) {
 					sec_status: sql`excluded.sec_status`,
 					corporation_id: sql`excluded.corporation_id`,
 					alliance_id: sql`excluded.alliance_id`,
+					esi_cache_expires: sql`excluded.esi_cache_expires`,
 					updated_at: sql`now()`
 				}
 			});

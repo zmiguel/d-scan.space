@@ -1,0 +1,1 @@
+ALTER TABLE "characters" ADD COLUMN "esi_cache_expires" timestamp;

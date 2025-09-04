@@ -5,7 +5,11 @@
 import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
 import { updateCorporationsLastSeen } from '$lib/database/corporations.js';
 import { updateAlliancesLastSeen } from '$lib/database/alliances.js';
-import { addCharactersFromESI, updateCharactersFromESI } from '$lib/server/characters.js';
+import {
+	addCharactersFromESI,
+	updateAffiliationsFromESI,
+	updateCharactersFromESI
+} from '$lib/server/characters.js';
 import logger from '$lib/logger';
 import { withSpan } from './tracer';
 
@@ -21,55 +25,86 @@ async function getCharacters(data) {
 			// get characters in the database
 			const charactersInDB = await getCharactersByName(data);
 
-			const { missingCharacters, outdatedCharacters, goodCharacters } = await withSpan(
-				'local_scan.filter_characters',
-				async (span) => {
-					const missingCharacters = await data.filter(
-						(l) => !charactersInDB.some((c) => c.name === l)
-					);
-					const outdatedCharacters = await charactersInDB.filter(
-						(c) =>
-							(typeof c.updated_at === 'number'
-								? c.updated_at
-								: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
-							Math.floor(Date.now() / 1000) - 86400
-					);
-					const goodCharacters = await charactersInDB.filter(
-						(c) =>
-							(typeof c.updated_at === 'number'
-								? c.updated_at
-								: Math.floor(new Date(c.updated_at).getTime() / 1000)) >=
-							Math.floor(Date.now() / 1000) - 86400
-					);
+			const {
+				missingCharacters,
+				outdatedExpiredCharacters,
+				outdatedCachedCharacters,
+				goodCharacters
+			} = await withSpan('local_scan.filter_characters', async (span) => {
+				const missingCharacters = await data.filter(
+					(l) => !charactersInDB.some((c) => c.name === l)
+				);
+				const outdatedExpiredCharacters = await charactersInDB.filter(
+					(c) =>
+						(typeof c.updated_at === 'number'
+							? c.updated_at
+							: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
+							Math.floor(Date.now() / 1000) - 86400 &&
+						(c.esi_cache_expires == null ||
+							Math.floor(new Date(c.esi_cache_expires).getTime() / 1000) <
+								Math.floor(Date.now() / 1000))
+				);
+				const outdatedCachedCharacters = await charactersInDB.filter(
+					(c) =>
+						(typeof c.updated_at === 'number'
+							? c.updated_at
+							: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
+							Math.floor(Date.now() / 1000) - 86400 &&
+						c.esi_cache_expires &&
+						Math.floor(new Date(c.esi_cache_expires).getTime() / 1000) >
+							Math.floor(Date.now() / 1000)
+				);
+				const goodCharacters = await charactersInDB.filter(
+					(c) =>
+						(typeof c.updated_at === 'number'
+							? c.updated_at
+							: Math.floor(new Date(c.updated_at).getTime() / 1000)) >=
+						Math.floor(Date.now() / 1000) - 86400
+				);
 
-					span.setAttributes({
-						'characters.missing_count': missingCharacters.length,
-						'characters.outdated_count': outdatedCharacters.length,
-						'characters.good_count': goodCharacters.length,
-						'characters.cache_hit_rate': ((goodCharacters.length / data.length) * 100).toFixed(2)
-					});
-					return { missingCharacters, outdatedCharacters, goodCharacters };
-				}
-			);
+				span.setAttributes({
+					'characters.missing_count': missingCharacters.length,
+					'characters.outdated_expired_count': outdatedExpiredCharacters.length,
+					'characters.outdated_cached_count': outdatedCachedCharacters.length,
+					'characters.good_count': goodCharacters.length,
+					'characters.cache_hit_rate': ((goodCharacters.length / data.length) * 100).toFixed(2)
+				});
+				return {
+					missingCharacters,
+					outdatedExpiredCharacters,
+					outdatedCachedCharacters,
+					goodCharacters
+				};
+			});
 
 			logger.info(
-				`Missing: ${missingCharacters.length}, Outdated: ${outdatedCharacters.length}, Good: ${goodCharacters.length}`
+				`Missing: ${missingCharacters.length}, Outdated (Expired): ${outdatedExpiredCharacters.length}, Outdated (Cached): ${outdatedCachedCharacters.length}, Good: ${goodCharacters.length}`
 			);
 
-			// check if we are missing characters from the database
+			// Run the three update paths in parallel where applicable
+			const updatePromises = [];
+			// missing characters → full character fetch
 			if (missingCharacters.length > 0) {
-				// get missing characters from ESI
-				await addCharactersFromESI(missingCharacters);
+				updatePromises.push(addCharactersFromESI(missingCharacters));
 			}
-
-			// check if characters are outdated in database
-			if (outdatedCharacters.length > 0) {
-				// get updated characters from ESI
-				await updateCharactersFromESI(outdatedCharacters);
+			// outdated with expired ESI cache → full character refresh
+			if (outdatedExpiredCharacters.length > 0) {
+				updatePromises.push(updateCharactersFromESI(outdatedExpiredCharacters));
+			}
+			// outdated but ESI cache still valid → affiliations-only refresh
+			if (outdatedCachedCharacters.length > 0) {
+				updatePromises.push(updateAffiliationsFromESI(outdatedCachedCharacters));
+			}
+			if (updatePromises.length > 0) {
+				await Promise.all(updatePromises);
 			}
 
 			// get all outdated and missing characters from db
-			const charactersToFetch = [...missingCharacters, ...outdatedCharacters.map((c) => c.name)];
+			const charactersToFetch = [
+				...missingCharacters,
+				...outdatedExpiredCharacters.map((c) => c.name),
+				...outdatedCachedCharacters.map((c) => c.name)
+			];
 			const updatedCharacters = await getCharactersByName(charactersToFetch);
 
 			// merge good with updated
@@ -77,7 +112,10 @@ async function getCharacters(data) {
 
 			span.setAttributes({
 				'characters.final_count': finalCharacters.length,
-				'characters.esi_calls_made': missingCharacters.length + outdatedCharacters.length
+				'characters.esi_calls_made':
+					missingCharacters.length +
+					outdatedExpiredCharacters.length +
+					outdatedCachedCharacters.length
 			});
 
 			return finalCharacters;

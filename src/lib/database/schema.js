@@ -47,7 +47,8 @@ export const characters = pgTable('characters', {
 	last_seen: timestamp().defaultNow().notNull(),
 	created_at: timestamp().defaultNow().notNull(),
 	updated_at: timestamp().defaultNow().notNull(),
-	deleted_at: timestamp()
+	deleted_at: timestamp(),
+	esi_cache_expires: timestamp()
 });
 
 export const corporations = pgTable('corporations', {
