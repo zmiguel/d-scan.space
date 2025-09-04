@@ -2,6 +2,7 @@
 	import { Table } from '@flowbite-svelte-plugins/datatable';
 	import { ListPlaceholder } from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let { data } = $props();
 
@@ -24,7 +25,7 @@
 	};
 
 	function open_item(scan) {
-		goto(`/scan/${scan.group_id}/${scan.id}`);
+		goto(resolve(`/scan/${scan.group_id}/${scan.id}`));
 	}
 
 	// Basic datatable options for better search functionality

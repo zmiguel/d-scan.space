@@ -1,5 +1,6 @@
 <script>
 	import {} from 'flowbite-svelte';
+	import { resolve } from '$app/paths';
 </script>
 
 <svelte:head>
@@ -18,7 +19,7 @@
 	<p class="font-normal text-gray-700 dark:text-gray-400">
 		If you have any questions about the functionality of this website, or if you have any
 		suggestions. Please reach out via the multiple channels available on the <a
-			href="/contact"
+			href={resolve('/contact')}
 			class="text-primary-700 dark:text-primary-400">Contact</a
 		> page.
 	</p>

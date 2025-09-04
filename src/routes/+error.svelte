@@ -2,9 +2,10 @@
 	import { Button } from 'flowbite-svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	function handleGoHome() {
-		goto('/');
+		goto(resolve('/'));
 	}
 </script>
 
