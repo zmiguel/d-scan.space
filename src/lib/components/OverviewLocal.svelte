@@ -97,63 +97,65 @@
 					</div>
 				</div>
 			{/snippet}
-			{#each alliance.corporations as corp (corp.id)}
-				<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
-					{#snippet header()}
-						<div class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2">
-							<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
-								<Avatar
-									cornerStyle="rounded"
-									src="https://images.evetech.net/corporations/{corp.id}/logo?size=32"
-									size="sm"
-									class="mr-2"
-								/>
-								<div
-									class="min-w-0 truncate font-medium dark:text-white"
-									id="corp-{corp.id}"
-									data-truncate-check
-								>
-									<div class="truncate">
-										<span class="text-primary-700 dark:text-primary-400"
-											>{'<' + corp.ticker + '>'}</span
-										>
-										{corp.name}
+			<Accordion flush multiple>
+				{#each alliance.corporations as corp (corp.id)}
+					<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
+						{#snippet header()}
+							<div class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2">
+								<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
+									<Avatar
+										cornerStyle="rounded"
+										src="https://images.evetech.net/corporations/{corp.id}/logo?size=32"
+										size="sm"
+										class="mr-2"
+									/>
+									<div
+										class="min-w-0 truncate font-medium dark:text-white"
+										id="corp-{corp.id}"
+										data-truncate-check
+									>
+										<div class="truncate">
+											<span class="text-primary-700 dark:text-primary-400"
+												>{'<' + corp.ticker + '>'}</span
+											>
+											{corp.name}
+										</div>
 									</div>
+									{#if truncatedElements[`corp-${corp.id}`]}
+										<Tooltip triggeredBy="#corp-{corp.id}" placement="top">
+											{'<' + corp.ticker + '>'}
+											{corp.name}
+										</Tooltip>
+									{/if}
 								</div>
-								{#if truncatedElements[`corp-${corp.id}`]}
-									<Tooltip triggeredBy="#corp-{corp.id}" placement="top">
-										{'<' + corp.ticker + '>'}
-										{corp.name}
-									</Tooltip>
-								{/if}
+								<div class="text-amber-600 dark:text-amber-400">
+									{corp.character_count}
+								</div>
 							</div>
-							<div class="text-amber-600 dark:text-amber-400">
-								{corp.character_count}
-							</div>
-						</div>
-					{/snippet}
+						{/snippet}
 
-					{#each corp.characters as pilot (pilot.id)}
-						<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
-							<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
-								<Avatar
-									cornerStyle="rounded"
-									src="https://images.evetech.net/characters/{pilot.id}/portrait?size=32"
-									size="sm"
-								/>
-								<div class="font-medium dark:text-white">
-									<div>
-										{pilot.name}
-										<span class="text-primary-700 dark:text-primary-400"
-											>{pilot.sec_status.toFixed(3)}</span
-										>
+						{#each corp.characters as pilot (pilot.id)}
+							<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
+								<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
+									<Avatar
+										cornerStyle="rounded"
+										src="https://images.evetech.net/characters/{pilot.id}/portrait?size=32"
+										size="sm"
+									/>
+									<div class="font-medium dark:text-white">
+										<div>
+											{pilot.name}
+											<span class="text-primary-700 dark:text-primary-400"
+												>{pilot.sec_status.toFixed(3)}</span
+											>
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
-					{/each}
-				</AccordionItem>
-			{/each}
+						{/each}
+					</AccordionItem>
+				{/each}
+			</Accordion>
 		</AccordionItem>
 	{/each}
 </Accordion>
