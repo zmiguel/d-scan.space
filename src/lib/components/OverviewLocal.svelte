@@ -1,6 +1,7 @@
 <script>
 	import { Accordion, AccordionItem, Avatar, Tooltip } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
+	import { secStatusColor } from '$lib/utils/secStatus';
 
 	let { data } = $props();
 	let truncatedElements = $state({});
@@ -145,9 +146,9 @@
 									<div class="font-medium dark:text-white">
 										<div>
 											{pilot.name}
-											<span class="text-primary-700 dark:text-primary-400"
-												>{pilot.sec_status.toFixed(3)}</span
-											>
+											<span style:color={secStatusColor(pilot.sec_status)}>
+												{pilot.sec_status.toFixed(3)}
+											</span>
 										</div>
 									</div>
 								</div>
