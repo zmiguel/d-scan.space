@@ -18,13 +18,13 @@
 				<div class="font-medium dark:text-white">
 					<div>
 						{#if alliance.ticker}
-							<span class="text-primary-700 dark:text-primary-400">[{alliance.ticker}]</span>
+							<span class="text-pink-600 dark:text-pink-400">[{alliance.ticker}]</span>
 							{alliance.name}
 						{:else}
 							<span class="italic">No Alliance</span>
 						{/if}
 					</div>
-					<div class="text-pink-600 dark:text-pink-400">
+					<div class="text-primary-700 dark:text-primary-400">
 						{alliance.corporation_count} Corporations
 					</div>
 				</div>
