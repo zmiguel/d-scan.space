@@ -8,7 +8,7 @@ import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/char
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
 import logger from '$lib/logger.js';
-import { CHARACTER_REQUEST_BATCH_SIZE } from '$lib/server/constants.js';
+import { CHARACTER_REQUEST_BATCH_SIZE, DOOMHEIM_ID } from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
 	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);
@@ -443,6 +443,11 @@ export async function updateAffiliationsFromESI(data) {
 				if (affiliation) {
 					char.alliance_id = affiliation.alliance_id;
 					char.corporation_id = affiliation.corporation_id;
+					// check if corporation ID is DOOMHEIM
+					if (affiliation.corporation_id === DOOMHEIM_ID) {
+						// this character was deleted!!
+						char.deleted_at = new Date();
+					}
 				}
 			}
 
