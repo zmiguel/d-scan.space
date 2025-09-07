@@ -287,19 +287,27 @@ export async function idsToCharacters(ids) {
 				return [];
 			}
 
+			let processedCharacters = [];
+
 			// Merge affiliation data into character results using a Map for O(1) lookups
 			const affByCharId = new Map(allCharacterAffiliations.map((a) => [a.character_id, a]));
 			for (const char of allResults) {
 				if (!char) continue;
 				const affiliation = affByCharId.get(char.id);
 				if (affiliation) {
+					if (affiliation.corporation_id === DOOMHEIM_ID) {
+						// Biomass the character if they are in Doomheim
+						await biomassCharacter(char.id);
+						continue;
+					}
 					char.corporation_id = affiliation.corporation_id;
 					char.alliance_id = affiliation.alliance_id ?? null;
+					processedCharacters.push(char);
 				}
 			}
 
 			// Filter out any null values from results
-			const filtered = allResults.filter((char) => char !== null);
+			const filtered = processedCharacters.filter((char) => char !== null);
 			return filtered;
 		},
 		{
