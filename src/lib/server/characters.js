@@ -3,7 +3,11 @@
  */
 import { addOrUpdateCorporations } from '$lib/server/corporations.js';
 import { addOrUpdateAlliances } from '$lib/server/alliances.js';
-import { addOrUpdateCharactersDB, getCharactersByName } from '$lib/database/characters.js';
+import {
+	addOrUpdateCharactersDB,
+	biomassCharacter,
+	getCharactersByName
+} from '$lib/database/characters.js';
 
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
@@ -414,9 +418,7 @@ export async function updateCharactersFromESI(data) {
 		'updateCharactersFromESI',
 		async () => {
 			const ids = data.map((char) => char.id);
-
 			const charactersData = await idsToCharacters(ids);
-
 			await addOrUpdateCharacters(charactersData);
 		},
 		{
@@ -432,26 +434,26 @@ export async function updateAffiliationsFromESI(data) {
 		'updateAffiliationsFromESI',
 		async () => {
 			const ids = data.map((char) => char.id);
-
 			const affiliationsData = await idsToAffiliations(ids);
-
 			const affiliationMap = new Map(affiliationsData.map((aff) => [aff.character_id, aff]));
+
+			let updatedCharacters = [];
 
 			// update character data with new affiliation data
 			for (const char of data) {
 				const affiliation = affiliationMap.get(char.id);
 				if (affiliation) {
+					if (affiliation.corporation_id === DOOMHEIM_ID) {
+						biomassCharacter(char.id);
+						continue;
+					}
 					char.alliance_id = affiliation.alliance_id;
 					char.corporation_id = affiliation.corporation_id;
-					// check if corporation ID is DOOMHEIM
-					if (affiliation.corporation_id === DOOMHEIM_ID) {
-						// this character was deleted!!
-						char.deleted_at = new Date();
-					}
+					updatedCharacters.push(char);
 				}
 			}
 
-			await addOrUpdateCharacters(data);
+			await addOrUpdateCharacters(updatedCharacters);
 		},
 		{
 			'characters.update_affiliations_from_esi': data.length

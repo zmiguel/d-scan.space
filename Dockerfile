@@ -18,4 +18,5 @@ EXPOSE 4173
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://
 ENV AGENT="Docker"
+ENV ORIGIN=undefined
 CMD [ "npm", "run", "prod" ]

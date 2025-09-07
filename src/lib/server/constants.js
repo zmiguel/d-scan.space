@@ -4,7 +4,8 @@ import { env } from '$env/dynamic/private';
 
 export const version = pkg.version;
 export const DOOMHEIM_ID = 1000001;
-export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV}; ${env.AGENT}) Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
+// Example user agent:     D-Scan.Space/0.0.1 (dev; Docker; Preview-Branch; +https://dev.d-scan.space) Node/24.7.0 (linux; arm64)
+export const USER_AGENT = `D-Scan.Space/${version} (${env.NODE_ENV}; ${env.AGENT}; +${env.ORIGIN || 'undefined'}) Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
 
 // BATCH SETTINGS
 export const BATCH_UNIVERSE = 50;

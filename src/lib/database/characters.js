@@ -55,12 +55,12 @@ export async function addOrUpdateCharactersDB(data) {
 			sec_status: character.security_status,
 			corporation_id: character.corporation_id,
 			alliance_id: character.alliance_id ?? null,
-			esi_cache_expires: character.esi_cache_expires ?? null,
-			deleted_at: character.deleted_at ?? null
+			esi_cache_expires: character.esi_cache_expires ?? null
 		}));
 
 		span.setAttributes({
-			'db.characters.insert': values.length
+			'db.characters.insert': values.length,
+			'db.characters.insert_values': JSON.stringify(values)
 		});
 
 		await db
@@ -74,7 +74,6 @@ export async function addOrUpdateCharactersDB(data) {
 					corporation_id: sql`excluded.corporation_id`,
 					alliance_id: sql`excluded.alliance_id`,
 					esi_cache_expires: sql`excluded.esi_cache_expires`,
-					deleted_at: sql`COALESCE(excluded.deleted_at, ${characters.deleted_at})`,
 					updated_at: sql`now()`
 				}
 			});
