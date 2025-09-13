@@ -52,7 +52,7 @@ export async function addOrUpdateCharactersDB(data) {
 		const values = data.map((character) => ({
 			id: character.id,
 			name: character.name,
-			sec_status: character.sec_status,
+			sec_status: character.sec_status || character.security_status || 0,
 			corporation_id: character.corporation_id,
 			alliance_id: character.alliance_id ?? null,
 			esi_cache_expires: character.esi_cache_expires ?? null
