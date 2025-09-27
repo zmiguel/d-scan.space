@@ -15,8 +15,11 @@ COPY package.json .
 COPY src/lib/logger.js src/lib/logger.js
 COPY drizzle drizzle/
 EXPOSE 4173
-ENV NODE_ENV=production
-ENV DATABASE_URL=postgres://
-ENV AGENT="Docker"
-ENV ORIGIN=undefined
+ENV NODE_ENV=production \
+    DATABASE_URL=postgres:// \
+    AGENT="" \
+    ORIGIN=undefined \
+    CONTACT_EMAIL=undefined \
+    CONTACT_EVE=undefined \
+    CONTACT_DISCORD=undefined
 CMD [ "npm", "run", "prod" ]

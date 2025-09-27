@@ -6,9 +6,10 @@ const headers = {
 	'Content-Type': 'application/json',
 	Accept: 'application/json',
 	'Accept-Language': 'en',
-	'X-Compatibility-Date': '2025-07-01',
+	'X-Compatibility-Date': '2025-09-01',
 	'X-Tenant': 'tranquility',
-	'User-Agent': USER_AGENT
+	'User-Agent': USER_AGENT,
+	'X-User-Agent': USER_AGENT
 };
 
 async function handleDelete(response, span, attempt, fullResponse) {
