@@ -52,7 +52,7 @@
 		"import-in-the-middle": "^1.14.4",
 		"js-yaml": "^4.1.0",
 		"pg": "^8.16.3",
-		"pino": "^9.11.0",
+		"pino": "^9.13.0",
 		"pino-pretty": "^13.1.1",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",
