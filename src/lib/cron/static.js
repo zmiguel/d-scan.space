@@ -10,14 +10,20 @@ import fs from 'fs';
 import path from 'path';
 import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
 import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
+import { fetchGET } from '$lib/server/wrappers';
 
 export async function updateStaticData() {
 	logger.info('[SDEUpdater] Updating static data...');
 	await withSpan('CRON Static', async () => {
 		// Get SDE version and compare it to the last entry in DB
-		const [updated, version] = await withSpan('SDE Version Check', async () => {
+		const [updated, version] = await withSpan('SDE Version Check', async (span) => {
 			const lastInstalledVersion = await getLastInstalledSDEVersion();
 			const latestOnlineVersion = await getOnlineVersion();
+
+			span.setAttributes({
+				'sde.installed': JSON.stringify(lastInstalledVersion),
+				'sde.online': JSON.stringify(latestOnlineVersion)
+			});
 
 			// If no previous version exists, force an update
 			if (!lastInstalledVersion) {
@@ -95,7 +101,7 @@ async function getOnlineVersion() {
 	return await withSpan('Get Online Version', async (span) => {
 		try {
 			// fetch the version data from the SDE Links
-			const response = await fetch(SDE_VERSION);
+			const response = await fetchGET(SDE_VERSION);
 
 			if (!response.ok) {
 				throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
@@ -141,7 +147,7 @@ async function downloadAndExtractSDE(url, files = []) {
 
 			// Download the zip file using streaming to avoid blocking
 			span.addEvent('Downloading SDE zip file');
-			const response = await fetch(url);
+			const response = await fetchGET(url);
 			if (!response.ok) {
 				span.setStatus({ code: 2, message: `Failed to download SDE: HTTP ${response.status}` });
 				throw new Error(`Failed to download SDE: HTTP ${response.status} ${response.statusText}`);
