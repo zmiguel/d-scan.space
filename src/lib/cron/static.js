@@ -1,10 +1,11 @@
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
-import { getLastInstalledSDEVersion, addSDEDataEntry, addOrUpdateSystemsDB } from '$lib/database/sde';
 import {
-	SDE_FILE,
-	SDE_VERSION,
-} from '$lib/server/constants';
+	getLastInstalledSDEVersion,
+	addSDEDataEntry,
+	addOrUpdateSystemsDB
+} from '$lib/database/sde';
+import { SDE_FILE, SDE_VERSION } from '$lib/server/constants';
 import fs from 'fs';
 import path from 'path';
 import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
@@ -24,9 +25,7 @@ export async function updateStaticData() {
 				return [false, latestOnlineVersion];
 			}
 
-			if (
-				lastInstalledVersion.release_version === latestOnlineVersion.release_version
-			) {
+			if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
 				logger.info('[SDEUpdater] Static data is up to date, no update needed.');
 				return [true, latestOnlineVersion];
 			}
@@ -48,7 +47,7 @@ export async function updateStaticData() {
 			// and these to update the universe
 			'mapRegions.jsonl',
 			'mapConstellations.jsonl',
-			'mapSolarSystems.jsonl',
+			'mapSolarSystems.jsonl'
 			// more...
 		];
 
@@ -59,16 +58,23 @@ export async function updateStaticData() {
 		// update NPC corps
 		logger.info('[SDEUpdater] Updating NPC corporations...');
 		const npcUpdateSuccess = await updateNPCCorps();
-		logger.info('[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed'));
+		logger.info(
+			'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
+		);
 
 		// update the universe
 		logger.info('[SDEUpdater] Updating universe data...');
 		const universeUpdateSuccess = await updateUniverse();
-		logger.info('[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed'));
+		logger.info(
+			'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
+		);
 
 		// save the SDE data entry
 		const final_result = npcUpdateSuccess && universeUpdateSuccess;
-		logger.info('[SDEUpdater] Recording new SDE version in database... ' + (final_result ? 'success' : 'failure'));
+		logger.info(
+			'[SDEUpdater] Recording new SDE version in database... ' +
+				(final_result ? 'success' : 'failure')
+		);
 		await addSDEDataEntry({
 			release_date: version.release_date,
 			release_version: version.release_version,
@@ -86,40 +92,40 @@ export async function updateStaticData() {
 }
 
 async function getOnlineVersion() {
-    return await withSpan('Get Online Version', async (span) => {
-        try {
-            // fetch the version data from the SDE Links
-            const response = await fetch(SDE_VERSION);
+	return await withSpan('Get Online Version', async (span) => {
+		try {
+			// fetch the version data from the SDE Links
+			const response = await fetch(SDE_VERSION);
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
-            }
+			if (!response.ok) {
+				throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
+			}
 
-            // Get the JSONL content
-            const jsonlContent = await response.text();
+			// Get the JSONL content
+			const jsonlContent = await response.text();
 
-            // Parse the JSONL (assuming single line for SDE data)
-            const lines = jsonlContent.trim().split('\n');
-            const sdeData = JSON.parse(lines[0]); // Get first line
+			// Parse the JSONL (assuming single line for SDE data)
+			const lines = jsonlContent.trim().split('\n');
+			const sdeData = JSON.parse(lines[0]); // Get first line
 
-            // Extract version information
-            const buildNumber = sdeData.buildNumber;
-            const releaseDate = sdeData.releaseDate;
+			// Extract version information
+			const buildNumber = sdeData.buildNumber;
+			const releaseDate = sdeData.releaseDate;
 
-            span.setAttributes({
-                'sde.build_number': buildNumber,
-                'sde.release_date': releaseDate,
-            });
+			span.setAttributes({
+				'sde.build_number': buildNumber,
+				'sde.release_date': releaseDate
+			});
 
-            return {
-                "release_version": buildNumber,
-                "release_date": releaseDate
-            };
-        } catch (error) {
-            span.setStatus({ code: 2, message: `Failed to get online version: ${error.message}` });
-            throw error;
-        }
-    });
+			return {
+				release_version: buildNumber,
+				release_date: releaseDate
+			};
+		} catch (error) {
+			span.setStatus({ code: 2, message: `Failed to get online version: ${error.message}` });
+			throw error;
+		}
+	});
 }
 
 async function downloadAndExtractSDE(url, files = []) {
@@ -229,7 +235,10 @@ async function updateNPCCorps() {
 			const readJSONLAsync = async (filePath) => {
 				return new Promise((resolve, reject) => {
 					const lines = [];
-					const stream = fs.createReadStream(filePath, { encoding: 'utf8', highWaterMark: 64 * 1024 });
+					const stream = fs.createReadStream(filePath, {
+						encoding: 'utf8',
+						highWaterMark: 64 * 1024
+					});
 					let buffer = '';
 
 					stream.on('data', (chunk) => {
@@ -344,7 +353,10 @@ async function updateUniverse() {
 			const readJSONLAsync = async (filePath) => {
 				return new Promise((resolve, reject) => {
 					const lines = [];
-					const stream = fs.createReadStream(filePath, { encoding: 'utf8', highWaterMark: 64 * 1024 });
+					const stream = fs.createReadStream(filePath, {
+						encoding: 'utf8',
+						highWaterMark: 64 * 1024
+					});
 					let buffer = '';
 
 					stream.on('data', (chunk) => {
@@ -458,7 +470,13 @@ async function updateUniverse() {
 					const securityStatus = systemData.securityStatus;
 
 					// Validate required fields
-					if (!systemId || !systemName || constellationId === undefined || regionId === undefined || securityStatus === undefined) {
+					if (
+						!systemId ||
+						!systemName ||
+						constellationId === undefined ||
+						regionId === undefined ||
+						securityStatus === undefined
+					) {
 						logger.warn(`Skipping solar system ${systemId} due to missing required fields`);
 						span.addEvent('Skipping system with missing data', {
 							systemId,
@@ -476,7 +494,9 @@ async function updateUniverse() {
 					const regionName = regionMap.get(regionId);
 
 					if (!constellationName || !regionName) {
-						logger.warn(`Skipping solar system ${systemId} (${systemName}) due to missing constellation or region mapping`);
+						logger.warn(
+							`Skipping solar system ${systemId} (${systemName}) due to missing constellation or region mapping`
+						);
 						span.addEvent('Skipping system with missing mapping', {
 							systemId,
 							systemName,

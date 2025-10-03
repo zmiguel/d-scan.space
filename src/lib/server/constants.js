@@ -20,6 +20,4 @@ export const CHARACTER_REQUEST_BATCH_SIZE = 500;
 // SDE LINKS
 export const SDE_FILE =
 	'https://developers.eveonline.com/static-data/eve-online-static-data-latest-jsonl.zip';
-export const SDE_VERSION =
-	'https://developers.eveonline.com/static-data/tranquility/latest.jsonl';
-
+export const SDE_VERSION = 'https://developers.eveonline.com/static-data/tranquility/latest.jsonl';
