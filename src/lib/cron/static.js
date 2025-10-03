@@ -17,8 +17,13 @@ export async function updateStaticData() {
 	await withSpan('CRON Static', async () => {
 		// Get SDE version and compare it to the last entry in DB
 		const [updated, version] = await withSpan('SDE Version Check', async (span) => {
-			const lastInstalledVersion = await getLastInstalledSDEVersion();
+			let lastInstalledVersion = await getLastInstalledSDEVersion();
 			const latestOnlineVersion = await getOnlineVersion();
+
+			// if lastInstalledVersion is an array, get the first element
+			if (Array.isArray(lastInstalledVersion)) {
+				lastInstalledVersion = lastInstalledVersion[0];
+			}
 
 			span.setAttributes({
 				'sde.installed': JSON.stringify(lastInstalledVersion),

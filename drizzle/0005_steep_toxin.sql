@@ -1,0 +1,1 @@
+ALTER TABLE "sde" ALTER COLUMN "release_version" SET DATA TYPE bigint USING "release_version"::bigint;

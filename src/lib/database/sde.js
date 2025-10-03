@@ -62,7 +62,7 @@ export async function addOrUpdateSystemsDB(data) {
 						constellation: sql`excluded.constellation`,
 						region: sql`excluded.region`,
 						sec_status: sql`excluded.sec_status`,
-						last_seen: sql`now()`,
+						last_seen: sql`systems.last_seen`, // Preserve existing last_seen
 						updated_at: sql`now()`
 					}
 				});

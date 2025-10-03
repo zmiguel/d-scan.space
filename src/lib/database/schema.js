@@ -86,7 +86,7 @@ export const systems = pgTable('systems', {
 export const sde = pgTable('sde', {
 	id: integer().primaryKey().generatedAlwaysAsIdentity(),
 	release_date: timestamp().defaultNow().notNull(),
-	release_version: text().notNull(),
+	release_version: bigint({ mode: 'number' }).notNull(),
 	run_date: timestamp().defaultNow().notNull(),
 	success: boolean().notNull().default(true)
 });
