@@ -1,65 +1,62 @@
 /**
  *  Functions related to corporations
  */
-import {
-	addCorporation,
-	getCorporationByID,
-	updateCorporation
-} from '$lib/database/corporations.js';
-import { getAllianceByID } from '$lib/database/alliances.js';
-import { addAllianceFromESI } from '$lib/server/alliances.js';
+import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
+import { withSpan } from './tracer.js';
+import { fetchGET } from './wrappers.js';
 
-export async function updateCorp(db, id, returnData = false) {
-	const corp = await getCorporationByID(db, id);
+async function getCorporationFromESI(id) {
+	// fetchGET has tracing built-in
+	const corporationData = await fetchGET(`https://esi.evetech.net/corporations/${id}`);
 
-	if (corp.updatedAt < new Date().getTime() - 86400000) {
-		const corpData = await fetch(
-			`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
-			{
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			}
-		);
-
-		const corpInfo = await corpData.json();
-		// Update corporation info
-		await updateCorporation(db, corpInfo);
-
-		if (returnData) {
-			return getCorporationByID(db, id);
-		}
-	}
-
-	if (returnData) {
-		return corp;
-	}
+	const corporationInfo = await corporationData.json();
+	corporationInfo.id = id;
+	delete corporationInfo.description; // Remove description if it exists
+	return corporationInfo;
 }
 
-export async function addCorporationFromESI(db, id) {
-	const corpData = await fetch(
-		`https://esi.evetech.net/latest/corporations/${id}/?datasource=tranquility`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json'
-			}
+export async function idsToCorporations(ids) {
+	return await withSpan('idsToCorporations', async () => {
+		// get all corporations from esi and return them
+		let corporationData = [];
+		const corporationPromises = ids.map(async (id) => {
+			const corporationInfo = await getCorporationFromESI(id);
+			corporationData.push(corporationInfo);
+		});
+
+		await Promise.all(corporationPromises);
+
+		return corporationData;
+	});
+}
+
+export async function addOrUpdateCorporations(data) {
+	await withSpan('addOrUpdateCorporations', async (span) => {
+		const corporationsInDB = await getCorporationsByID(data);
+
+		// find missing corporations
+		const missingCorporations = data.filter((id) => !corporationsInDB.some((a) => a.id === id));
+
+		// find outdated corporations
+		const outdatedCorporations = corporationsInDB.filter(
+			(a) => new Date(a.updated_at).getTime() < Date.now() - 86400 * 1000 // 24 hours
+		);
+
+		// combine missing and outdated corporations
+		const corporationsToFetch = [...missingCorporations, ...outdatedCorporations.map((a) => a.id)];
+
+		if (corporationsToFetch.length === 0) {
+			return;
 		}
-	);
 
-	const corpInfo = await corpData.json();
-	corpInfo.id = id;
+		const corporationData = await idsToCorporations(corporationsToFetch);
 
-	if (corpInfo.alliance_id) {
-		// check if we have the alliance in the database
-		let alliance = await getAllianceByID(db, corpInfo.alliance_id);
+		span.setAttributes({
+			'scan.corporations.missing': missingCorporations.length,
+			'scan.corporations.outdated': outdatedCorporations.length,
+			'scan.corporations.fetched': corporationData.length
+		});
 
-		if (!alliance) {
-			// add alliance to database
-			await addAllianceFromESI(db, corpInfo.alliance_id);
-		}
-	}
-
-	await addCorporation(db, corpInfo);
+		await addOrUpdateCorporationsDB(corporationData);
+	});
 }

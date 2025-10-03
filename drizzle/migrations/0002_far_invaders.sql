@@ -1,1 +1,0 @@
-ALTER TABLE `characters` ADD `deleted_at` integer;

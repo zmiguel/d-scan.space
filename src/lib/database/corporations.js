@@ -1,36 +1,71 @@
 /**
  * All DB functions related to corporations
  */
-
+import { db } from '$lib/database/client';
+import logger from '$lib/logger';
+import { withSpan } from '$lib/server/tracer';
 import { corporations } from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 
-export async function getCorporationByID(db, id) {
-	return await db.select().from(corporations).where(eq(corporations.id, id)).get();
+export async function getCorporationsByID(ids) {
+	return db.select().from(corporations).where(inArray(corporations.id, ids));
 }
 
-export async function updateCorporation(db, data) {
-	return await db
+export async function getAllCorporations() {
+	return db.select().from(corporations);
+}
+
+export async function addOrUpdateCorporationsDB(data) {
+	await withSpan('addOrUpdateCorporationsDB', async (span) => {
+		if (!data || data.length === 0) {
+			logger.warn('Tried to add corporations from ESI but corporations array was empty');
+			return;
+		}
+
+		const values = data.map((corporation) => ({
+			id: corporation.id,
+			name: corporation.name,
+			ticker: corporation.ticker,
+			alliance_id: corporation.alliance_id ?? null,
+			...(corporation.npc !== undefined && { npc: corporation.npc })
+		}));
+
+		span.setAttributes({
+			'corporations.data.length': values.length
+		});
+
+		// Determine if any of the records have npc field
+		const hasNpcData = values.some((corp) => corp.npc !== undefined);
+
+		const updateSet = {
+			name: sql`excluded.name`,
+			ticker: sql`excluded.ticker`,
+			alliance_id: sql`excluded.alliance_id`,
+			updated_at: sql`now()`
+		};
+
+		// Only update npc if the data contains npc values
+		if (hasNpcData) {
+			updateSet.npc = sql`excluded.npc`;
+		}
+
+		await db.insert(corporations).values(values).onConflictDoUpdate({
+			target: corporations.id,
+			set: updateSet
+		});
+	});
+}
+
+export async function updateCorporationsLastSeen(corporationsIDs) {
+	if (!corporationsIDs || corporationsIDs.length === 0) {
+		logger.warn('Tried to update corporations last seen but corporations array was empty');
+		return;
+	}
+
+	await db
 		.update(corporations)
 		.set({
-			name: data.name,
-			ticker: data.ticker,
-			alliance_id: data.alliance_id ? data.alliance_id : null,
-			updated_at: Math.floor(Date.now() / 1000)
+			last_seen: sql`now()`
 		})
-		.where(corporations.id.eq(data.id))
-		.run();
-}
-
-export async function addCorporation(db, data) {
-	return await db
-		.insert(corporations)
-		.values({
-			id: data.id,
-			name: data.name,
-			ticker: data.ticker,
-			alliance_id: data.alliance_id ?? null
-		})
-		.onConflictDoNothing()
-		.run();
+		.where(inArray(corporations.id, corporationsIDs));
 }

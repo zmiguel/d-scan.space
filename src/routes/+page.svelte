@@ -4,13 +4,14 @@
 	import { Spinner } from 'flowbite-svelte';
 	import { enhance } from '$app/forms';
 
-	let isLoading = false;
+	let isLoading = $state(false);
+
 	function handleSubmit() {
 		isLoading = true;
-	}
-
-	function handleComplete() {
-		isLoading = false;
+		return async ({ update }) => {
+			await update();
+			isLoading = false;
+		};
 	}
 </script>
 
@@ -20,9 +21,9 @@
 
 <div class="content-center">
 	{#if isLoading}
-		<div class="flex flex-col items-center justify-center min-h-[60vh] py-12">
+		<div class="flex min-h-[60vh] flex-col items-center justify-center py-12">
 			<Spinner size="12" class="mb-4" color="blue" />
-			<h2 class="text-2xl font-semibold mb-2 text-primary-700 dark:text-primary-400">
+			<h2 class="mb-2 text-2xl font-semibold text-primary-700 dark:text-primary-400">
 				... Processing ...
 			</h2>
 			<p class="text-gray-600 dark:text-gray-400">
@@ -31,13 +32,7 @@
 		</div>
 	{:else}
 		<div class="container mx-auto">
-			<form
-				method="POST"
-				use:enhance
-				action="/scan"
-				on:submit={handleSubmit}
-				on:reset={handleComplete}
-			>
+			<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
 				<Label for="textarea-id" class="mb-2"
 					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
 					<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
@@ -45,18 +40,17 @@
 				<Textarea
 					id="textarea-id"
 					placeholder="Paste your data"
-					rows="16"
+					rows={16}
 					name="scan_content"
+					class="block w-full"
 					required
 				/>
 
-				<Toggle class="mt-2" checked={false} name="is_public"
+				<Toggle class="mt-3 cursor-pointer" checked={false} name="is_public"
 					>Make this Scan public on the site.</Toggle
 				>
 
-				<Button class="mt-4 w-full" color="primary" type="submit" formaction="/scan?/create"
-					>Process</Button
-				>
+				<Button class="mt-4 w-full cursor-pointer" color="primary" type="submit">Process</Button>
 			</form>
 		</div>
 	{/if}
