@@ -1,26 +1,26 @@
 import { db } from '$lib/database/client';
 import { withSpan } from '$lib/server/tracer';
-import { sde_data, systems } from './schema';
+import { sde, systems } from './schema';
 import { desc, eq, sql, inArray } from 'drizzle-orm';
 
-export async function getLastChecksums() {
-	return await withSpan('getLastChecksums', async () => {
+export async function getLastInstalledSDEVersion() {
+	return await withSpan('getLastInstalledSDEVersion', async () => {
 		return await db
 			.select()
-			.from(sde_data)
-			.where(eq(sde_data.success, true))
-			.orderBy(desc(sde_data.install_date))
+			.from(sde)
+			.where(eq(sde.success, true))
+			.orderBy(desc(sde.run_date))
 			.limit(1);
 	});
 }
 
-export async function addSDEDataEntry(checksums) {
+export async function addSDEDataEntry(data) {
 	await withSpan('addSDEDataEntry', async () => {
-		await db.insert(sde_data).values({
-			fsd_checksum: checksums.fsd,
-			bsd_checksum: checksums.bsd,
-			universe_checksum: checksums.universe,
-			success: true
+		await db.insert(sde).values({
+			release_date: new Date(data.release_date),
+			release_version: String(data.release_version),
+			run_date: sql`now()`,
+			success: data.success
 		});
 	});
 }

@@ -3,7 +3,7 @@ import { updateDynamicData } from '$lib/cron/dynamic';
 import { USER_AGENT } from '$lib/server/constants';
 import logger from '$lib/logger';
 import { env } from '$env/dynamic/private';
-//import { updateStaticData } from '$lib/cron/static';
+import { updateStaticData } from '$lib/cron/static';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
@@ -20,7 +20,7 @@ export async function init() {
 		}
 	});
 
-	/*new Cron(env.STATIC_UPDATE_CRON || '30 10,12 * * *', async () => {
+	new Cron(env.STATIC_UPDATE_CRON || '30 10,12 * * *', async () => {
 		try {
 			logger.info('[CRON] Update SDE...');
 			await updateStaticData();
@@ -28,5 +28,5 @@ export async function init() {
 		} catch (error) {
 			logger.error('[CRON] SDE update failed:', error);
 		}
-	});*/
+	});
 }

@@ -29,7 +29,7 @@ export const scans = pgTable('scans', {
 export const scanGroups = pgTable('scan_groups', {
 	id: text().primaryKey(),
 	public: boolean().notNull().default(false),
-	system: bigint({ mode: 'number' }).references(() => systems.id),
+	system: json(),
 
 	created_at: timestamp().defaultNow().notNull()
 });
@@ -83,13 +83,10 @@ export const systems = pgTable('systems', {
 	updated_at: timestamp().defaultNow().notNull()
 });
 
-// STATIC DATA
-
-export const sde_data = pgTable('sde_data', {
+export const sde = pgTable('sde', {
 	id: integer().primaryKey().generatedAlwaysAsIdentity(),
-	install_date: timestamp().defaultNow().notNull(),
-	fsd_checksum: text().notNull(),
-	bsd_checksum: text().notNull(),
-	universe_checksum: text().notNull(),
+	release_date: timestamp().defaultNow().notNull(),
+	release_version: text().notNull(),
+	run_date: timestamp().defaultNow().notNull(),
 	success: boolean().notNull().default(true)
 });
