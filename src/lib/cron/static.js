@@ -147,7 +147,7 @@ async function downloadAndExtractSDE(url, files = []) {
 
 			// Download the zip file using streaming to avoid blocking
 			span.addEvent('Downloading SDE zip file');
-			const response = await fetchGET(url);
+			const response = await fetch(url);
 			if (!response.ok) {
 				span.setStatus({ code: 2, message: `Failed to download SDE: HTTP ${response.status}` });
 				throw new Error(`Failed to download SDE: HTTP ${response.status} ${response.statusText}`);
