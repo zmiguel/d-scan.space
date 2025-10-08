@@ -7,10 +7,29 @@ import { updateCharactersFromESI, updateAffiliationsFromESI } from '$lib/server/
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 import { BATCH_CHARACTERS, BATCH_CORPORATIONS, BATCH_ALLIANCES } from '$lib/server/constants';
+import { fetchGET } from '$lib/server/wrappers';
 
+/**
+ * Main function to update all dynamic EVE Online data (characters, corporations, and alliances).
+ *
+ * This function:
+ * 1. Checks if the TQ server is available
+ * 2. Updates character data (up to 1000 characters per run)
+ * 3. Updates corporation data (last seen within a year, not updated in 23+ hours)
+ * 4. Updates alliance data (last seen within a year, not updated in 23+ hours)
+ *
+ * @returns {Promise<boolean>} true when all updates complete successfully
+ */
 export async function updateDynamicData() {
 	logger.info('[DynUpdater] Updating dynamic data...');
 	await withSpan('CRON Dynamic', async () => {
+		// first we check if the server is up before doing anything
+		const status = await getTQStatus();
+		if (!status) {
+			logger.warn('[DynUpdater] TQ is not available, skipping dynamic data update.');
+			return false;
+		}
+
 		// Update the Character data
 		await updateCharacterData();
 
@@ -24,6 +43,69 @@ export async function updateDynamicData() {
 	return true;
 }
 
+/**
+ * Checks if the EVE Online Tranquility (TQ) server is up and available.
+ *
+ * The server is considered "up" when:
+ * - It has more than 100 players online
+ * - VIP mode is disabled (vip === false)
+ *
+ * @returns {Promise<boolean>} true if the server is up and available, false otherwise
+ */
+async function getTQStatus() {
+	return await withSpan('Get TQ Status', async (span) => {
+		try {
+			const res = await fetchGET('https://esi.evetech.net/status');
+			if (!res.ok) {
+				logger.warn(`[DynUpdater] Failed to fetch TQ status: ${res.status} ${res.statusText}`);
+				span.setAttributes({
+					'cron.task.get_tq_status.error': `HTTP ${res.status}`,
+					'cron.task.get_tq_status.is_up': false
+				});
+				return false;
+			}
+			const data = await res.json();
+
+			// Server is considered "up" when it has more than 100 players and VIP mode is false
+			const isServerUp = data.players > 100 && data.vip === false;
+
+			span.setAttributes({
+				'cron.task.get_tq_status.players': data.players,
+				'cron.task.get_tq_status.vip': data.vip,
+				'cron.task.get_tq_status.is_up': isServerUp
+			});
+
+			if (isServerUp) {
+				logger.info(`[DynUpdater] TQ is up with ${data.players} players (VIP: ${data.vip})`);
+			} else {
+				logger.warn(
+					`[DynUpdater] TQ is not available: ${data.players} players, VIP mode: ${data.vip}`
+				);
+			}
+
+			return isServerUp;
+		} catch (error) {
+			span.setAttributes({
+				'cron.task.get_tq_status.error': error.message,
+				'cron.task.get_tq_status.is_up': false
+			});
+			logger.error(`[DynUpdater] Error fetching TQ status: ${error.message}`);
+			return false;
+		}
+	});
+}
+
+/**
+ * Updates alliance data from ESI for alliances that need refreshing.
+ *
+ * Filters alliances by:
+ * - Last seen within the past year
+ * - Not updated in the last 23 hours
+ *
+ * Updates are performed in batches (size: BATCH_ALLIANCES) to avoid overwhelming ESI.
+ *
+ * @returns {Promise<boolean|undefined>} true on successful completion, undefined if no updates needed
+ */
 async function updateAllianceData() {
 	return await withSpan(
 		'Update Alliances',
@@ -106,6 +188,22 @@ async function updateAllianceData() {
 	);
 }
 
+/**
+ * Updates corporation data from ESI for corporations that need refreshing.
+ *
+ * Filters corporations by:
+ * - Last seen within the past year
+ * - Not updated in the last 23 hours
+ *
+ * For each corporation batch:
+ * - Fetches corporation data from ESI
+ * - Checks for new alliances and fetches them if needed
+ * - Updates corporations in the database
+ *
+ * Updates are performed in batches (size: BATCH_CORPORATIONS) to avoid overwhelming ESI.
+ *
+ * @returns {Promise<boolean|undefined>} true on successful completion, undefined if no updates needed
+ */
 async function updateCorporationData() {
 	return await withSpan(
 		'Update Corporations',
@@ -218,6 +316,19 @@ async function updateCorporationData() {
 	);
 }
 
+/**
+ * Updates character data from ESI for the least recently updated characters.
+ *
+ * This function is designed to run frequently (every minute) and processes up to 1000 characters per run.
+ *
+ * Characters are split into two categories:
+ * - **Expired characters**: ESI cache has expired - performs full refresh + affiliations update
+ * - **Cached characters**: ESI cache still valid - only updates affiliations
+ *
+ * Both paths run in parallel for efficiency. Updates are performed in batches (size: BATCH_CHARACTERS).
+ *
+ * @returns {Promise<boolean|undefined>} true on successful completion, undefined if no characters to update
+ */
 async function updateCharacterData() {
 	return await withSpan(
 		'Update Characters',
