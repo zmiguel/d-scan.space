@@ -42,7 +42,7 @@
 		"croner": "^9.1.0",
 		"drizzle-kit": "^0.31.5",
 		"drizzle-orm": "^0.44.6",
-		"eslint": "^9.36.0",
+		"eslint": "^9.37.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.12.4",
 		"espree": "^10.4.0",
