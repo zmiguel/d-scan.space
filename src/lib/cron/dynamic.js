@@ -48,7 +48,7 @@ export async function updateDynamicData() {
  *
  * The server is considered "up" when:
  * - It has more than 100 players online
- * - VIP mode is disabled (vip === false)
+ * - VIP mode is NOT explicitly enabled (vip !== true)
  *
  * @returns {Promise<boolean>} true if the server is up and available, false otherwise
  */
@@ -66,8 +66,8 @@ async function getTQStatus() {
 			}
 			const data = await res.json();
 
-			// Server is considered "up" when it has more than 100 players and VIP mode is false
-			const isServerUp = data.players > 100 && data.vip === false;
+			// Server is considered "up" when it has more than 100 players and VIP mode is NOT explicitly true
+			const isServerUp = data.players > 100 && data.vip !== true;
 
 			span.setAttributes({
 				'cron.task.get_tq_status.players': data.players,
