@@ -90,3 +90,41 @@ export const sde = pgTable('sde', {
 	run_date: timestamp().defaultNow().notNull(),
 	success: boolean().notNull().default(true)
 });
+
+export const invCategories = pgTable('inv_categories', {
+	id: bigint({ mode: 'number' }).primaryKey(),
+	name: text().notNull(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull()
+});
+
+export const invGroups = pgTable('inv_groups', {
+	id: bigint({ mode: 'number' }).primaryKey(),
+	name: text().notNull(),
+	anchorable: boolean().notNull().default(false),
+	anchored: boolean().notNull().default(false),
+	fittable_non_singleton: boolean().notNull().default(false),
+	category_id: bigint({ mode: 'number' })
+		.notNull()
+		.references(() => invCategories.id),
+	icon_id: integer(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull()
+});
+
+export const invTypes = pgTable('inv_types', {
+	id: bigint({ mode: 'number' }).primaryKey(),
+	name: text().notNull(),
+	mass: doublePrecision().notNull().default(0),
+	volume: doublePrecision().notNull().default(0),
+	capacity: doublePrecision(),
+	faction_id: integer().notNull().default(0),
+	race_id: integer().notNull().default(0),
+	group_id: bigint({ mode: 'number' })
+		.notNull()
+		.references(() => invGroups.id),
+	market_group_id: integer(),
+	icon_id: integer(),
+	created_at: timestamp().defaultNow().notNull(),
+	updated_at: timestamp().defaultNow().notNull()
+});

@@ -3,7 +3,10 @@ import logger from '$lib/logger';
 import {
 	getLastInstalledSDEVersion,
 	addSDEDataEntry,
-	addOrUpdateSystemsDB
+	addOrUpdateSystemsDB,
+	addOrUpdateCategoriesDB,
+	addOrUpdateGroupsDB,
+	addOrUpdateTypesDB
 } from '$lib/database/sde';
 import { SDE_FILE, SDE_VERSION } from '$lib/server/constants';
 import fs from 'fs';
@@ -58,8 +61,11 @@ export async function updateStaticData() {
 			// and these to update the universe
 			'mapRegions.jsonl',
 			'mapConstellations.jsonl',
-			'mapSolarSystems.jsonl'
-			// more...
+			'mapSolarSystems.jsonl',
+			// stuff in space & more
+			'categories.jsonl',
+			'groups.jsonl',
+			'types.jsonl'
 		];
 
 		logger.info('[SDEUpdater] Downloading and extracting SDE files...');
@@ -80,8 +86,13 @@ export async function updateStaticData() {
 			'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
 		);
 
+		// update items
+		logger.info('[SDEUpdater] Updating item data...');
+		const itemUpdateSuccess = await updateItems();
+		logger.info('[SDEUpdater] Item data update ' + (itemUpdateSuccess ? 'succeeded' : 'failed'));
+
 		// save the SDE data entry
-		const final_result = npcUpdateSuccess && universeUpdateSuccess;
+		const final_result = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
 		logger.info(
 			'[SDEUpdater] Recording new SDE version in database... ' +
 				(final_result ? 'success' : 'failure')
@@ -575,6 +586,282 @@ async function updateUniverse() {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			logger.error(`Error updating Universe: ${errorMessage}`);
+			span.setStatus({ code: 2, message: errorMessage });
+			return false;
+		}
+	});
+}
+
+async function updateItems() {
+	return await withSpan('Update Items', async (span) => {
+		try {
+			const tempDir = './temp';
+
+			span.addEvent('Starting item data processing');
+
+			// Helper function to read JSONL file asynchronously without blocking
+			const readJSONLAsync = async (filePath) => {
+				return new Promise((resolve, reject) => {
+					const lines = [];
+					const stream = fs.createReadStream(filePath, {
+						encoding: 'utf8',
+						highWaterMark: 64 * 1024
+					});
+					let buffer = '';
+
+					stream.on('data', (chunk) => {
+						buffer += chunk;
+						const newlineIndex = buffer.lastIndexOf('\n');
+						if (newlineIndex !== -1) {
+							const completeLines = buffer.substring(0, newlineIndex);
+							buffer = buffer.substring(newlineIndex + 1);
+							lines.push(...completeLines.split('\n'));
+						}
+					});
+
+					stream.on('end', () => {
+						if (buffer.trim()) {
+							lines.push(buffer);
+						}
+						resolve(lines);
+					});
+
+					stream.on('error', reject);
+				});
+			};
+
+			// Process categories
+			const categoriesPath = path.join(tempDir, 'categories.jsonl');
+			const categoriesData = [];
+
+			if (!fs.existsSync(categoriesPath)) {
+				span.setStatus({ code: 2, message: 'categories.jsonl file not found' });
+				throw new Error('categories.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading categories.jsonl file');
+			const categoryLines = await readJSONLAsync(categoriesPath);
+
+			let categoryCount = 0;
+			let skippedCategories = 0;
+
+			for (const line of categoryLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const categoryData = JSON.parse(line);
+					const id = categoryData._key;
+					const name = categoryData.name?.en;
+
+					// Validate required fields
+					if (!id || !name) {
+						logger.warn(`Skipping category ${id} due to missing name`);
+						span.addEvent('Skipping category with missing data', {
+							categoryId: id,
+							hasName: !!name
+						});
+						skippedCategories++;
+						continue;
+					}
+
+					categoriesData.push({
+						id,
+						name
+					});
+
+					categoryCount++;
+
+					// Yield control every 50 categories
+					if (categoryCount % 50 === 0) {
+						await new Promise((resolve) => setImmediate(resolve));
+					}
+				} catch (parseError) {
+					logger.warn(`Error parsing category line: ${parseError.message}`);
+					skippedCategories++;
+				}
+			}
+
+			span.setAttributes({
+				'categories.total_in_file': categoryCount,
+				'categories.skipped': skippedCategories,
+				'categories.valid': categoriesData.length
+			});
+
+			span.addEvent('Updating categories in database', {
+				categoriesCount: categoriesData.length
+			});
+
+			if (categoriesData.length > 0) {
+				await addOrUpdateCategoriesDB(categoriesData);
+				span.addEvent('Categories updated successfully', {
+					updatedCount: categoriesData.length
+				});
+			}
+
+			// Process groups
+			const groupsPath = path.join(tempDir, 'groups.jsonl');
+			const groupsData = [];
+
+			if (!fs.existsSync(groupsPath)) {
+				span.setStatus({ code: 2, message: 'groups.jsonl file not found' });
+				throw new Error('groups.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading groups.jsonl file');
+			const groupLines = await readJSONLAsync(groupsPath);
+
+			let groupCount = 0;
+			let skippedGroups = 0;
+
+			for (const line of groupLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const groupData = JSON.parse(line);
+					const id = groupData._key;
+					const name = groupData.name?.en;
+					const categoryId = groupData.categoryID;
+
+					// Validate required fields
+					if (!id || !name || categoryId === undefined || categoryId === 0) {
+						logger.warn(`Skipping group ${id} due to missing required fields`);
+						span.addEvent('Skipping group with missing data', {
+							groupId: id,
+							hasName: !!name,
+							hasCategoryId: categoryId !== undefined
+						});
+						skippedGroups++;
+						continue;
+					}
+
+					groupsData.push({
+						id,
+						name,
+						anchorable: groupData.anchorable || false,
+						anchored: groupData.anchored || false,
+						fittable_non_singleton: groupData.fittableNonSingleton || false,
+						category_id: categoryId,
+						icon_id: groupData.iconID || null
+					});
+
+					groupCount++;
+
+					// Yield control every 50 groups
+					if (groupCount % 50 === 0) {
+						await new Promise((resolve) => setImmediate(resolve));
+					}
+				} catch (parseError) {
+					logger.warn(`Error parsing group line: ${parseError.message}`);
+					skippedGroups++;
+				}
+			}
+
+			span.setAttributes({
+				'groups.total_in_file': groupCount,
+				'groups.skipped': skippedGroups,
+				'groups.valid': groupsData.length
+			});
+
+			span.addEvent('Updating groups in database', {
+				groupsCount: groupsData.length
+			});
+
+			if (groupsData.length > 0) {
+				await addOrUpdateGroupsDB(groupsData);
+				span.addEvent('Groups updated successfully', {
+					updatedCount: groupsData.length
+				});
+			}
+
+			// Process types
+			const typesPath = path.join(tempDir, 'types.jsonl');
+			const typesData = [];
+
+			if (!fs.existsSync(typesPath)) {
+				span.setStatus({ code: 2, message: 'types.jsonl file not found' });
+				throw new Error('types.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading types.jsonl file');
+			const typeLines = await readJSONLAsync(typesPath);
+
+			let typeCount = 0;
+			let skippedTypes = 0;
+
+			for (const line of typeLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const typeData = JSON.parse(line);
+					const id = typeData._key;
+					const name = typeData.name?.en;
+					const groupId = typeData.groupID;
+
+					// Validate required fields
+					if (!id || !name || groupId === undefined || groupId === 0) {
+						logger.warn(`Skipping type ${id} due to missing required fields`);
+						span.addEvent('Skipping type with missing data', {
+							typeId: id,
+							hasName: !!name,
+							hasGroupId: groupId !== undefined
+						});
+						skippedTypes++;
+						continue;
+					}
+
+					typesData.push({
+						id,
+						name,
+						mass: typeData.mass || 0,
+						volume: typeData.volume || 0,
+						capacity: typeData.capacity || null,
+						faction_id: typeData.factionID || 0,
+						race_id: typeData.raceID || 0,
+						group_id: groupId,
+						market_group_id: typeData.marketGroupID || null,
+						icon_id: typeData.iconID || null
+					});
+
+					typeCount++;
+
+					// Yield control every 50 types
+					if (typeCount % 50 === 0) {
+						await new Promise((resolve) => setImmediate(resolve));
+					}
+				} catch (parseError) {
+					logger.warn(`Error parsing type line: ${parseError.message}`);
+					skippedTypes++;
+				}
+			}
+
+			span.setAttributes({
+				'types.total_in_file': typeCount,
+				'types.skipped': skippedTypes,
+				'types.valid': typesData.length
+			});
+
+			span.addEvent('Updating types in database', {
+				typesCount: typesData.length
+			});
+
+			if (typesData.length > 0) {
+				await addOrUpdateTypesDB(typesData);
+				span.addEvent('Types updated successfully', {
+					updatedCount: typesData.length
+				});
+			}
+
+			span.addEvent('Item data update completed successfully', {
+				totalCategories: categoriesData.length,
+				totalGroups: groupsData.length,
+				totalTypes: typesData.length
+			});
+
+			span.setStatus({ code: 0, message: 'Item data updated successfully' });
+			return true;
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			logger.error(`Error updating item data: ${errorMessage}`);
 			span.setStatus({ code: 2, message: errorMessage });
 			return false;
 		}

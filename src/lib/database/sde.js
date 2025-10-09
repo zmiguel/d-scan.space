@@ -1,6 +1,6 @@
 import { db } from '$lib/database/client';
 import { withSpan } from '$lib/server/tracer';
-import { sde, systems } from './schema';
+import { sde, systems, invCategories, invGroups, invTypes } from './schema';
 import { desc, eq, sql, inArray } from 'drizzle-orm';
 
 export async function getLastInstalledSDEVersion() {
@@ -87,4 +87,152 @@ export async function updateSystemsLastSeen(systemIds) {
 			last_seen: sql`now()`
 		})
 		.where(inArray(systems.id, systemIds));
+}
+
+export async function addOrUpdateCategoriesDB(data) {
+	await withSpan('addOrUpdateCategoriesDB', async (span) => {
+		if (!data || data.length === 0) {
+			return;
+		}
+
+		const BATCH_SIZE = 1000;
+		const totalBatches = Math.ceil(data.length / BATCH_SIZE);
+
+		span.setAttributes({
+			'categories.data.length': data.length,
+			'categories.batch_size': BATCH_SIZE,
+			'categories.total_batches': totalBatches
+		});
+
+		for (let i = 0; i < totalBatches; i++) {
+			const start = i * BATCH_SIZE;
+			const end = Math.min(start + BATCH_SIZE, data.length);
+			const batch = data.slice(start, end);
+
+			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+				batchNumber: i + 1,
+				batchSize: batch.length
+			});
+
+			await db
+				.insert(invCategories)
+				.values(batch)
+				.onConflictDoUpdate({
+					target: invCategories.id,
+					set: {
+						name: sql`excluded.name`,
+						updated_at: sql`now()`
+					}
+				});
+
+			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+		}
+
+		span.addEvent('All batches completed successfully', {
+			totalCategoriesProcessed: data.length
+		});
+	});
+}
+
+export async function addOrUpdateGroupsDB(data) {
+	await withSpan('addOrUpdateGroupsDB', async (span) => {
+		if (!data || data.length === 0) {
+			return;
+		}
+
+		const BATCH_SIZE = 1000;
+		const totalBatches = Math.ceil(data.length / BATCH_SIZE);
+
+		span.setAttributes({
+			'groups.data.length': data.length,
+			'groups.batch_size': BATCH_SIZE,
+			'groups.total_batches': totalBatches
+		});
+
+		for (let i = 0; i < totalBatches; i++) {
+			const start = i * BATCH_SIZE;
+			const end = Math.min(start + BATCH_SIZE, data.length);
+			const batch = data.slice(start, end);
+
+			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+				batchNumber: i + 1,
+				batchSize: batch.length
+			});
+
+			await db
+				.insert(invGroups)
+				.values(batch)
+				.onConflictDoUpdate({
+					target: invGroups.id,
+					set: {
+						name: sql`excluded.name`,
+						anchorable: sql`excluded.anchorable`,
+						anchored: sql`excluded.anchored`,
+						fittable_non_singleton: sql`excluded.fittable_non_singleton`,
+						category_id: sql`excluded.category_id`,
+						icon_id: sql`excluded.icon_id`,
+						updated_at: sql`now()`
+					}
+				});
+
+			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+		}
+
+		span.addEvent('All batches completed successfully', {
+			totalGroupsProcessed: data.length
+		});
+	});
+}
+
+export async function addOrUpdateTypesDB(data) {
+	await withSpan('addOrUpdateTypesDB', async (span) => {
+		if (!data || data.length === 0) {
+			return;
+		}
+
+		const BATCH_SIZE = 1000;
+		const totalBatches = Math.ceil(data.length / BATCH_SIZE);
+
+		span.setAttributes({
+			'types.data.length': data.length,
+			'types.batch_size': BATCH_SIZE,
+			'types.total_batches': totalBatches
+		});
+
+		for (let i = 0; i < totalBatches; i++) {
+			const start = i * BATCH_SIZE;
+			const end = Math.min(start + BATCH_SIZE, data.length);
+			const batch = data.slice(start, end);
+
+			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+				batchNumber: i + 1,
+				batchSize: batch.length
+			});
+
+			await db
+				.insert(invTypes)
+				.values(batch)
+				.onConflictDoUpdate({
+					target: invTypes.id,
+					set: {
+						name: sql`excluded.name`,
+						mass: sql`excluded.mass`,
+						volume: sql`excluded.volume`,
+						capacity: sql`excluded.capacity`,
+						faction_id: sql`excluded.faction_id`,
+						race_id: sql`excluded.race_id`,
+						group_id: sql`excluded.group_id`,
+						market_group_id: sql`excluded.market_group_id`,
+						icon_id: sql`excluded.icon_id`,
+						updated_at: sql`now()`
+					}
+				});
+
+			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+		}
+
+		span.addEvent('All batches completed successfully', {
+			totalTypesProcessed: data.length
+		});
+	});
 }

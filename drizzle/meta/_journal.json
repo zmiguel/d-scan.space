@@ -43,6 +43,13 @@
       "when": 1759527924858,
       "tag": "0005_steep_toxin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759986704976,
+      "tag": "0006_flowery_bruce_banner",
+      "breakpoints": true
     }
   ]
 }
