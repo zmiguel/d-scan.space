@@ -14,103 +14,120 @@ import path from 'path';
 import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
 import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
 import { fetchGET } from '$lib/server/wrappers';
+import { recordCronJob } from '$lib/server/metrics';
 
 export async function updateStaticData() {
-	logger.info('[SDEUpdater] Updating static data...');
-	await withSpan('CRON Static', async () => {
-		// Get SDE version and compare it to the last entry in DB
-		const [updated, version] = await withSpan('SDE Version Check', async (span) => {
-			let lastInstalledVersion = await getLastInstalledSDEVersion();
-			const latestOnlineVersion = await getOnlineVersion();
+	const startTime = Date.now();
 
-			// if lastInstalledVersion is an array, get the first element
-			if (Array.isArray(lastInstalledVersion)) {
-				lastInstalledVersion = lastInstalledVersion[0];
-			}
+	try {
+		logger.info('[SDEUpdater] Updating static data...');
+		await withSpan('CRON Static', async () => {
+			// Get SDE version and compare it to the last entry in DB
+			const [updated, version] = await withSpan('SDE Version Check', async (span) => {
+				let lastInstalledVersion = await getLastInstalledSDEVersion();
+				const latestOnlineVersion = await getOnlineVersion();
 
-			span.setAttributes({
-				'sde.installed': JSON.stringify(lastInstalledVersion),
-				'sde.online': JSON.stringify(latestOnlineVersion)
+				// if lastInstalledVersion is an array, get the first element
+				if (Array.isArray(lastInstalledVersion)) {
+					lastInstalledVersion = lastInstalledVersion[0];
+				}
+
+				span.setAttributes({
+					'sde.installed': JSON.stringify(lastInstalledVersion),
+					'sde.online': JSON.stringify(latestOnlineVersion)
+				});
+
+				// If no previous version exists, force an update
+				if (!lastInstalledVersion) {
+					logger.info('[SDEUpdater] No previous SDE data found, update needed.');
+					return [false, latestOnlineVersion];
+				}
+
+				if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
+					logger.info('[SDEUpdater] Static data is up to date, no update needed.');
+					return [true, latestOnlineVersion];
+				}
+				logger.info('[SDEUpdater] Static data is out of date, update needed.');
+				return [false, latestOnlineVersion];
 			});
 
-			// If no previous version exists, force an update
-			if (!lastInstalledVersion) {
-				logger.info('[SDEUpdater] No previous SDE data found, update needed.');
-				return [false, latestOnlineVersion];
+			// no update needed
+			if (updated) {
+				// Record skipped CRON job (no update needed)
+				const duration = Date.now() - startTime;
+				recordCronJob('updateStaticData', duration, true);
+				return;
 			}
 
-			if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
-				logger.info('[SDEUpdater] Static data is up to date, no update needed.');
-				return [true, latestOnlineVersion];
-			}
-			logger.info('[SDEUpdater] Static data is out of date, update needed.');
-			return [false, latestOnlineVersion];
+			// update needed
+
+			// extract only the files we need to save memory and time
+			const filesToExtract = [
+				// we need this to update NPC corps
+				'npcCorporations.jsonl',
+				// and these to update the universe
+				'mapRegions.jsonl',
+				'mapConstellations.jsonl',
+				'mapSolarSystems.jsonl',
+				// stuff in space & more
+				'categories.jsonl',
+				'groups.jsonl',
+				'types.jsonl'
+			];
+
+			logger.info('[SDEUpdater] Downloading and extracting SDE files...');
+
+			await downloadAndExtractSDE(SDE_FILE, filesToExtract);
+
+			// update NPC corps
+			logger.info('[SDEUpdater] Updating NPC corporations...');
+			const npcUpdateSuccess = await updateNPCCorps();
+			logger.info(
+				'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
+			);
+
+			// update the universe
+			logger.info('[SDEUpdater] Updating universe data...');
+			const universeUpdateSuccess = await updateUniverse();
+			logger.info(
+				'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
+			);
+
+			// update items
+			logger.info('[SDEUpdater] Updating item data...');
+			const itemUpdateSuccess = await updateItems();
+			logger.info('[SDEUpdater] Item data update ' + (itemUpdateSuccess ? 'succeeded' : 'failed'));
+
+			// save the SDE data entry
+			const final_result = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
+			logger.info(
+				'[SDEUpdater] Recording new SDE version in database... ' +
+					(final_result ? 'success' : 'failure')
+			);
+			await addSDEDataEntry({
+				release_date: version.release_date,
+				release_version: version.release_version,
+				success: final_result
+			});
+
+			// Update done
+			// clean up files
+			logger.info('[SDEUpdater] Cleaning up temporary files...');
+			await cleanupTemp();
 		});
 
-		// no update needed
-		if (updated) {
-			return;
-		}
+		logger.info('[SDEUpdater] Static data update completed.');
 
-		// update needed
+		// Record successful CRON job
+		const duration = Date.now() - startTime;
+		recordCronJob('updateStaticData', duration, true);
 
-		// extract only the files we need to save memory and time
-		const filesToExtract = [
-			// we need this to update NPC corps
-			'npcCorporations.jsonl',
-			// and these to update the universe
-			'mapRegions.jsonl',
-			'mapConstellations.jsonl',
-			'mapSolarSystems.jsonl',
-			// stuff in space & more
-			'categories.jsonl',
-			'groups.jsonl',
-			'types.jsonl'
-		];
-
-		logger.info('[SDEUpdater] Downloading and extracting SDE files...');
-
-		await downloadAndExtractSDE(SDE_FILE, filesToExtract);
-
-		// update NPC corps
-		logger.info('[SDEUpdater] Updating NPC corporations...');
-		const npcUpdateSuccess = await updateNPCCorps();
-		logger.info(
-			'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
-		);
-
-		// update the universe
-		logger.info('[SDEUpdater] Updating universe data...');
-		const universeUpdateSuccess = await updateUniverse();
-		logger.info(
-			'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
-		);
-
-		// update items
-		logger.info('[SDEUpdater] Updating item data...');
-		const itemUpdateSuccess = await updateItems();
-		logger.info('[SDEUpdater] Item data update ' + (itemUpdateSuccess ? 'succeeded' : 'failed'));
-
-		// save the SDE data entry
-		const final_result = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
-		logger.info(
-			'[SDEUpdater] Recording new SDE version in database... ' +
-				(final_result ? 'success' : 'failure')
-		);
-		await addSDEDataEntry({
-			release_date: version.release_date,
-			release_version: version.release_version,
-			success: final_result
-		});
-
-		// Update done
-		// clean up files
-		logger.info('[SDEUpdater] Cleaning up temporary files...');
-		await cleanupTemp();
-	});
-
-	logger.info('[SDEUpdater] Static data update completed.');
-	return true;
+		return true;
+	} catch (error) {
+		const duration = Date.now() - startTime;
+		recordCronJob('updateStaticData', duration, false);
+		throw error;
+	}
 }
 
 async function getOnlineVersion() {
