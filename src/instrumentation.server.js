@@ -103,7 +103,7 @@ if (env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_ENDPOINT) 
 	metricReaders.push(
 		new PeriodicExportingMetricReader({
 			exporter: otlpMetricExporter,
-			exportIntervalMillis: 5000 // Export every 5 seconds
+			exportIntervalMillis: 1000 // Export every 1 second
 		})
 	);
 	logger.info('OTLP metric exporter configured');
@@ -217,8 +217,7 @@ const sdk = new NodeSDK({
 			'@opentelemetry/instrumentation-http': { enabled: false },
 			// Enable PostgreSQL instrumentation with metrics
 			'@opentelemetry/instrumentation-pg': {
-				enabled: true,
-				enhancedDatabaseReporting: true
+				enabled: true
 			}
 		})
 	]
