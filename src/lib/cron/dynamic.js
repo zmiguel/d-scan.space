@@ -8,6 +8,12 @@ import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 import { BATCH_CHARACTERS, BATCH_CORPORATIONS, BATCH_ALLIANCES } from '$lib/server/constants';
 import { fetchGET } from '$lib/server/wrappers';
+import {
+	recordCronJob,
+	charactersUpdatedCounter,
+	corporationsUpdatedCounter,
+	alliancesUpdatedCounter
+} from '$lib/server/metrics';
 
 /**
  * Main function to update all dynamic EVE Online data (characters, corporations, and alliances).
@@ -21,26 +27,42 @@ import { fetchGET } from '$lib/server/wrappers';
  * @returns {Promise<boolean>} true when all updates complete successfully
  */
 export async function updateDynamicData() {
-	logger.info('[DynUpdater] Updating dynamic data...');
-	await withSpan('CRON Dynamic', async () => {
-		// first we check if the server is up before doing anything
-		const status = await getTQStatus();
-		if (!status) {
-			logger.warn('[DynUpdater] TQ is not available, skipping dynamic data update.');
-			return false;
-		}
+	const startTime = Date.now();
 
-		// Update the Character data
-		await updateCharacterData();
+	try {
+		logger.info('[DynUpdater] Updating dynamic data...');
+		await withSpan('CRON Dynamic', async () => {
+			// first we check if the server is up before doing anything
+			const status = await getTQStatus();
+			if (!status) {
+				logger.warn('[DynUpdater] TQ is not available, skipping dynamic data update.');
+				// Record skipped CRON job (not really a failure, but server unavailable)
+				const duration = Date.now() - startTime;
+				recordCronJob('updateDynamicData', duration, false);
+				return false;
+			}
 
-		// Update the Corporation data
-		await updateCorporationData();
+			// Update the Character data
+			await updateCharacterData();
 
-		// Update the Alliance data
-		await updateAllianceData();
-	});
-	logger.info('[DynUpdater] Dynamic data update completed.');
-	return true;
+			// Update the Corporation data
+			await updateCorporationData();
+
+			// Update the Alliance data
+			await updateAllianceData();
+		});
+		logger.info('[DynUpdater] Dynamic data update completed.');
+
+		// Record successful CRON job
+		const duration = Date.now() - startTime;
+		recordCronJob('updateDynamicData', duration, true);
+
+		return true;
+	} catch (error) {
+		const duration = Date.now() - startTime;
+		recordCronJob('updateDynamicData', duration, false);
+		throw error;
+	}
 }
 
 /**
@@ -170,6 +192,9 @@ async function updateAllianceData() {
 							);
 
 							await addOrUpdateAlliancesDB(validAlliancesData);
+
+							// Record metrics for alliances updated
+							alliancesUpdatedCounter.add(validAlliancesData.length);
 						});
 					}
 				},
@@ -298,6 +323,9 @@ async function updateCorporationData() {
 								});
 
 								await addOrUpdateCorporationsDB(validCorporationsData);
+
+								// Record metrics for corporations updated
+								corporationsUpdatedCounter.add(validCorporationsData.length);
 							}
 						);
 					}
@@ -383,6 +411,9 @@ async function updateCharacterData() {
 							span.setAttributes({
 								'cron.task.update_characters.expired_batch_size': batch.length
 							});
+
+							// Record metrics for characters updated
+							charactersUpdatedCounter.add(batch.length);
 						});
 					}
 				},
@@ -402,6 +433,9 @@ async function updateCharacterData() {
 							span.setAttributes({
 								'cron.task.update_characters.cached_batch_size': batch.length
 							});
+
+							// Record metrics for characters updated (affiliations only)
+							charactersUpdatedCounter.add(batch.length);
 						});
 					}
 				},

@@ -4,6 +4,7 @@ import { createNewLocalScan } from '$lib/server/local.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
+import { scansProcessedCounter } from '$lib/server/metrics';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
@@ -80,6 +81,13 @@ export const actions = {
 				}
 
 				logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
+
+				// Record metric for scan processed
+				scansProcessedCounter.add(1, {
+					type: isDirectional ? 'directional' : 'local',
+					public: is_public.toString()
+				});
+
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
 			{},
@@ -157,6 +165,13 @@ export const actions = {
 				}
 
 				logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
+
+				// Record metric for scan processed (update)
+				scansProcessedCounter.add(1, {
+					type: isDirectional ? 'directional' : 'local',
+					public: 'false' // Updates are always on existing scans
+				});
+
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
 			{},

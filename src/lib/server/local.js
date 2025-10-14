@@ -12,6 +12,7 @@ import {
 } from '$lib/server/characters.js';
 import logger from '$lib/logger';
 import { withSpan } from './tracer';
+import { cacheHitCounter, cacheMissCounter } from './metrics';
 
 async function getCharacters(data) {
 	return await withSpan(
@@ -69,6 +70,18 @@ async function getCharacters(data) {
 					'characters.good_count': goodCharacters.length,
 					'characters.cache_hit_rate': ((goodCharacters.length / data.length) * 100).toFixed(2)
 				});
+
+				// Record cache metrics
+				// Good characters = cache hit (data is fresh)
+				cacheHitCounter.add(goodCharacters.length, { resource: 'character' });
+				// Missing + outdated = cache miss (need to fetch from ESI)
+				cacheMissCounter.add(
+					missingCharacters.length +
+						outdatedExpiredCharacters.length +
+						outdatedCachedCharacters.length,
+					{ resource: 'character' }
+				);
+
 				return {
 					missingCharacters,
 					outdatedExpiredCharacters,

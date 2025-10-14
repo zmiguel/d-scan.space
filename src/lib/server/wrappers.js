@@ -1,6 +1,7 @@
 import { biomassCharacter } from '$lib/database/characters';
 import { USER_AGENT } from './constants';
 import { withSpan } from './tracer.js';
+import { recordEsiRequest } from './metrics';
 
 const headers = {
 	'Content-Type': 'application/json',
@@ -34,6 +35,7 @@ export async function fetchGET(url, maxRetries = 3) {
 		`fetchGET`,
 		async (span) => {
 			let lastError;
+			const startTime = Date.now();
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
@@ -66,6 +68,10 @@ export async function fetchGET(url, maxRetries = 3) {
 						attempt: attempt
 					});
 
+					// Extract rate limit info if available
+					const errorLimitRemain = response.headers.get('x-esi-error-limit-remain');
+					const errorLimitReset = response.headers.get('x-esi-error-limit-reset');
+
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
@@ -96,11 +102,20 @@ export async function fetchGET(url, maxRetries = 3) {
 						}
 					}
 
+					// Record successful ESI request metrics
+					const duration = Date.now() - startTime;
+					recordEsiRequest('GET', response.status, duration, errorLimitRemain, errorLimitReset);
+
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
 					lastError = error;
+
+					// Record failed request metrics
+					const duration = Date.now() - startTime;
+					const status = error.responseDetails?.['http.response.status'] || 500;
+					recordEsiRequest('GET', status, duration, null, null);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
@@ -143,6 +158,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 		`fetchPOST`,
 		async (span) => {
 			let lastError;
+			const startTime = Date.now();
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
@@ -176,6 +192,10 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 						attempt: attempt
 					});
 
+					// Extract rate limit info if available
+					const errorLimitRemain = response.headers.get('x-esi-error-limit-remain');
+					const errorLimitReset = response.headers.get('x-esi-error-limit-reset');
+
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
@@ -206,11 +226,20 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 						}
 					}
 
+					// Record successful ESI request metrics
+					const duration = Date.now() - startTime;
+					recordEsiRequest('POST', response.status, duration, errorLimitRemain, errorLimitReset);
+
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
 					lastError = error;
+
+					// Record failed request metrics
+					const duration = Date.now() - startTime;
+					const status = error.responseDetails?.['http.response.status'] || 500;
+					recordEsiRequest('POST', status, duration, null, null);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {

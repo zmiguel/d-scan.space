@@ -177,19 +177,19 @@ async function namesToCharacters(names) {
 		return [];
 	}
 
+	// filter out any null values from characterData first
+	const filteredCharacterData = characterData.filter((char) => char !== null);
+
 	const affiliationMap = new Map(allCharacterAffiliations.map((aff) => [aff.character_id, aff]));
 
 	// now we need to merge the affiliation data into the character data
-	for (const char of characterData) {
+	for (const char of filteredCharacterData) {
 		const affiliation = affiliationMap.get(char.id);
 		if (affiliation) {
 			char.corporation_id = affiliation.corporation_id;
 			char.alliance_id = affiliation.alliance_id ?? null;
 		}
 	}
-
-	// filter out any null values from characterData
-	const filteredCharacterData = characterData.filter((char) => char !== null);
 
 	return filteredCharacterData;
 }
