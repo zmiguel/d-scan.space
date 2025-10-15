@@ -12,7 +12,11 @@ import {
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
 import logger from '$lib/logger.js';
-import { CHARACTER_REQUEST_BATCH_SIZE, DOOMHEIM_ID } from '$lib/server/constants.js';
+import {
+	CHARACTER_REQUEST_BATCH_SIZE,
+	CHARACTER_BATCH_CONCURRENCY,
+	DOOMHEIM_ID
+} from '$lib/server/constants.js';
 
 async function getCharacterFromESI(id) {
 	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);
@@ -52,6 +56,31 @@ async function getCharacterFromESI(id) {
 	}
 
 	return characterInfo;
+}
+
+async function runBatchesWithConcurrency(batches, concurrency, handler) {
+	if (!Array.isArray(batches) || batches.length === 0) {
+		return [];
+	}
+
+	const limit = Math.max(1, Math.floor(concurrency ?? 1));
+	const results = new Array(batches.length);
+	let index = 0;
+
+	const workers = Array.from({ length: Math.min(limit, batches.length) }, async () => {
+		while (true) {
+			const currentIndex = index++;
+			if (currentIndex >= batches.length) {
+				break;
+			}
+
+			results[currentIndex] = await handler(batches[currentIndex], currentIndex);
+		}
+	});
+
+	await Promise.all(workers);
+
+	return results.flat();
 }
 
 async function namesToCharacters(names) {
@@ -146,22 +175,23 @@ async function namesToCharacters(names) {
 	});
 
 	const charactersPromise = withSpan('namesToCharacters.fetchCharacterData', async (span) => {
-		const allCharacterData = [];
-		for (let batchIndex = 0; batchIndex < characterBatches.length; batchIndex++) {
-			const characterBatch = characterBatches[batchIndex];
-			const batchPromises = characterBatch.map(async (character) => {
-				const characterInfo = await getCharacterFromESI(character.id);
-				return characterInfo;
-			});
+		const effectiveConcurrency = Math.min(
+			characterBatches.length || 1,
+			Math.max(1, CHARACTER_BATCH_CONCURRENCY)
+		);
 
-			const batchResults = await Promise.all(batchPromises);
-			allCharacterData.push(...batchResults);
-		}
+		const allCharacterData = await runBatchesWithConcurrency(
+			characterBatches,
+			CHARACTER_BATCH_CONCURRENCY,
+			async (characterBatch) =>
+				Promise.all(characterBatch.map(async (character) => getCharacterFromESI(character.id)))
+		);
 
 		span.setAttributes({
 			'batch.character_batches': characterBatches.length,
 			'batch.characters_to_fetch': allCharacters.length,
-			'batch.characters_fetched': allCharacterData.length
+			'batch.characters_fetched': allCharacterData.length,
+			'batch.character_concurrency': effectiveConcurrency
 		});
 
 		return allCharacterData;
@@ -241,37 +271,33 @@ export async function idsToCharacters(ids) {
 
 			// Fetch character data (sequential batches) under a parent span
 			const charactersPromise = withSpan('idsToCharacters.characterData', async (span) => {
-				const allResults = [];
-				for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-					const batch = batches[batchIndex];
-					const batchResult = await withSpan(
-						`idsToCharacters.batch.${batchIndex + 1}`,
-						async () => {
-							const batchData = [];
-							const characterPromises = batch.map(async (id) => {
-								const characterInfo = await getCharacterFromESI(id);
-								batchData.push(characterInfo);
-							});
+				const effectiveConcurrency = Math.min(
+					batches.length || 1,
+					Math.max(1, CHARACTER_BATCH_CONCURRENCY)
+				);
 
-							await Promise.all(characterPromises);
-							return batchData;
-						},
-						{
-							'batch.size': batch.length,
-							'batch.start_id': batch[0],
-							'batch.end_id': batch[batch.length - 1],
-							'batch.index': batchIndex + 1,
-							'batch.total': batches.length
-						}
-					);
-
-					allResults.push(...batchResult);
-				}
+				const allResults = await runBatchesWithConcurrency(
+					batches,
+					CHARACTER_BATCH_CONCURRENCY,
+					async (batch, batchIndex) =>
+						withSpan(
+							`idsToCharacters.batch.${batchIndex + 1}`,
+							async () => Promise.all(batch.map((id) => getCharacterFromESI(id))),
+							{
+								'batch.size': batch.length,
+								'batch.start_id': batch[0],
+								'batch.end_id': batch[batch.length - 1],
+								'batch.index': batchIndex + 1,
+								'batch.total': batches.length
+							}
+						)
+				);
 
 				span.setAttributes({
 					'batch.character_batches': batches.length,
 					'batch.characters_to_fetch': ids.length,
-					'batch.characters_fetched': allResults.length
+					'batch.characters_fetched': allResults.length,
+					'batch.character_concurrency': effectiveConcurrency
 				});
 
 				return allResults;

@@ -1,7 +1,21 @@
 import { biomassCharacter } from '$lib/database/characters';
-import { USER_AGENT } from './constants';
+import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants';
 import { withSpan } from './tracer.js';
 import { recordEsiRequest } from './metrics';
+import { Agent } from 'undici';
+
+const esiAgent = new Agent({
+	connections: ESI_MAX_CONNECTIONS,
+	keepAliveTimeout: 10_000,
+	keepAliveMaxTimeout: 60_000,
+	connect: {
+		timeout: 30_000
+	}
+});
+
+process.once('beforeExit', () => {
+	esiAgent.close();
+});
 
 const headers = {
 	'Content-Type': 'application/json',
@@ -41,7 +55,8 @@ export async function fetchGET(url, maxRetries = 3) {
 				try {
 					const response = await fetch(url, {
 						method: 'GET',
-						headers: headers
+						headers: headers,
+						dispatcher: esiAgent
 					});
 
 					const responseClone = response.clone();
@@ -165,7 +180,8 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					const response = await fetch(url, {
 						method: 'POST',
 						headers: headers,
-						body: JSON.stringify(body)
+						body: JSON.stringify(body),
+						dispatcher: esiAgent
 					});
 
 					const responseClone = response.clone();
