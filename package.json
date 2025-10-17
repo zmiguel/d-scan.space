@@ -32,7 +32,7 @@
 		"@opentelemetry/semantic-conventions": "^1.37.0",
 		"@popperjs/core": "^2.11.8",
 		"@sveltejs/adapter-node": "^5.3.3",
-		"@sveltejs/kit": "^2.46.5",
+		"@sveltejs/kit": "^2.47.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@tailwindcss/vite": "^4.1.14",
 		"@types/eslint": "9.6.1",
