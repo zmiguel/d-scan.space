@@ -36,7 +36,7 @@
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@tailwindcss/vite": "^4.1.14",
 		"@types/eslint": "9.6.1",
-		"@types/node": "^24.7.2",
+		"@types/node": "^24.9.1",
 		"@types/pg": "^8.15.5",
 		"adm-zip": "^0.5.16",
 		"croner": "^9.1.0",
