@@ -64,7 +64,13 @@ export async function addOrUpdateSystemsDB(data) {
 						sec_status: sql`excluded.sec_status`,
 						last_seen: sql`systems.last_seen`, // Preserve existing last_seen
 						updated_at: sql`now()`
-					}
+					},
+					where: sql`
+						systems.name IS DISTINCT FROM excluded.name OR
+						systems.constellation IS DISTINCT FROM excluded.constellation OR
+						systems.region IS DISTINCT FROM excluded.region OR
+						systems.sec_status IS DISTINCT FROM excluded.sec_status
+					`
 				});
 
 			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
@@ -122,7 +128,10 @@ export async function addOrUpdateCategoriesDB(data) {
 					set: {
 						name: sql`excluded.name`,
 						updated_at: sql`now()`
-					}
+					},
+					where: sql`
+						inv_categories.name IS DISTINCT FROM excluded.name
+					`
 				});
 
 			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
@@ -172,7 +181,15 @@ export async function addOrUpdateGroupsDB(data) {
 						category_id: sql`excluded.category_id`,
 						icon_id: sql`excluded.icon_id`,
 						updated_at: sql`now()`
-					}
+					},
+					where: sql`
+						inv_groups.name IS DISTINCT FROM excluded.name OR
+						inv_groups.anchorable IS DISTINCT FROM excluded.anchorable OR
+						inv_groups.anchored IS DISTINCT FROM excluded.anchored OR
+						inv_groups.fittable_non_singleton IS DISTINCT FROM excluded.fittable_non_singleton OR
+						inv_groups.category_id IS DISTINCT FROM excluded.category_id OR
+						inv_groups.icon_id IS DISTINCT FROM excluded.icon_id
+					`
 				});
 
 			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
@@ -225,7 +242,18 @@ export async function addOrUpdateTypesDB(data) {
 						market_group_id: sql`excluded.market_group_id`,
 						icon_id: sql`excluded.icon_id`,
 						updated_at: sql`now()`
-					}
+					},
+					where: sql`
+						inv_types.name IS DISTINCT FROM excluded.name OR
+						inv_types.mass IS DISTINCT FROM excluded.mass OR
+						inv_types.volume IS DISTINCT FROM excluded.volume OR
+						inv_types.capacity IS DISTINCT FROM excluded.capacity OR
+						inv_types.faction_id IS DISTINCT FROM excluded.faction_id OR
+						inv_types.race_id IS DISTINCT FROM excluded.race_id OR
+						inv_types.group_id IS DISTINCT FROM excluded.group_id OR
+						inv_types.market_group_id IS DISTINCT FROM excluded.market_group_id OR
+						inv_types.icon_id IS DISTINCT FROM excluded.icon_id
+					`
 				});
 
 			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
