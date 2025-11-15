@@ -59,11 +59,11 @@
 								class="mr-2"
 							/>
 						{/if}
-						<div class="min-w-0 font-medium dark:text-white flex items-center gap-1">
+						<div class="flex min-w-0 items-center gap-1 font-medium dark:text-white">
 							{#if alliance.ticker}
 								<span class="text-pink-600 dark:text-pink-400">[{alliance.ticker}]</span>
 								<span
-									class="truncate min-w-0 max-w-full"
+									class="max-w-full min-w-0 truncate"
 									id="alliance-{alliance.id}"
 									data-truncate-check
 								>
@@ -118,10 +118,12 @@
 										size="sm"
 										class="mr-2"
 									/>
-									<div class="min-w-0 font-medium dark:text-white flex items-center gap-1">
-										<span class="text-primary-700 dark:text-primary-400">{'<' + corp.ticker + '>'}</span>
+									<div class="flex min-w-0 items-center gap-1 font-medium dark:text-white">
+										<span class="text-primary-700 dark:text-primary-400"
+											>{'<' + corp.ticker + '>'}</span
+										>
 										<span
-											class="truncate min-w-0 max-w-full"
+											class="max-w-full min-w-0 truncate"
 											id="corp-{corp.id}"
 											data-truncate-check
 										>
@@ -156,38 +158,38 @@
 							</div>
 						{/snippet}
 
-							{#each corp.characters as pilot (pilot.id)}
-								<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
-									<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
-										<Avatar
-											cornerStyle="rounded"
-											src="https://images.evetech.net/characters/{pilot.id}/portrait?size=32"
-											size="sm"
-										/>
-										<div class="font-medium dark:text-white flex items-center gap-1">
-											<div>
-												{pilot.name}
-												<span style:color={secStatusColor(pilot.sec_status)}>
-													{pilot.sec_status.toFixed(3)}
-												</span>
-											</div>
-											<a
-												href={`https://zkillboard.com/character/${pilot.id}/`}
-												target="_blank"
-												rel="noopener"
-												class="inline-flex flex-shrink-0 align-middle"
-												title="zKillBoard"
-											>
-												<img
-													src={asset('/wreck.png')}
-													alt="zKillBoard"
-													class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
-												/>
-											</a>
+						{#each corp.characters as pilot (pilot.id)}
+							<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
+								<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
+									<Avatar
+										cornerStyle="rounded"
+										src="https://images.evetech.net/characters/{pilot.id}/portrait?size=32"
+										size="sm"
+									/>
+									<div class="flex items-center gap-1 font-medium dark:text-white">
+										<div>
+											{pilot.name}
+											<span style:color={secStatusColor(pilot.sec_status)}>
+												{pilot.sec_status.toFixed(3)}
+											</span>
 										</div>
+										<a
+											href={`https://zkillboard.com/character/${pilot.id}/`}
+											target="_blank"
+											rel="noopener"
+											class="inline-flex flex-shrink-0 align-middle"
+											title="zKillBoard"
+										>
+											<img
+												src={asset('/wreck.png')}
+												alt="zKillBoard"
+												class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+											/>
+										</a>
 									</div>
 								</div>
-							{/each}
+							</div>
+						{/each}
 					</AccordionItem>
 				{/each}
 			</Accordion>
