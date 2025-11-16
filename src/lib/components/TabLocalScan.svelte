@@ -3,12 +3,17 @@
 	import { secStatusColor } from '$lib/utils/secStatus';
 	import { asset } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
+	import {
+		getHighlightClass,
+		getHoverClass,
+		getPilotHoverClass,
+		normalizeTicker
+	} from '$lib/utils/tickerStyles';
 
 	let { data, corps = [], pilots = [] } = $props();
 
 	let selectedItem = $state(null);
 	let hoveredItem = $state(null);
-	const styleCache = new Set();
 
 	const highlightLookups = $derived(createHighlightLookups(corps, pilots));
 
@@ -134,10 +139,6 @@
 		return a.ticker === b.ticker;
 	}
 
-	function normalizeTicker(ticker) {
-		return ticker && ticker !== '' ? ticker : 'none';
-	}
-
 	function createHighlightLookups(corpsList = [], pilotsList = []) {
 		const corpsByTicker = new SvelteMap();
 		const corpsByAlliance = new SvelteMap();
@@ -234,69 +235,6 @@
 		const colorKey = pilot.corporation_ticker || 'none';
 		pilotsMap.set(pilot.id, colorKey);
 		addCorpContext(pilot.corporation_ticker, colorKey, lookups, alliancesMap, corpsMap, pilotsMap);
-	}
-
-	function ensureTickerStyles(ticker) {
-		const normalizedTicker = normalizeTicker(ticker);
-		const colors = getTickerColor(normalizedTicker);
-		addTickerStyles(normalizedTicker, colors);
-		return colors;
-	}
-
-	function getTickerColor(ticker) {
-		if (!ticker || ticker === 'none') {
-			return {
-				lightColor: '#e5e7eb',
-				darkColor: '#4b5563',
-				customClass: 'ticker-none'
-			};
-		}
-
-		let hash = 0;
-		for (let i = 0; i < ticker.length; i++) {
-			hash = ((hash << 5) - hash + ticker.charCodeAt(i)) & 0xffffffff;
-		}
-
-		const hue = Math.abs(hash) % 360;
-		const lightColor = `hsl(${hue}, 70%, 85%)`;
-		const darkColor = `hsl(${hue}, 60%, 25%)`;
-
-		return {
-			lightColor,
-			darkColor,
-			customClass: `ticker-${ticker.replace(/[^a-zA-Z0-9]/g, '')}`
-		};
-	}
-
-	function addTickerStyles(ticker, colors) {
-		const className = colors.customClass;
-		if (styleCache.has(className)) return;
-
-		const styleId = `style-${className}`;
-		if (!document.getElementById(styleId)) {
-			const style = document.createElement('style');
-			style.id = styleId;
-			style.textContent = `
-				.${className} { background-color: ${colors.lightColor} !important; }
-				.dark .${className} { background-color: ${colors.darkColor} !important; }
-				.hover-${className}:hover { background-color: ${colors.lightColor} !important; }
-				.dark .hover-${className}:hover { background-color: ${colors.darkColor} !important; }
-			`;
-			document.head.appendChild(style);
-			styleCache.add(className);
-		}
-	}
-
-	function getHoverClass(ticker) {
-		return `hover-${ensureTickerStyles(ticker).customClass}`;
-	}
-
-	function getHighlightClass(ticker) {
-		return ensureTickerStyles(ticker).customClass;
-	}
-
-	function getPilotHoverClass(corpTicker) {
-		return getHoverClass(corpTicker);
 	}
 
 	function combineClasses(...classes) {
