@@ -1,6 +1,7 @@
 <script>
 	import { Avatar } from 'flowbite-svelte';
 	import { secStatusColor } from '$lib/utils/secStatus';
+	import { asset } from '$app/paths';
 
 	let { data, corps, pilots } = $props();
 
@@ -460,6 +461,22 @@
 								{#if alliance.ticker}
 									<span class="text-pink-600 dark:text-pink-400">[{alliance.ticker}]</span>
 									{alliance.name}
+									{#if alliance.id}
+										<a
+											href={`https://zkillboard.com/alliance/${alliance.id}/`}
+											target="_blank"
+											rel="noopener"
+											class="ms-1 inline-flex flex-shrink-0 align-middle"
+											title="zKillBoard"
+											onclick={(event) => event.stopPropagation()}
+										>
+											<img
+												src={asset('/wreck.png')}
+												alt="zKillBoard"
+												class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+											/>
+										</a>
+									{/if}
 								{:else}
 									<span class="italic">No Alliance</span>
 								{/if}
@@ -505,6 +522,20 @@
 								<span class="text-primary-700 dark:text-primary-400">{'<' + corp.ticker + '>'}</span
 								>
 								{corp.name}
+								<a
+									href={`https://zkillboard.com/corporation/${corp.id}/`}
+									target="_blank"
+									rel="noopener"
+									class="ms-1 inline-flex flex-shrink-0 align-middle"
+									title="zKillBoard"
+									onclick={(event) => event.stopPropagation()}
+								>
+									<img
+										src={asset('/wreck.png')}
+										alt="zKillBoard"
+										class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+									/>
+								</a>
 							</div>
 							{#if corp.alliance_ticker}
 								<div class="text-pink-600 dark:text-pink-400">
@@ -553,6 +584,20 @@
 								<span style:color={secStatusColor(pilot.sec_status)}
 									>{pilot.sec_status.toFixed(3)}</span
 								>
+								<a
+									href={`https://zkillboard.com/character/${pilot.id}/`}
+									target="_blank"
+									rel="noopener"
+									class="ms-1 inline-flex flex-shrink-0 align-middle"
+									title="zKillBoard"
+									onclick={(event) => event.stopPropagation()}
+								>
+									<img
+										src={asset('/wreck.png')}
+										alt="zKillBoard"
+										class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+									/>
+								</a>
 							</div>
 							<div>
 								{#if pilot.alliance_ticker}
