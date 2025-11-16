@@ -27,12 +27,23 @@ const headers = {
 	'X-User-Agent': USER_AGENT
 };
 
+const RESPONSE_PREVIEW_LIMIT = 800;
+
+function createPreview(payload) {
+	if (payload == null) return 'null';
+	const stringified = typeof payload === 'string' ? payload : JSON.stringify(payload);
+	if (stringified.length <= RESPONSE_PREVIEW_LIMIT) {
+		return stringified;
+	}
+	return `${stringified.slice(0, RESPONSE_PREVIEW_LIMIT)}…`;
+}
+
 async function handleDelete(response, span, attempt, fullResponse) {
 	// Handle the deleted edge case
 	span.addEvent('Resource marked as deleted', {
 		url: response.url,
 		attempt: attempt,
-		fullResponse: fullResponse
+		preview: createPreview(fullResponse)
 	});
 	if (response.url.includes('character')) {
 		const idStr = response.url.split('/').pop();
@@ -72,15 +83,14 @@ export async function fetchGET(url, maxRetries = 3) {
 					}
 
 					span.setAttributes({
-						'http.response.status': response.status,
+						'http.response.status_code': response.status,
 						'http.response.status_text': response.statusText,
 						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
 						'http.response.body': JSON.stringify(fullResponse),
-						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						attempt: attempt
+						'http.retry.attempt': attempt
 					});
 
 					// Extract rate limit info if available
@@ -95,22 +105,18 @@ export async function fetchGET(url, maxRetries = 3) {
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
 							const error = new Error(
-								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+								`HTTP ${response.status}: ${response.statusText} | ${createPreview(fullResponse)}`
 							);
-							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
-									'http.response.status': response.status,
-									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(
-										Object.fromEntries(response.headers.entries())
-									),
-									'http.response.body': JSON.stringify(fullResponse),
-									'http.response.url': response.url,
-									'http.response.redirected': response.redirected,
-									'http.response.type': response.type,
-									'http.response.ok': response.ok,
-									attempt: attempt
+									status: response.status,
+									statusText: response.statusText,
+									url: response.url,
+									redirected: response.redirected,
+									type: response.type,
+									ok: response.ok,
+									attempt: attempt,
+									preview: createPreview(fullResponse)
 								}
 							});
 							throw error;
@@ -129,7 +135,7 @@ export async function fetchGET(url, maxRetries = 3) {
 
 					// Record failed request metrics
 					const duration = Date.now() - startTime;
-					const status = error.responseDetails?.['http.response.status'] || 500;
+					const status = error.responseDetails?.status || 500;
 					recordEsiRequest('GET', status, duration, null, null);
 
 					// Add detailed fetch failure event if response details are available
@@ -197,15 +203,14 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					}
 
 					span.setAttributes({
-						'http.response.status': response.status,
+						'http.response.status_code': response.status,
 						'http.response.status_text': response.statusText,
 						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
 						'http.response.body': JSON.stringify(fullResponse),
-						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						attempt: attempt
+						'http.retry.attempt': attempt
 					});
 
 					// Extract rate limit info if available
@@ -220,22 +225,18 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
 							const error = new Error(
-								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+								`HTTP ${response.status}: ${response.statusText} | ${createPreview(fullResponse)}`
 							);
-							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
-									'http.response.status': response.status,
-									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(
-										Object.fromEntries(response.headers.entries())
-									),
-									'http.response.body': JSON.stringify(fullResponse),
-									'http.response.url': response.url,
-									'http.response.redirected': response.redirected,
-									'http.response.type': response.type,
-									'http.response.ok': response.ok,
-									attempt: attempt
+									status: response.status,
+									statusText: response.statusText,
+									url: response.url,
+									redirected: response.redirected,
+									type: response.type,
+									ok: response.ok,
+									attempt: attempt,
+									preview: createPreview(fullResponse)
 								}
 							});
 							throw error;
@@ -254,7 +255,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Record failed request metrics
 					const duration = Date.now() - startTime;
-					const status = error.responseDetails?.['http.response.status'] || 500;
+					const status = error.responseDetails?.status || 500;
 					recordEsiRequest('POST', status, duration, null, null);
 
 					// Add detailed fetch failure event if response details are available
@@ -289,6 +290,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 			'http.url': url,
 			'http.request.headers': JSON.stringify(headers),
 			'http.request.body': JSON.stringify(body),
+			'http.request.body_size': Buffer.byteLength(JSON.stringify(body ?? {})),
 			'max.retries': maxRetries
 		}
 	);

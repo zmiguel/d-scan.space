@@ -47,22 +47,22 @@ function getSvelteKitRootSpan(event) {
 
 /**
  * Create and execute a span, with optional SvelteKit integration
+ * @template T
  * @param {string} name - The name of the span
- * @param {Function} fn - The function to execute within the span
- * @param {Object} attributes - Optional attributes to add to the span
- * @param {Object} options - Optional span options
+ * @param {(span: import('@opentelemetry/api').Span) => Promise<T> | T} fn - The function to execute within the span
+ * @param {Record<string, unknown>} attributes - Optional attributes to add to the span
+ * @param {import('@opentelemetry/api').SpanOptions} options - Optional span options
  * @param {import('$app/server').RequestEvent | undefined} event - Optional SvelteKit request event
- * @returns {Promise} - The result of the function execution
+ * @returns {Promise<T>} - The result of the function execution
  */
 export async function withSpan(name, fn, attributes = {}, options = {}, event = undefined) {
-	// Try to use SvelteKit's current span as parent if available
-	let parentSpan = undefined;
+	// Determine parent context (SvelteKit span if available, otherwise active context)
+	let parentContext = context.active();
 	if (event?.tracing?.current) {
-		parentSpan = event.tracing.current;
-		options.parent = trace.setSpan(context.active(), parentSpan);
+		parentContext = trace.setSpan(parentContext, event.tracing.current);
 	}
 
-	const span = tracer.startSpan(name, options);
+	const span = tracer.startSpan(name, options, parentContext);
 
 	// Add attributes if provided
 	if (Object.keys(attributes).length > 0) {

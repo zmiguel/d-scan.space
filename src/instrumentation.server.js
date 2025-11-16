@@ -16,6 +16,7 @@ import { metrics } from '@opentelemetry/api';
 import { PeriodicExportingMetricReader, MeterProvider } from '@opentelemetry/sdk-metrics';
 import { AggregationType } from '@opentelemetry/sdk-metrics/build/src/view/AggregationOption.js';
 import { createAllowListAttributesProcessor } from '@opentelemetry/sdk-metrics/build/src/view/AttributesProcessor.js';
+import { ExportResultCode } from '@opentelemetry/core';
 import {
 	ESI_DURATION_BOUNDARIES,
 	HTTP_DURATION_BOUNDARIES,
@@ -37,34 +38,59 @@ const traceExporter = new OTLPTraceExporter({
 	}
 });
 
-// Add error handling for the exporter with retry logic
-traceExporter.export = ((originalExport) => {
-	return function (spans, resultCallback) {
-		const attemptExport = async (attempt = 1, maxRetries = 3) => {
-			logger.info(`Exporting ${spans.length} spans, attempt ${attempt}/${maxRetries}`);
-			return new Promise((resolve) => {
-				originalExport.call(this, spans, (result) => {
-					if (result.code !== 0 && attempt < maxRetries) {
-						logger.warn(`Export attempt ${attempt} failed, retrying... Error: ${result.error}`);
-						setTimeout(
-							() => {
-								attemptExport(attempt + 1, maxRetries).then(resolve);
-							},
-							Math.pow(2, attempt) * 1000
-						); // Exponential backoff
-					} else {
-						if (result.code !== 0) {
-							logger.error(`Failed to export spans after ${maxRetries} attempts: ${result.error}`);
-						}
-						resolve(result);
-					}
-				});
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+class RetryingSpanExporter {
+	constructor(exporter, { maxRetries = 3, baseDelayMillis = 500 } = {}) {
+		this._exporter = exporter;
+		this._maxRetries = maxRetries;
+		this._baseDelayMillis = baseDelayMillis;
+	}
+
+	export(spans, resultCallback) {
+		const attempt = async (currentAttempt = 1) => {
+			const result = await new Promise((resolve) => {
+				this._exporter.export(spans, resolve);
 			});
+
+			if (result.code === ExportResultCode.SUCCESS || currentAttempt >= this._maxRetries) {
+				if (result.code !== ExportResultCode.SUCCESS) {
+					logger.error(
+						`Failed to export spans after ${currentAttempt} attempts: ${result.error || 'unknown error'}`
+					);
+				}
+				resultCallback(result);
+				return;
+			}
+
+			logger.warn(
+				`Span export failed (attempt ${currentAttempt}/${this._maxRetries}), retrying... ${result.error || ''}`
+			);
+			const delay = Math.pow(2, currentAttempt - 1) * this._baseDelayMillis;
+			await wait(delay);
+			return attempt(currentAttempt + 1);
 		};
 
-		attemptExport().then((result) => resultCallback(result));
-	};
-})(traceExporter.export.bind(traceExporter));
+		attempt();
+	}
+
+	async shutdown() {
+		if (typeof this._exporter.shutdown === 'function') {
+			await this._exporter.shutdown();
+		}
+	}
+
+	async forceFlush() {
+		if (typeof this._exporter.forceFlush === 'function') {
+			await this._exporter.forceFlush();
+		}
+	}
+}
+
+const retryingTraceExporter = new RetryingSpanExporter(traceExporter, {
+	maxRetries: 3,
+	baseDelayMillis: 1000
+});
 
 // Set up Prometheus exporter for metrics
 const prometheusPort = parseInt(env.PROMETHEUS_PORT || process.env.PROMETHEUS_PORT || '9464');
@@ -79,9 +105,18 @@ const prometheusExporter = new PrometheusExporter(
 );
 
 // Create resource for metrics
+const environment =
+	env.DEPLOYMENT_ENV ||
+	env.VERCEL_ENV ||
+	env.NODE_ENV ||
+	process.env.DEPLOYMENT_ENV ||
+	process.env.NODE_ENV ||
+	'local';
+
 const resource = resourceFromAttributes({
 	[ATTR_SERVICE_NAME]: 'd-scan.space',
-	[ATTR_SERVICE_VERSION]: pkg.version
+	[ATTR_SERVICE_VERSION]: pkg.version,
+	'deployment.environment': environment
 });
 
 // Prepare metric readers array
@@ -200,7 +235,7 @@ metrics.setGlobalMeterProvider(meterProvider);
 
 const sdk = new NodeSDK({
 	resource: resource,
-	spanProcessor: new BatchSpanProcessor(traceExporter, {
+	spanProcessor: new BatchSpanProcessor(retryingTraceExporter, {
 		// Force faster export for debugging
 		scheduledDelayMillis: 1000,
 		exportTimeoutMillis: 30000,
@@ -234,23 +269,19 @@ try {
 	logger.error('Failed to start OpenTelemetry SDK:', error);
 }
 
-// Handle process exit to ensure spans are flushed
-process.on('SIGTERM', async () => {
+async function shutdownTelemetry(signal) {
 	try {
+		logger.info(`Received ${signal}. Flushing telemetry...`);
 		await sdk.shutdown();
+		await meterProvider.shutdown();
 		logger.info('OpenTelemetry SDK shut down successfully');
 	} catch (error) {
 		logger.error('Error shutting down OpenTelemetry SDK:', error);
+	} finally {
+		process.exit(0);
 	}
-	process.exit(0);
-});
+}
 
-process.on('SIGINT', async () => {
-	try {
-		await sdk.shutdown();
-		logger.info('OpenTelemetry SDK shut down successfully');
-	} catch (error) {
-		logger.error('Error shutting down OpenTelemetry SDK:', error);
-	}
-	process.exit(0);
-});
+// Handle process exit to ensure spans are flushed
+process.on('SIGTERM', () => shutdownTelemetry('SIGTERM'));
+process.on('SIGINT', () => shutdownTelemetry('SIGINT'));
