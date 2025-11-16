@@ -183,9 +183,17 @@ export async function createNewLocalScan(data) {
 			 *  ],
 			 */
 
-			/** @type {{ alliances: Array<any> }} */
+			/** @type {{
+				alliances: Array<any>;
+				total_alliances: number;
+				total_corporations: number;
+				total_pilots: number;
+			}} */
 			const formattedData = {
-				alliances: []
+				alliances: [],
+				total_alliances: 0,
+				total_corporations: 0,
+				total_pilots: 0
 			};
 
 			const alliancesMap = new Map();
@@ -244,13 +252,21 @@ export async function createNewLocalScan(data) {
 
 			formattedData.alliances.sort((a, b) => b.character_count - a.character_count);
 
+			const totalAlliances = formattedData.alliances.length;
+			const totalCorporations = formattedData.alliances.reduce(
+				(acc, alliance) => acc + (alliance.corporation_count ?? 0),
+				0
+			);
+			const totalPilots = allCharacters.length;
+
+			formattedData.total_alliances = totalAlliances;
+			formattedData.total_corporations = totalCorporations;
+			formattedData.total_pilots = totalPilots;
+
 			span.setAttributes({
-				'scan.processed_characters': allCharacters.length,
-				'scan.alliances_count': formattedData.alliances.length,
-				'scan.corporations_count': formattedData.alliances.reduce(
-					(acc, alliance) => acc + alliance.corporation_count,
-					0
-				)
+				'scan.processed_characters': totalPilots,
+				'scan.alliances_count': totalAlliances,
+				'scan.corporations_count': totalCorporations
 			});
 
 			return formattedData;

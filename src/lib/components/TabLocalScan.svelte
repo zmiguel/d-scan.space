@@ -2,57 +2,262 @@
 	import { Avatar } from 'flowbite-svelte';
 	import { secStatusColor } from '$lib/utils/secStatus';
 	import { asset } from '$app/paths';
+	import { SvelteMap } from 'svelte/reactivity';
 
-	let { data, corps, pilots } = $props();
+	let { data, corps = [], pilots = [] } = $props();
 
-	// State for single selection
-	let selectedItem = $state(null); // { type: 'alliance'|'corp'|'pilot', ticker: string, name?: string }
+	let selectedItem = $state(null);
+	let hoveredItem = $state(null);
+	const styleCache = new Set();
 
-	// Cache for DOM elements to improve performance
-	let elementCache = $state(new Map());
-	let styleCache = $state(new Set()); // Track which styles we've already added
+	const highlightLookups = $derived(createHighlightLookups(corps, pilots));
 
-	// Clear element cache when data changes
-	$effect(() => {
-		elementCache.clear();
-		styleCache.clear();
+	const highlightMaps = $derived.by(() => {
+		const focuses = [selectedItem, hoveredItem].filter(Boolean);
+
+		if (focuses.length === 0) {
+			return {
+				alliances: new SvelteMap(),
+				corps: new SvelteMap(),
+				pilots: new SvelteMap()
+			};
+		}
+
+		const alliancesMap = new SvelteMap();
+		const corpsMap = new SvelteMap();
+		const pilotsMap = new SvelteMap();
+
+		for (const focus of focuses) {
+			if (focus.type === 'alliance') {
+				addAllianceContext(
+					focus.ticker,
+					focus.ticker,
+					highlightLookups,
+					alliancesMap,
+					corpsMap,
+					pilotsMap
+				);
+			} else if (focus.type === 'corp') {
+				addCorpContext(
+					focus.ticker,
+					focus.ticker,
+					highlightLookups,
+					alliancesMap,
+					corpsMap,
+					pilotsMap
+				);
+			} else if (focus.type === 'pilot') {
+				addPilotContext(focus.id, highlightLookups, alliancesMap, corpsMap, pilotsMap);
+			}
+		}
+
+		return {
+			alliances: alliancesMap,
+			corps: corpsMap,
+			pilots: pilotsMap
+		};
 	});
 
-	// Get cached DOM elements or query and cache them
-	function getCachedElements(selector) {
-		if (!elementCache.has(selector)) {
-			elementCache.set(selector, Array.from(document.querySelectorAll(selector)));
+	const highlightedAlliances = $derived(highlightMaps.alliances);
+	const highlightedCorps = $derived(highlightMaps.corps);
+	const highlightedPilots = $derived(highlightMaps.pilots);
+
+	function toggleAlliance(allianceTicker) {
+		const next = { type: 'alliance', ticker: normalizeTicker(allianceTicker) };
+		selectedItem = isSameItem(selectedItem, next) ? null : next;
+		if (selectedItem) hoveredItem = null;
+	}
+
+	function toggleCorporation(corpTicker) {
+		const next = { type: 'corp', ticker: corpTicker };
+		selectedItem = isSameItem(selectedItem, next) ? null : next;
+		if (selectedItem) hoveredItem = null;
+	}
+
+	function togglePilot(pilotId) {
+		const next = { type: 'pilot', id: pilotId };
+		selectedItem = isSameItem(selectedItem, next) ? null : next;
+		if (selectedItem) hoveredItem = null;
+	}
+
+	function setHover(item) {
+		if (isSameItem(selectedItem, item)) {
+			hoveredItem = null;
+			return;
 		}
-		return elementCache.get(selector);
+		hoveredItem = item;
 	}
 
-	// Batch DOM operations for better performance
-	function batchDOMOperations(operations) {
-		requestAnimationFrame(() => {
-			operations.forEach((op) => op());
-		});
+	function clearHover(item) {
+		if (isSameItem(hoveredItem, item)) {
+			hoveredItem = null;
+		}
 	}
 
-	// Generate a unique color based on ticker
+	function setHoverAlliance(allianceTicker) {
+		setHover({ type: 'alliance', ticker: normalizeTicker(allianceTicker) });
+	}
+
+	function clearHoverAlliance(allianceTicker) {
+		clearHover({ type: 'alliance', ticker: normalizeTicker(allianceTicker) });
+	}
+
+	function setHoverCorporation(corpTicker) {
+		setHover({ type: 'corp', ticker: corpTicker });
+	}
+
+	function clearHoverCorporation(corpTicker) {
+		clearHover({ type: 'corp', ticker: corpTicker });
+	}
+
+	function setHoverPilot(pilotId) {
+		setHover({ type: 'pilot', id: pilotId });
+	}
+
+	function clearHoverPilot(pilotId) {
+		clearHover({ type: 'pilot', id: pilotId });
+	}
+
+	function handleInteractiveKey(event, callback) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			callback();
+		}
+	}
+
+	function isSameItem(a, b) {
+		if (!a || !b) return false;
+		if (a.type !== b.type) return false;
+		if (a.type === 'pilot') {
+			return a.id === b.id;
+		}
+		return a.ticker === b.ticker;
+	}
+
+	function normalizeTicker(ticker) {
+		return ticker && ticker !== '' ? ticker : 'none';
+	}
+
+	function createHighlightLookups(corpsList = [], pilotsList = []) {
+		const corpsByTicker = new SvelteMap();
+		const corpsByAlliance = new SvelteMap();
+
+		for (const corp of corpsList) {
+			if (!corp?.ticker) continue;
+			corpsByTicker.set(corp.ticker, corp);
+			const allianceKey = normalizeTicker(corp.alliance_ticker);
+			if (!corpsByAlliance.has(allianceKey)) {
+				corpsByAlliance.set(allianceKey, []);
+			}
+			corpsByAlliance.get(allianceKey).push(corp);
+		}
+
+		const pilotsByCorp = new SvelteMap();
+		const pilotsByAlliance = new SvelteMap();
+		const pilotById = new SvelteMap();
+
+		for (const pilot of pilotsList) {
+			if (!pilot) continue;
+			pilotById.set(pilot.id, pilot);
+
+			if (pilot.corporation_ticker) {
+				if (!pilotsByCorp.has(pilot.corporation_ticker)) {
+					pilotsByCorp.set(pilot.corporation_ticker, []);
+				}
+				pilotsByCorp.get(pilot.corporation_ticker).push(pilot);
+			}
+
+			const allianceKey = normalizeTicker(pilot.alliance_ticker);
+			if (!pilotsByAlliance.has(allianceKey)) {
+				pilotsByAlliance.set(allianceKey, []);
+			}
+			pilotsByAlliance.get(allianceKey).push(pilot);
+		}
+
+		return {
+			corpsByTicker,
+			corpsByAlliance,
+			pilotsByCorp,
+			pilotsByAlliance,
+			pilotById
+		};
+	}
+
+	function addAllianceContext(
+		allianceTicker,
+		colorKey,
+		lookups,
+		alliancesMap,
+		corpsMap,
+		pilotsMap
+	) {
+		const normalizedTicker = normalizeTicker(allianceTicker);
+		alliancesMap.set(normalizedTicker, colorKey);
+
+		const corpsInAlliance = lookups.corpsByAlliance.get(normalizedTicker) ?? [];
+		for (const corp of corpsInAlliance) {
+			corpsMap.set(corp.ticker, colorKey);
+			const corpPilots = lookups.pilotsByCorp.get(corp.ticker) ?? [];
+			for (const pilot of corpPilots) {
+				pilotsMap.set(pilot.id, colorKey);
+			}
+		}
+
+		const alliancePilots = lookups.pilotsByAlliance.get(normalizedTicker) ?? [];
+		for (const pilot of alliancePilots) {
+			pilotsMap.set(pilot.id, colorKey);
+			if (pilot.corporation_ticker) {
+				corpsMap.set(pilot.corporation_ticker, colorKey);
+			}
+		}
+	}
+
+	function addCorpContext(corpTicker, colorKey, lookups, alliancesMap, corpsMap, pilotsMap) {
+		if (!corpTicker) return;
+		corpsMap.set(corpTicker, colorKey);
+
+		const corp = lookups.corpsByTicker.get(corpTicker);
+		const allianceTicker = normalizeTicker(corp?.alliance_ticker);
+		if (allianceTicker) {
+			alliancesMap.set(allianceTicker, colorKey);
+		}
+
+		const corpPilots = lookups.pilotsByCorp.get(corpTicker) ?? [];
+		for (const pilot of corpPilots) {
+			pilotsMap.set(pilot.id, colorKey);
+		}
+	}
+
+	function addPilotContext(pilotId, lookups, alliancesMap, corpsMap, pilotsMap) {
+		const pilot = lookups.pilotById.get(pilotId);
+		if (!pilot) return;
+		const colorKey = pilot.corporation_ticker || 'none';
+		pilotsMap.set(pilot.id, colorKey);
+		addCorpContext(pilot.corporation_ticker, colorKey, lookups, alliancesMap, corpsMap, pilotsMap);
+	}
+
+	function ensureTickerStyles(ticker) {
+		const normalizedTicker = normalizeTicker(ticker);
+		const colors = getTickerColor(normalizedTicker);
+		addTickerStyles(normalizedTicker, colors);
+		return colors;
+	}
+
 	function getTickerColor(ticker) {
 		if (!ticker || ticker === 'none') {
 			return {
-				lightColor: '#e5e7eb', // gray-200
-				darkColor: '#4b5563', // gray-600
+				lightColor: '#e5e7eb',
+				darkColor: '#4b5563',
 				customClass: 'ticker-none'
 			};
 		}
 
-		// Simple hash function
 		let hash = 0;
 		for (let i = 0; i < ticker.length; i++) {
 			hash = ((hash << 5) - hash + ticker.charCodeAt(i)) & 0xffffffff;
 		}
 
-		// Convert to positive and get hue (0-360)
 		const hue = Math.abs(hash) % 360;
-
-		// Use HSL with fixed saturation and lightness for consistency
 		const lightColor = `hsl(${hue}, 70%, 85%)`;
 		const darkColor = `hsl(${hue}, 60%, 25%)`;
 
@@ -63,11 +268,8 @@
 		};
 	}
 
-	// Add CSS dynamically - optimized with caching
 	function addTickerStyles(ticker, colors) {
 		const className = colors.customClass;
-
-		// Skip if we've already added this style
 		if (styleCache.has(className)) return;
 
 		const styleId = `style-${className}`;
@@ -85,348 +287,20 @@
 		}
 	}
 
-	// Clear all highlights - optimized version
-	function clearAllHighlights() {
-		// Clear cache since we're about to modify classes
-		elementCache.clear();
-
-		// Get all elements that might have highlight classes
-		const elements = document.querySelectorAll(
-			'[data-alliance-ticker], [data-corp-ticker], [id*="alliance-"], [id*="corporation-"]'
-		);
-
-		// Get all possible ticker classes to remove
-		const allTickers = [
-			...(data.local?.alliances?.map((a) => a.ticker).filter(Boolean) || []),
-			...corps.map((c) => c.ticker).filter(Boolean),
-			'none'
-		];
-
-		// Create array of all class names to remove
-		const classesToRemove = allTickers.map((ticker) => getTickerColor(ticker).customClass);
-
-		// Batch remove all classes from all elements
-		elements.forEach((el) => {
-			el.classList.remove(...classesToRemove);
-		});
-	}
-
-	// Apply highlights based on selection - optimized version
-	function applyHighlights(type, ticker, pilotName = null) {
-		const colors = getTickerColor(ticker);
-		addTickerStyles(ticker, colors);
-
-		// Use requestAnimationFrame to batch DOM operations
-		requestAnimationFrame(() => {
-			if (type === 'alliance') {
-				// Highlight alliance itself
-				getCachedElements(`[data-alliance-ticker="${ticker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-				// Highlight all corps and pilots in this alliance
-				getCachedElements(`[id*="alliance-${ticker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			} else if (type === 'corp') {
-				// Find the corp to get its alliance
-				const corp = corps.find((c) => c.ticker === ticker);
-				const allianceTicker = corp?.alliance_ticker || 'none';
-
-				// Highlight corp itself
-				getCachedElements(`[data-corp-ticker="${ticker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-				// Highlight all pilots in this corp
-				getCachedElements(`[id*="corporation-${ticker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-				// Always highlight the parent alliance (including "No Alliance")
-				getCachedElements(`[data-alliance-ticker="${allianceTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			} else if (type === 'pilot') {
-				// Find the pilot to get corp and alliance info
-				const pilot = pilots.find((p) => p.name === pilotName);
-				const corpTicker = pilot?.corporation_ticker;
-				const allianceTicker = pilot?.alliance_ticker;
-
-				// Highlight the pilot itself
-				getCachedElements(`[id*="corporation-${corpTicker}"]`).forEach((el) => {
-					if (el.textContent.includes(pilotName)) {
-						el.classList.add(colors.customClass);
-					}
-				});
-				// Highlight parent corp
-				if (corpTicker) {
-					getCachedElements(`[data-corp-ticker="${corpTicker}"]`).forEach((el) => {
-						el.classList.add(colors.customClass);
-					});
-				}
-				// Always highlight parent alliance (including "No Alliance")
-				const finalAllianceTicker = allianceTicker || 'none';
-				getCachedElements(`[data-alliance-ticker="${finalAllianceTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			}
-		});
-	}
-
-	// Click handlers
-	function clickAlliance(allianceTicker) {
-		// If clicking the same item, deselect it
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) {
-			clearAllHighlights();
-			selectedItem = null;
-		} else {
-			// Clear previous selection and apply new one
-			clearAllHighlights();
-			selectedItem = { type: 'alliance', ticker: allianceTicker };
-			applyHighlights('alliance', allianceTicker);
-		}
-	}
-
-	function clickCorporation(corpTicker) {
-		// If clicking the same item, deselect it
-		if (selectedItem?.type === 'corp' && selectedItem?.ticker === corpTicker) {
-			clearAllHighlights();
-			selectedItem = null;
-		} else {
-			// Clear previous selection and apply new one
-			clearAllHighlights();
-			selectedItem = { type: 'corp', ticker: corpTicker };
-			applyHighlights('corp', corpTicker);
-		}
-	}
-
-	function clickPilot(pilotName, corpTicker) {
-		// If clicking the same item, deselect it
-		if (selectedItem?.type === 'pilot' && selectedItem?.name === pilotName) {
-			clearAllHighlights();
-			selectedItem = null;
-		} else {
-			// Clear previous selection and apply new one
-			clearAllHighlights();
-			selectedItem = { type: 'pilot', ticker: corpTicker, name: pilotName };
-			applyHighlights('pilot', corpTicker, pilotName);
-		}
-	}
-
-	// Hover handlers (temporary highlighting)
-	function highlightAlliance(allianceTicker) {
-		// Don't add hover highlight if this alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		// Don't add if there's a selected corp from this alliance
-		if (selectedItem?.type === 'corp') {
-			const selectedCorp = corps.find((c) => c.ticker === selectedItem.ticker);
-			if (selectedCorp?.alliance_ticker === allianceTicker) return;
-		}
-
-		// Don't add if there's a selected pilot from this alliance
-		if (selectedItem?.type === 'pilot') {
-			const selectedPilot = pilots.find((p) => p.name === selectedItem.name);
-			if (selectedPilot?.alliance_ticker === allianceTicker) return;
-		}
-
-		const colors = getTickerColor(allianceTicker);
-		addTickerStyles(allianceTicker, colors);
-
-		// Use cached elements for better performance
-		requestAnimationFrame(() => {
-			// Highlight corporations and pilots in this alliance
-			getCachedElements(`[id*="alliance-${allianceTicker}"]`).forEach((el) => {
-				el.classList.add(colors.customClass);
-			});
-
-			// Also highlight the alliance itself
-			getCachedElements(`[data-alliance-ticker="${allianceTicker}"]`).forEach((el) => {
-				el.classList.add(colors.customClass);
-			});
-		});
-	}
-
-	function unhighlightAlliance(allianceTicker) {
-		// Don't remove hover highlight if this alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		// Don't remove if there's a selected corp from this alliance
-		if (selectedItem?.type === 'corp') {
-			const selectedCorp = corps.find((c) => c.ticker === selectedItem.ticker);
-			if (selectedCorp?.alliance_ticker === allianceTicker) return;
-		}
-
-		// Don't remove if there's a selected pilot from this alliance
-		if (selectedItem?.type === 'pilot') {
-			const selectedPilot = pilots.find((p) => p.name === selectedItem.name);
-			if (selectedPilot?.alliance_ticker === allianceTicker) return;
-		}
-
-		const colors = getTickerColor(allianceTicker);
-
-		requestAnimationFrame(() => {
-			// Remove highlight from corporations and pilots
-			getCachedElements(`[id*="alliance-${allianceTicker}"]`).forEach((el) => {
-				el.classList.remove(colors.customClass);
-			});
-			// Remove highlight from the alliance itself
-			getCachedElements(`[data-alliance-ticker="${allianceTicker}"]`).forEach((el) => {
-				el.classList.remove(colors.customClass);
-			});
-		});
-	}
-
-	function highlightCorporation(corpTicker, allianceTicker) {
-		// Don't add hover highlight if this corp is selected
-		if (selectedItem?.type === 'corp' && selectedItem?.ticker === corpTicker) return;
-
-		// Don't add if this corp's alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		// Don't add if there's a selected pilot from this corp
-		if (selectedItem?.type === 'pilot') {
-			const selectedPilot = pilots.find((p) => p.name === selectedItem.name);
-			if (selectedPilot?.corporation_ticker === corpTicker) return;
-		}
-
-		const colors = getTickerColor(corpTicker);
-		addTickerStyles(corpTicker, colors);
-		const finalAllianceTicker = allianceTicker || 'none';
-
-		// Batch DOM operations for better performance
-		batchDOMOperations([
-			() => {
-				// Highlight pilots in this corporation
-				getCachedElements(`[id*="corporation-${corpTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			},
-			() => {
-				// Highlight the parent alliance (including "No Alliance")
-				getCachedElements(`[data-alliance-ticker="${finalAllianceTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			}
-		]);
-	}
-
-	function unhighlightCorporation(corpTicker, allianceTicker) {
-		// Don't remove hover highlight if this corp is selected
-		if (selectedItem?.type === 'corp' && selectedItem?.ticker === corpTicker) return;
-
-		// Don't remove if this corp's alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		// Don't remove if there's a selected pilot from this corp
-		if (selectedItem?.type === 'pilot') {
-			const selectedPilot = pilots.find((p) => p.name === selectedItem.name);
-			if (selectedPilot?.corporation_ticker === corpTicker) return;
-		}
-
-		const colors = getTickerColor(corpTicker);
-		const finalAllianceTicker = allianceTicker || 'none';
-
-		// Batch DOM operations for better performance
-		batchDOMOperations([
-			() => {
-				// Remove highlight from pilots
-				getCachedElements(`[id*="corporation-${corpTicker}"]`).forEach((el) => {
-					el.classList.remove(colors.customClass);
-				});
-			},
-			() => {
-				// Remove highlight from the corporation itself
-				getCachedElements(`[data-corp-ticker="${corpTicker}"]`).forEach((el) => {
-					el.classList.remove(colors.customClass);
-				});
-			},
-			() => {
-				// Remove highlight from parent alliance (including "No Alliance")
-				getCachedElements(`[data-alliance-ticker="${finalAllianceTicker}"]`).forEach((el) => {
-					el.classList.remove(colors.customClass);
-				});
-			}
-		]);
-	}
-
-	function highlightPilot(pilotName, corpTicker, allianceTicker) {
-		// Don't add hover highlight if this item is selected
-		if (selectedItem?.type === 'pilot' && selectedItem?.name === pilotName) return;
-
-		// Don't add if this pilot's corp is selected
-		if (selectedItem?.type === 'corp' && selectedItem?.ticker === corpTicker) return;
-
-		// Don't add if this pilot's alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		const colors = getTickerColor(corpTicker);
-		addTickerStyles(corpTicker, colors);
-		const finalAllianceTicker = allianceTicker || 'none';
-
-		// Batch DOM operations for better performance
-		batchDOMOperations([
-			() => {
-				// Highlight the corporation
-				getCachedElements(`[data-corp-ticker="${corpTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			},
-			() => {
-				// Highlight the parent alliance (including "No Alliance")
-				getCachedElements(`[data-alliance-ticker="${finalAllianceTicker}"]`).forEach((el) => {
-					el.classList.add(colors.customClass);
-				});
-			}
-		]);
-	}
-
-	function unhighlightPilot(pilotName, corpTicker, allianceTicker) {
-		// Don't remove hover highlight if this item is selected
-		if (selectedItem?.type === 'pilot' && selectedItem?.name === pilotName) return;
-
-		// Don't remove if this pilot's corp is selected
-		if (selectedItem?.type === 'corp' && selectedItem?.ticker === corpTicker) return;
-
-		// Don't remove if this pilot's alliance is selected
-		if (selectedItem?.type === 'alliance' && selectedItem?.ticker === allianceTicker) return;
-
-		// Don't remove if there's a selected pilot from the same corp (preserve corp/alliance highlights)
-		if (selectedItem?.type === 'pilot') {
-			const selectedPilot = pilots.find((p) => p.name === selectedItem.name);
-			if (selectedPilot?.corporation_ticker === corpTicker) return;
-		}
-
-		const colors = getTickerColor(corpTicker);
-		const finalAllianceTicker = allianceTicker || 'none';
-
-		// Batch DOM operations for better performance
-		batchDOMOperations([
-			() => {
-				// Remove highlight from corporation
-				getCachedElements(`[data-corp-ticker="${corpTicker}"]`).forEach((el) => {
-					el.classList.remove(colors.customClass);
-				});
-			},
-			() => {
-				// Remove highlight from alliance (including "No Alliance")
-				getCachedElements(`[data-alliance-ticker="${finalAllianceTicker}"]`).forEach((el) => {
-					el.classList.remove(colors.customClass);
-				});
-			}
-		]);
-	}
-
-	// Helper function to get hover class for elements
 	function getHoverClass(ticker) {
-		const colors = getTickerColor(ticker);
-		addTickerStyles(ticker, colors);
-		return `hover-${colors.customClass}`;
+		return `hover-${ensureTickerStyles(ticker).customClass}`;
 	}
 
-	// Helper function to get hover class for pilots (uses corp color)
+	function getHighlightClass(ticker) {
+		return ensureTickerStyles(ticker).customClass;
+	}
+
 	function getPilotHoverClass(corpTicker) {
-		const colors = getTickerColor(corpTicker);
-		addTickerStyles(corpTicker, colors);
-		return `hover-${colors.customClass}`;
+		return getHoverClass(corpTicker);
+	}
+
+	function combineClasses(...classes) {
+		return classes.filter(Boolean).join(' ');
 	}
 </script>
 
@@ -436,18 +310,20 @@
 		<div class="col-auto mt-2">
 			{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 				{@const allianceTicker = alliance.ticker || 'none'}
+				{@const allianceHighlightTicker = highlightedAlliances.get(allianceTicker)}
 				<div
 					data-alliance-ticker={allianceTicker}
-					class="flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center {getHoverClass(
-						allianceTicker
-					)}"
+					class={combineClasses(
+						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						getHoverClass(allianceTicker),
+						allianceHighlightTicker ? getHighlightClass(allianceHighlightTicker) : ''
+					)}
 					role="button"
 					tabindex="0"
-					onclick={() => clickAlliance(allianceTicker)}
-					onkeydown={(e) =>
-						e.key === 'Enter' || e.key === ' ' ? clickAlliance(allianceTicker) : null}
-					onmouseenter={() => highlightAlliance(allianceTicker)}
-					onmouseleave={() => unhighlightAlliance(allianceTicker)}
+					onclick={() => toggleAlliance(allianceTicker)}
+					onkeydown={(event) => handleInteractiveKey(event, () => toggleAlliance(allianceTicker))}
+					onmouseenter={() => setHoverAlliance(allianceTicker)}
+					onmouseleave={() => clearHoverAlliance(allianceTicker)}
 				>
 					<div class="mt-1 flex items-center space-x-2 rtl:space-x-reverse">
 						{#if alliance.ticker}
@@ -498,19 +374,21 @@
 		<h1 class="ms-2 text-xl font-bold">Corporations</h1>
 		<div class="col-auto mt-2">
 			{#each corps as corp (corp.id)}
+				{@const corpHighlightTicker = highlightedCorps.get(corp.ticker)}
 				<div
 					id="alliance-{corp.alliance_ticker || 'none'}"
 					data-corp-ticker={corp.ticker}
-					class="flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center {getHoverClass(
-						corp.ticker
-					)}"
+					class={combineClasses(
+						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						getHoverClass(corp.ticker),
+						corpHighlightTicker ? getHighlightClass(corpHighlightTicker) : ''
+					)}
 					role="button"
 					tabindex="0"
-					onclick={() => clickCorporation(corp.ticker)}
-					onkeydown={(e) =>
-						e.key === 'Enter' || e.key === ' ' ? clickCorporation(corp.ticker) : null}
-					onmouseenter={() => highlightCorporation(corp.ticker, corp.alliance_ticker)}
-					onmouseleave={() => unhighlightCorporation(corp.ticker, corp.alliance_ticker)}
+					onclick={() => toggleCorporation(corp.ticker)}
+					onkeydown={(event) => handleInteractiveKey(event, () => toggleCorporation(corp.ticker))}
+					onmouseenter={() => setHoverCorporation(corp.ticker)}
+					onmouseleave={() => clearHoverCorporation(corp.ticker)}
 				>
 					<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
@@ -556,22 +434,20 @@
 		<h1 class="ms-2 text-xl font-bold">Pilots</h1>
 		<div class="col-auto mt-2">
 			{#each pilots as pilot (pilot.id)}
+				{@const pilotHighlightTicker = highlightedPilots.get(pilot.id)}
 				<div
 					id="alliance-{pilot.alliance_ticker || 'none'} corporation-{pilot.corporation_ticker}"
-					class="flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center {getPilotHoverClass(
-						pilot.corporation_ticker
-					)}"
+					class={combineClasses(
+						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						getPilotHoverClass(pilot.corporation_ticker),
+						pilotHighlightTicker ? getHighlightClass(pilotHighlightTicker) : ''
+					)}
 					role="button"
 					tabindex="0"
-					onclick={() => clickPilot(pilot.name, pilot.corporation_ticker)}
-					onkeydown={(e) =>
-						e.key === 'Enter' || e.key === ' '
-							? clickPilot(pilot.name, pilot.corporation_ticker)
-							: null}
-					onmouseenter={() =>
-						highlightPilot(pilot.name, pilot.corporation_ticker, pilot.alliance_ticker)}
-					onmouseleave={() =>
-						unhighlightPilot(pilot.name, pilot.corporation_ticker, pilot.alliance_ticker)}
+					onclick={() => togglePilot(pilot.id)}
+					onkeydown={(event) => handleInteractiveKey(event, () => togglePilot(pilot.id))}
+					onmouseenter={() => setHoverPilot(pilot.id)}
+					onmouseleave={() => clearHoverPilot(pilot.id)}
 				>
 					<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
