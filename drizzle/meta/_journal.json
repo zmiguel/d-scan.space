@@ -5,57 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1752077047079,
-      "tag": "0000_tense_ego",
+      "when": 1763479291840,
+      "tag": "0000_create_initial_schemas",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1756306282628,
-      "tag": "0001_mean_rocket_raccoon",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1756307830732,
-      "tag": "0002_minor_chimera",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1757017389098,
-      "tag": "0003_modern_morbius",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1759514477367,
-      "tag": "0004_chubby_newton_destine",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1759527924858,
-      "tag": "0005_steep_toxin",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1759986704976,
-      "tag": "0006_flowery_bruce_banner",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1763249107944,
-      "tag": "0007_same_bedlam",
+      "when": 1763479346081,
+      "tag": "0001_shiny_captain_marvel",
       "breakpoints": true
     }
   ]

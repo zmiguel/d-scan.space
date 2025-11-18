@@ -33,7 +33,7 @@ export async function init() {
 		}
 	});
 
-	const staticSchedule = env.STATIC_UPDATE_CRON || '30 10,12 * * *';
+	const staticSchedule = env.STATIC_UPDATE_CRON || '30 11,12 * * *';
 	new Cron(staticSchedule, async () => {
 		try {
 			logger.info('[CRON] Update SDE...');
