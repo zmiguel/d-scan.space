@@ -9,14 +9,19 @@ import {
 	boolean,
 	pgEnum,
 	index,
-	uniqueIndex
+	uniqueIndex,
+	pgSchema
 } from 'drizzle-orm/pg-core';
+
+const dbEnvSchema =
+	(typeof process !== 'undefined' && process.env?.DB_ENV?.trim())?.toLowerCase() || 'dev';
+const scanSchema = pgSchema(dbEnvSchema);
 
 // SCANS
 
 export const scanTypesEnum = pgEnum('scanTypes', ['local', 'directional']);
 
-export const scans = pgTable(
+export const scans = scanSchema.table(
 	'scans',
 	{
 		id: text().primaryKey(),
@@ -35,7 +40,7 @@ export const scans = pgTable(
 	})
 );
 
-export const scanGroups = pgTable(
+export const scanGroups = scanSchema.table(
 	'scan_groups',
 	{
 		id: text().primaryKey(),
