@@ -1,6 +1,6 @@
 {
 	"name": "d-scan-space",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -20,14 +20,14 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"dependencies": {
-		"@eslint/compat": "^1.4.1",
+		"@eslint/compat": "^2.0.0",
 		"@eslint/js": "^9.18.0",
 		"@flowbite-svelte-plugins/datatable": "^0.4.1",
 		"@opentelemetry/api": "^1.9.0",
 		"@opentelemetry/auto-instrumentations-node": "^0.65.0",
-		"@opentelemetry/exporter-trace-otlp-proto": "^0.206.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.208.0",
 		"@opentelemetry/resources": "^2.0.1",
-		"@opentelemetry/sdk-node": "^0.206.0",
+		"@opentelemetry/sdk-node": "^0.208.0",
 		"@opentelemetry/sdk-trace-node": "^2.2.0",
 		"@opentelemetry/semantic-conventions": "^1.38.0",
 		"@popperjs/core": "^2.11.8",
@@ -49,7 +49,7 @@
 		"flowbite": "^3.1.2",
 		"flowbite-svelte": "^1.28.1",
 		"flowbite-svelte-icons": "^3.0.0",
-		"import-in-the-middle": "^1.15.0",
+		"import-in-the-middle": "^2.0.0",
 		"js-yaml": "^4.1.1",
 		"pg": "^8.16.3",
 		"pino": "^10.1.0",
@@ -58,7 +58,7 @@
 		"prettier-plugin-svelte": "^3.4.0",
 		"prettier-plugin-tailwindcss": "^0.6.14",
 		"short-unique-id": "^5.3.2",
-		"svelte": "^5.43.11",
+		"svelte": "^5.43.12",
 		"svelte-check": "^4.3.4",
 		"tailwind-merge": "^3.4.0",
 		"tailwind-variants": "^3.1.1",

@@ -145,7 +145,6 @@ export const actions = {
 				} else {
 					// DIRECTIONAL SCAN
 					result = await createNewDirectionalScan(lines);
-					console.log(result);
 				}
 
 				try {
