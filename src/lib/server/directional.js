@@ -61,8 +61,11 @@ export async function createNewDirectionalScan(rawData) {
 
 			const categoryId =
 				typeof resolvedMetadata.categoryId === 'number' ? resolvedMetadata.categoryId : null;
-			if (!systemNameCandidate && categoryId === 65) {
-				systemNameCandidate = extractSystemName(entry.name);
+			const groupId =
+				typeof resolvedMetadata.groupId === 'number' ? resolvedMetadata.groupId : null;
+
+			if (!systemNameCandidate) {
+				systemNameCandidate = determineSystemName(entry.name, categoryId, groupId);
 			}
 
 			const bucketKey = entry.isOnGrid ? GRID_BUCKETS.ON : GRID_BUCKETS.OFF;
@@ -312,15 +315,58 @@ function buildResult() {
 }
 
 /**
- * Extracts system name from a string like "System Name - Structure Name".
- * @param {string} entryName
+ * Determines the system name from a scan entry based on its category and group.
+ * @param {string} name
+ * @param {number|null} categoryId
+ * @param {number|null} groupId
  * @returns {string|null}
  */
-function extractSystemName(entryName) {
-	if (!entryName || entryName === UNKNOWN_LABEL) return null;
+function determineSystemName(name, categoryId, groupId) {
+	if (!name || name === UNKNOWN_LABEL) return null;
+
+	// Category 65: Structure (Player)
+	if (categoryId === 65) {
+		return extractSystemFromStructureName(name);
+	}
+
+	// Category 3: Station (NPC)
+	if (categoryId === 3) {
+		return extractSystemFromCelestialName(name);
+	}
+
+	// Category 2: Celestial
+	if (categoryId === 2) {
+		// Group 6: Sun
+		if (groupId === 6) {
+			return extractSystemFromSunName(name);
+		}
+		// Group 7: Planet, 8: Moon
+		if (groupId === 7 || groupId === 8) {
+			return extractSystemFromCelestialName(name);
+		}
+	}
+
+	return null;
+}
+
+function extractSystemFromStructureName(name) {
 	const delimiter = ' - ';
-	const delimiterIndex = entryName.indexOf(delimiter);
-	const candidate =
-		delimiterIndex === -1 ? entryName.trim() : entryName.slice(0, delimiterIndex).trim();
+	const delimiterIndex = name.indexOf(delimiter);
+	const candidate = delimiterIndex === -1 ? name.trim() : name.slice(0, delimiterIndex).trim();
 	return candidate.length > 0 ? candidate : null;
+}
+
+function extractSystemFromSunName(name) {
+	const delimiter = ' - ';
+	const delimiterIndex = name.indexOf(delimiter);
+	return delimiterIndex === -1 ? null : name.slice(0, delimiterIndex).trim();
+}
+
+function extractSystemFromCelestialName(name) {
+	const delimiter = ' - ';
+	const delimiterIndex = name.indexOf(delimiter);
+	const celestialName = delimiterIndex === -1 ? name.trim() : name.slice(0, delimiterIndex).trim();
+
+	// Remove Roman Numerals (I, II, IV, X, etc) from the end
+	return celestialName.replace(/\s+[IVX]+$/, '');
 }
