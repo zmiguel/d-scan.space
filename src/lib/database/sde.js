@@ -3,6 +3,10 @@ import { withSpan } from '$lib/server/tracer';
 import { sde, systems, invCategories, invGroups, invTypes } from './schema';
 import { desc, eq, sql, inArray } from 'drizzle-orm';
 
+/**
+ * Retrieves the last successfully installed SDE version.
+ * @returns {Promise<Object|null>}
+ */
 export async function getLastInstalledSDEVersion() {
 	return await withSpan('getLastInstalledSDEVersion', async () => {
 		return await db
@@ -14,6 +18,10 @@ export async function getLastInstalledSDEVersion() {
 	});
 }
 
+/**
+ * Records a new SDE installation entry.
+ * @param {Object} data
+ */
 export async function addSDEDataEntry(data) {
 	await withSpan('addSDEDataEntry', async () => {
 		await db.insert(sde).values({
@@ -25,6 +33,10 @@ export async function addSDEDataEntry(data) {
 	});
 }
 
+/**
+ * Bulk inserts or updates solar systems.
+ * @param {Array<Object>} data
+ */
 export async function addOrUpdateSystemsDB(data) {
 	await withSpan('addOrUpdateSystemsDB', async (span) => {
 		if (!data || data.length === 0) {
@@ -82,6 +94,10 @@ export async function addOrUpdateSystemsDB(data) {
 	});
 }
 
+/**
+ * Updates the last_seen timestamp for a list of system IDs.
+ * @param {number[]} systemIds
+ */
 export async function updateSystemsLastSeen(systemIds) {
 	if (!systemIds || systemIds.length === 0) {
 		return;
@@ -95,6 +111,10 @@ export async function updateSystemsLastSeen(systemIds) {
 		.where(inArray(systems.id, systemIds));
 }
 
+/**
+ * Bulk inserts or updates inventory categories.
+ * @param {Array<Object>} data
+ */
 export async function addOrUpdateCategoriesDB(data) {
 	await withSpan('addOrUpdateCategoriesDB', async (span) => {
 		if (!data || data.length === 0) {
@@ -143,6 +163,10 @@ export async function addOrUpdateCategoriesDB(data) {
 	});
 }
 
+/**
+ * Bulk inserts or updates inventory groups.
+ * @param {Array<Object>} data
+ */
 export async function addOrUpdateGroupsDB(data) {
 	await withSpan('addOrUpdateGroupsDB', async (span) => {
 		if (!data || data.length === 0) {
@@ -201,6 +225,10 @@ export async function addOrUpdateGroupsDB(data) {
 	});
 }
 
+/**
+ * Bulk inserts or updates inventory types.
+ * @param {Array<Object>} data
+ */
 export async function addOrUpdateTypesDB(data) {
 	await withSpan('addOrUpdateTypesDB', async (span) => {
 		if (!data || data.length === 0) {
@@ -265,6 +293,11 @@ export async function addOrUpdateTypesDB(data) {
 	});
 }
 
+/**
+ * Retrieves hierarchy metadata (Type -> Group -> Category) for a list of Type IDs.
+ * @param {number[]} typeIds
+ * @returns {Promise<Map<number, Object>>}
+ */
 export async function getTypeHierarchyMetadata(typeIds) {
 	return await withSpan('getTypeHierarchyMetadata', async (span) => {
 		if (!typeIds || typeIds.length === 0) {
@@ -326,6 +359,11 @@ export async function getTypeHierarchyMetadata(typeIds) {
 	});
 }
 
+/**
+ * Looks up a solar system by its exact name.
+ * @param {string} name
+ * @returns {Promise<Object|null>}
+ */
 export async function getSystemByName(name) {
 	return await withSpan('getSystemByName', async (span) => {
 		const trimmed = name?.trim();

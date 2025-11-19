@@ -13,6 +13,11 @@ const GRID_BUCKETS = {
 
 const UNKNOWN_LABEL = 'Unknown';
 
+/**
+ * Parses raw directional scan data and aggregates it into a structured result.
+ * @param {string|string[]} rawData - The raw scan data (string or array of strings).
+ * @returns {Promise<Object>} The structured scan result.
+ */
 export async function createNewDirectionalScan(rawData) {
 	return await withSpan('directional_scan.create_new', async (span) => {
 		const parsed = parseDirectionalLines(rawData);
@@ -26,7 +31,8 @@ export async function createNewDirectionalScan(rawData) {
 			return buildResult();
 		}
 
-		const metadataMap = await getTypeHierarchyMetadata(parsed.entries.map((entry) => entry.typeId));
+		const uniqueTypeIds = Array.from(new Set(parsed.entries.map((entry) => entry.typeId)));
+		const metadataMap = await getTypeHierarchyMetadata(uniqueTypeIds);
 		const missingTypes = new Set();
 		const buckets = {
 			[GRID_BUCKETS.ON]: createBucket(),
@@ -99,6 +105,11 @@ export async function createNewDirectionalScan(rawData) {
 	});
 }
 
+/**
+ * Parses the raw lines into structured entries.
+ * @param {string|string[]} rawData
+ * @returns {{rawCount: number, entries: Array<Object>}}
+ */
 function parseDirectionalLines(rawData) {
 	const lines = normalizeLines(rawData);
 	if (lines.length === 0) {
@@ -106,6 +117,7 @@ function parseDirectionalLines(rawData) {
 	}
 
 	const entries = [];
+	let invalidLines = 0;
 
 	for (const line of lines) {
 		const trimmed = line.trim();
@@ -113,14 +125,14 @@ function parseDirectionalLines(rawData) {
 
 		const parts = trimmed.split('\t');
 		if (parts.length < 4) {
-			logger.warn({ msg: 'Directional scan line skipped (insufficient columns)', line: trimmed });
+			invalidLines++;
 			continue;
 		}
 
 		const [typeIdRaw, nameRaw, typeNameRaw, distanceRaw] = parts;
 		const typeId = Number(typeIdRaw);
 		if (!Number.isFinite(typeId) || typeId <= 0) {
-			logger.warn({ msg: 'Directional scan line skipped (invalid type id)', line: trimmed });
+			invalidLines++;
 			continue;
 		}
 
@@ -133,9 +145,22 @@ function parseDirectionalLines(rawData) {
 		});
 	}
 
+	if (invalidLines > 0) {
+		logger.warn({
+			msg: 'Directional scan lines skipped due to invalid format',
+			count: invalidLines,
+			totalLines: lines.length
+		});
+	}
+
 	return { rawCount: lines.length, entries };
 }
 
+/**
+ * Normalizes input data into an array of strings.
+ * @param {string|string[]} rawData
+ * @returns {string[]}
+ */
 function normalizeLines(rawData) {
 	if (Array.isArray(rawData)) {
 		return rawData.map((line) => {
@@ -152,6 +177,11 @@ function normalizeLines(rawData) {
 	return [];
 }
 
+/**
+ * Determines if an object is on grid based on distance string.
+ * @param {string} distance
+ * @returns {boolean}
+ */
 function isOnGrid(distance) {
 	if (!distance) return false;
 	const normalized = distance.toLowerCase();
@@ -165,6 +195,10 @@ function isOnGrid(distance) {
 	return false;
 }
 
+/**
+ * Creates a new empty bucket structure.
+ * @returns {Object}
+ */
 function createBucket() {
 	return {
 		totalObjects: 0,
@@ -173,6 +207,12 @@ function createBucket() {
 	};
 }
 
+/**
+ * Accumulates a single entry into the bucket structure.
+ * @param {Object} bucket
+ * @param {Object} entry
+ * @param {Object} metadata
+ */
 function accumulateEntry(bucket, entry, metadata) {
 	const objectMass = metadata.mass || 0;
 	bucket.totalObjects += 1;
@@ -224,6 +264,11 @@ function accumulateEntry(bucket, entry, metadata) {
 	typeEntry.totalMass += objectMass;
 }
 
+/**
+ * Converts the bucket map structure into the final sorted array format.
+ * @param {Object} bucket
+ * @returns {Object}
+ */
 function finalizeBucket(bucket) {
 	return {
 		total_objects: bucket.totalObjects,
@@ -248,8 +293,7 @@ function finalizeBucket(bucket) {
 							.map((type) => ({
 								id: type.id,
 								name: type.name,
-								count: type.count,
-								total_mass: type.totalMass
+								count: type.count
 							}))
 					}))
 			}))
@@ -263,6 +307,11 @@ function buildResult() {
 	};
 }
 
+/**
+ * Extracts system name from a string like "System Name - Structure Name".
+ * @param {string} entryName
+ * @returns {string|null}
+ */
 function extractSystemName(entryName) {
 	if (!entryName || entryName === UNKNOWN_LABEL) return null;
 	const delimiter = ' - ';

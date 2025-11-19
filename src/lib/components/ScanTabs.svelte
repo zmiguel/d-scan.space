@@ -41,7 +41,11 @@
 	);
 
 	const localCount = $derived(formatCountValue(data.local?.total_pilots));
-	const spaceCount = $derived(formatCountValue(data.directional?.on_grid?.total_objects + data.directional?.off_grid?.total_objects));
+	const spaceCount = $derived(
+		formatCountValue(
+			data.directional?.on_grid?.total_objects + data.directional?.off_grid?.total_objects
+		)
+	);
 
 	function formatCountValue(value) {
 		return typeof value === 'number' && !Number.isNaN(value) ? value : '?';
