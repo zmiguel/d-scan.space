@@ -17,7 +17,7 @@
 				.toISOString()
 				.replace('T', ' ')
 				.replace(/\.\d+Z$/, ''),
-			scan.system.name || 'Unknown',
+			scan.system?.name || 'Unknown',
 			scan.scan_type,
 			scan.id,
 			scan.group_id

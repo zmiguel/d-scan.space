@@ -1,7 +1,7 @@
 import { biomassCharacter } from '$lib/database/characters';
 import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants';
 import { withSpan } from './tracer.js';
-import { recordEsiRequest } from './metrics';
+import { recordEsiRequest, esiConcurrentRequests } from './metrics';
 import { Agent } from 'undici';
 
 const esiAgent = new Agent({
@@ -38,6 +38,19 @@ function createPreview(payload) {
 	return `${stringified.slice(0, RESPONSE_PREVIEW_LIMIT)}…`;
 }
 
+function getResourceType(url) {
+	if (url.includes('/characters/')) return 'character';
+	if (url.includes('/corporations/')) return 'corporation';
+	if (url.includes('/alliances/')) return 'alliance';
+	if (url.includes('/universe/systems/')) return 'system';
+	if (url.includes('/universe/types/')) return 'type';
+	if (url.includes('/universe/groups/')) return 'group';
+	if (url.includes('/universe/categories/')) return 'category';
+	if (url.includes('/status/')) return 'status';
+	if (url.includes('/search/')) return 'search';
+	return 'other';
+}
+
 async function handleDelete(response, span, attempt, fullResponse) {
 	// Handle the deleted edge case
 	span.addEvent('Resource marked as deleted', {
@@ -61,14 +74,17 @@ export async function fetchGET(url, maxRetries = 3) {
 		async (span) => {
 			let lastError;
 			const startTime = Date.now();
+			const resourceType = getResourceType(url);
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
+					esiConcurrentRequests.add(1);
 					const response = await fetch(url, {
 						method: 'GET',
 						headers: headers,
 						dispatcher: esiAgent
 					});
+					esiConcurrentRequests.add(-1);
 
 					const responseClone = response.clone();
 					let fullResponse;
@@ -90,7 +106,8 @@ export async function fetchGET(url, maxRetries = 3) {
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						'http.retry.attempt': attempt
+						'http.retry.attempt': attempt,
+						'esi.resource_type': resourceType
 					});
 
 					// Extract rate limit info if available
@@ -125,18 +142,30 @@ export async function fetchGET(url, maxRetries = 3) {
 
 					// Record successful ESI request metrics
 					const duration = Date.now() - startTime;
-					recordEsiRequest('GET', response.status, duration, errorLimitRemain, errorLimitReset);
+					recordEsiRequest(
+						'GET',
+						response.status,
+						duration,
+						errorLimitRemain,
+						errorLimitReset,
+						resourceType
+					);
 
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
+					// Ensure we decrement if fetch fails (e.g. network error)
+					if (error.name !== 'Error') {
+						esiConcurrentRequests.add(-1);
+					}
+
 					lastError = error;
 
 					// Record failed request metrics
 					const duration = Date.now() - startTime;
 					const status = error.responseDetails?.status || 500;
-					recordEsiRequest('GET', status, duration, null, null);
+					recordEsiRequest('GET', status, duration, null, null, resourceType);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
@@ -180,15 +209,18 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 		async (span) => {
 			let lastError;
 			const startTime = Date.now();
+			const resourceType = getResourceType(url);
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
+					esiConcurrentRequests.add(1);
 					const response = await fetch(url, {
 						method: 'POST',
 						headers: headers,
 						body: JSON.stringify(body),
 						dispatcher: esiAgent
 					});
+					esiConcurrentRequests.add(-1);
 
 					const responseClone = response.clone();
 					let fullResponse;
@@ -210,7 +242,8 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						'http.retry.attempt': attempt
+						'http.retry.attempt': attempt,
+						'esi.resource_type': resourceType
 					});
 
 					// Extract rate limit info if available
@@ -220,7 +253,11 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
-						if (response.status === 404 && fullResponse.error.includes('deleted')) {
+						if (
+							response.status === 404 &&
+							fullResponse.error &&
+							fullResponse.error.includes('deleted')
+						) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
@@ -245,18 +282,30 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Record successful ESI request metrics
 					const duration = Date.now() - startTime;
-					recordEsiRequest('POST', response.status, duration, errorLimitRemain, errorLimitReset);
+					recordEsiRequest(
+						'POST',
+						response.status,
+						duration,
+						errorLimitRemain,
+						errorLimitReset,
+						resourceType
+					);
 
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
+					// Ensure we decrement if fetch fails (e.g. network error)
+					if (error.name !== 'Error') {
+						esiConcurrentRequests.add(-1);
+					}
+
 					lastError = error;
 
 					// Record failed request metrics
 					const duration = Date.now() - startTime;
 					const status = error.responseDetails?.status || 500;
-					recordEsiRequest('POST', status, duration, null, null);
+					recordEsiRequest('POST', status, duration, null, null, resourceType);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
@@ -271,7 +320,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
-						// Exponential backoff: 1s, 2s, 4s
+						// Exponential backoff: 500ms, 1s, 2s
 						const delay = Math.pow(2, attempt - 1) * 500;
 						await new Promise((resolve) => setTimeout(resolve, delay));
 					}

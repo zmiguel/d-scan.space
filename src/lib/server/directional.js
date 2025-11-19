@@ -3,7 +3,7 @@
  */
 import logger from '$lib/logger';
 import { withSpan } from './tracer';
-import { scansProcessedCounter } from './metrics';
+import { scansProcessedCounter, scanItemsCount, scanDuration } from './metrics';
 import { getTypeHierarchyMetadata, getSystemByName } from '$lib/database/sde';
 
 const GRID_BUCKETS = {
@@ -20,6 +20,7 @@ const UNKNOWN_LABEL = 'Unknown';
  */
 export async function createNewDirectionalScan(rawData) {
 	return await withSpan('directional_scan.create_new', async (span) => {
+		const startTime = Date.now();
 		const parsed = parseDirectionalLines(rawData);
 		span.setAttributes({
 			'scan.type': 'directional',
@@ -76,6 +77,9 @@ export async function createNewDirectionalScan(rawData) {
 			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects
 		});
 
+		const duration = Date.now() - startTime;
+		scanItemsCount.record(parsed.entries.length, { type: 'directional' });
+		scanDuration.record(duration / 1000, { type: 'directional' });
 		scansProcessedCounter.add(1, { type: 'directional' });
 
 		let systemDetails;

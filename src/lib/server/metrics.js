@@ -98,6 +98,11 @@ export const esiErrorLimitReset = meter.createObservableGauge('esi_error_limit_r
 	unit: 's'
 });
 
+export const esiConcurrentRequests = meter.createUpDownCounter('esi_concurrent_requests', {
+	description: 'Number of concurrent ESI API requests',
+	unit: '1'
+});
+
 meter.addBatchObservableCallback(
 	(observableResult) => {
 		if (Number.isFinite(latestEsiErrorLimitRemain)) {
@@ -154,6 +159,16 @@ export const scansProcessedCounter = meter.createCounter('scans_processed_total'
 	unit: '1'
 });
 
+export const scanItemsCount = meter.createHistogram('scan_items_count', {
+	description: 'Number of items in a scan',
+	unit: '1'
+});
+
+export const scanDuration = meter.createHistogram('scan_processing_duration_seconds', {
+	description: 'Time taken to process a scan',
+	unit: 's'
+});
+
 export const charactersUpdatedCounter = meter.createCounter('characters_updated_total', {
 	description: 'Total number of characters updated',
 	unit: '1'
@@ -193,19 +208,21 @@ export function recordHttpRequest(method, route, statusCode, durationMs) {
  * @param {number} durationMs - Request duration in milliseconds
  * @param {number|null} errorLimitRemain - Value from x-esi-error-limit-remain header
  * @param {number|null} errorLimitReset - Value from x-esi-error-limit-reset header
+ * @param {string} resourceType - Type of ESI resource (character, corporation, etc.)
  */
 export function recordEsiRequest(
 	method,
 	statusCode,
 	durationMs,
 	errorLimitRemain = null,
-	errorLimitReset = null
+	errorLimitReset = null,
+	resourceType = 'unknown'
 ) {
-	const attributes = { method, status: statusCode.toString() };
+	const attributes = { method, status: statusCode.toString(), resource: resourceType };
 
 	// Record basic metrics without endpoint to avoid high cardinality
 	esiRequestCounter.add(1, attributes);
-	esiRequestDuration.record(durationMs / 1000, { method });
+	esiRequestDuration.record(durationMs / 1000, { method, resource: resourceType });
 	esiResponseStatusCounter.add(1, { status: statusCode.toString() });
 
 	// Update rate limit gauges if headers are present

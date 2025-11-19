@@ -27,11 +27,14 @@ export const actions = {
 
 				// Figure out if local or directional scan
 				//  - Directional scans start with numbers and have 3 tabs per line
-				const isDirectional = lines.every((line) => {
+				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
+				const directionalLineCount = lines.filter((line) => {
 					const parts = line.split('\t');
 					// @ts-ignore
-					return parts.length === 4 && !isNaN(parts[0]);
-				});
+					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
+				}).length;
+
+				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = uid.randomUUID(8);
@@ -114,11 +117,14 @@ export const actions = {
 
 				// Figure out if local or directional scan
 				//  - Directional scans start with numbers and have 3 tabs per line
-				const isDirectional = lines.every((line) => {
+				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
+				const directionalLineCount = lines.filter((line) => {
 					const parts = line.split('\t');
 					// @ts-ignore
-					return parts.length === 4 && !isNaN(parts[0]);
-				});
+					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
+				}).length;
+
+				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = data.get('scan_group');
