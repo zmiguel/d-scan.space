@@ -1,6 +1,7 @@
 import ShortUniqueId from 'short-unique-id';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
+import { createNewDirectionalScan } from '$lib/server/directional.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
@@ -47,11 +48,11 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
+					// LOCAL SCAN
 					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
-					//
-					// TBD.
+					result = await createNewDirectionalScan(lines);
 				}
 
 				try {
@@ -133,11 +134,12 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
+					// LOCAL SCAN
 					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
-					//
-					// TBD.
+					result = await createNewDirectionalScan(lines);
+					console.log(result);
 				}
 
 				try {

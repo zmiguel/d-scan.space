@@ -47,29 +47,62 @@ export async function load({ params, event }) {
 				}
 			);
 
-			let localScan;
-			let directionalScan;
-
-			if (thisScan.scan_type === 'local') {
-				localScan = thisScan;
-			} else {
-				directionalScan = thisScan;
-			}
+			const thisScanDate = new Date(thisScan.created_at);
+			let priorOppositeScan = null;
 
 			if (groupScans.length > 1) {
-				groupScans.forEach((scanItem) => {
-					if (
-						scanItem.created_at < thisScan.created_at &&
-						scanItem.scan_type !== thisScan.scan_type
-					) {
-						if (scanItem.scan_type === 'local') {
-							localScan = scanItem;
-						} else {
-							directionalScan = scanItem;
-						}
+				for (const scanItem of groupScans) {
+					if (scanItem.id === thisScan.id) {
+						continue;
 					}
-				});
+
+					if (scanItem.scan_type === thisScan.scan_type) {
+						continue;
+					}
+
+					const scanItemDate = new Date(scanItem.created_at);
+					if (scanItemDate >= thisScanDate) {
+						continue;
+					}
+
+					if (!priorOppositeScan || scanItemDate > new Date(priorOppositeScan.created_at)) {
+						priorOppositeScan = scanItem;
+					}
+				}
 			}
+
+			if (priorOppositeScan) {
+				const priorScanResult = await withSpan(
+					'database.get_scan_by_id.prior',
+					async () => {
+						return await getScanByID(priorOppositeScan.id);
+					},
+					{
+						'scan.id': priorOppositeScan.id,
+						'operation.type': 'read'
+					}
+				);
+
+				if (priorScanResult && priorScanResult[0]) {
+					priorOppositeScan = priorScanResult[0];
+				} else {
+					priorOppositeScan = null;
+				}
+			}
+
+			const localScan =
+				thisScan.scan_type === 'local'
+					? thisScan
+					: priorOppositeScan?.scan_type === 'local'
+						? priorOppositeScan
+						: null;
+
+			const directionalScan =
+				thisScan.scan_type === 'directional'
+					? thisScan
+					: priorOppositeScan?.scan_type === 'directional'
+						? priorOppositeScan
+						: null;
 
 			span.setAttributes({
 				'scan.found': true,
@@ -82,8 +115,8 @@ export async function load({ params, event }) {
 			return {
 				system: thisScan.system,
 				created_at: thisScan.created_at,
-				local: localScan ? thisScan.data : null,
-				directional: directionalScan ? thisScan.data : null,
+				local: localScan ? localScan.data : null,
+				directional: directionalScan ? directionalScan.data : null,
 				related: groupScans,
 				params: {
 					group: group,

@@ -3,7 +3,7 @@
  */
 import { db } from '$lib/database/client';
 import { scans, scanGroups } from '../database/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 
 export async function getScanByID(id) {
 	return db
@@ -32,11 +32,12 @@ export async function getScansByGroupID(id) {
 
 export async function createNewScan(data) {
 	const timestamp = new Date();
+	const systemInfo = data.type === 'directional' && data.data?.system ? data.data.system : null;
 
 	await db.transaction(async (tx) => {
 		await tx.insert(scanGroups).values({
 			id: data.scanGroupId,
-			system: null,
+			system: systemInfo,
 			public: data.is_public,
 			created_at: timestamp
 		});
@@ -54,14 +55,24 @@ export async function createNewScan(data) {
 
 export async function updateScan(data) {
 	const timestamp = new Date();
+	const systemInfo = data.type === 'directional' && data.data?.system ? data.data.system : null;
 
-	await db.insert(scans).values({
-		id: data.scanId,
-		group_id: data.scanGroupId,
-		scan_type: data.type,
-		data: data.data,
-		raw_data: data.raw_data,
-		created_at: timestamp
+	await db.transaction(async (tx) => {
+		await tx.insert(scans).values({
+			id: data.scanId,
+			group_id: data.scanGroupId,
+			scan_type: data.type,
+			data: data.data,
+			raw_data: data.raw_data,
+			created_at: timestamp
+		});
+
+		if (systemInfo) {
+			await tx
+				.update(scanGroups)
+				.set({ system: systemInfo })
+				.where(and(eq(scanGroups.id, data.scanGroupId), isNull(scanGroups.system)));
+		}
 	});
 }
 

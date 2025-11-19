@@ -264,3 +264,89 @@ export async function addOrUpdateTypesDB(data) {
 		});
 	});
 }
+
+export async function getTypeHierarchyMetadata(typeIds) {
+	return await withSpan('getTypeHierarchyMetadata', async (span) => {
+		if (!typeIds || typeIds.length === 0) {
+			return new Map();
+		}
+
+		const ids = Array.from(
+			new Set(typeIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))
+		);
+
+		if (ids.length === 0) {
+			return new Map();
+		}
+
+		span.setAttributes({ 'types.requested': ids.length });
+
+		const rows = await db
+			.select({
+				typeId: invTypes.id,
+				typeName: invTypes.name,
+				mass: invTypes.mass,
+				groupId: invGroups.id,
+				groupName: invGroups.name,
+				anchorable: invGroups.anchorable,
+				anchored: invGroups.anchored,
+				categoryId: invCategories.id,
+				categoryName: invCategories.name
+			})
+			.from(invTypes)
+			.leftJoin(invGroups, eq(invTypes.group_id, invGroups.id))
+			.leftJoin(invCategories, eq(invGroups.category_id, invCategories.id))
+			.where(inArray(invTypes.id, ids));
+
+		const result = new Map();
+		for (const row of rows) {
+			const typeId = Number(row.typeId);
+			if (!Number.isFinite(typeId) || typeId <= 0) {
+				continue;
+			}
+
+			const groupId = row.groupId != null ? Number(row.groupId) : null;
+			const categoryId = row.categoryId != null ? Number(row.categoryId) : null;
+
+			result.set(typeId, {
+				typeId,
+				typeName: row.typeName,
+				mass: Number(row.mass) || 0,
+				groupId,
+				groupName: row.groupName ?? 'Unknown Group',
+				anchorable: Boolean(row.anchorable),
+				anchored: Boolean(row.anchored),
+				categoryId,
+				categoryName: row.categoryName ?? 'Unknown Category'
+			});
+		}
+
+		span.setAttributes({ 'types.found': result.size });
+		return result;
+	});
+}
+
+export async function getSystemByName(name) {
+	return await withSpan('getSystemByName', async (span) => {
+		const trimmed = name?.trim();
+		if (!trimmed) {
+			return null;
+		}
+
+		span.setAttributes({ 'system.lookup_name': trimmed });
+
+		const rows = await db
+			.select({
+				id: systems.id,
+				name: systems.name,
+				constellation: systems.constellation,
+				region: systems.region,
+				secStatus: systems.sec_status
+			})
+			.from(systems)
+			.where(eq(systems.name, trimmed))
+			.limit(1);
+
+		return rows[0] ?? null;
+	});
+}

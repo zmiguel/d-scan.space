@@ -1,0 +1,273 @@
+/**
+ * File for all Directional Scan related functions
+ */
+import logger from '$lib/logger';
+import { withSpan } from './tracer';
+import { scansProcessedCounter } from './metrics';
+import { getTypeHierarchyMetadata, getSystemByName } from '$lib/database/sde';
+
+const GRID_BUCKETS = {
+	ON: 'on_grid',
+	OFF: 'off_grid'
+};
+
+const UNKNOWN_LABEL = 'Unknown';
+
+export async function createNewDirectionalScan(rawData) {
+	return await withSpan('directional_scan.create_new', async (span) => {
+		const parsed = parseDirectionalLines(rawData);
+		span.setAttributes({
+			'scan.type': 'directional',
+			'scan.raw_line_count': parsed.rawCount,
+			'scan.valid_line_count': parsed.entries.length
+		});
+
+		if (parsed.entries.length === 0) {
+			return buildResult();
+		}
+
+		const metadataMap = await getTypeHierarchyMetadata(parsed.entries.map((entry) => entry.typeId));
+		const missingTypes = new Set();
+		const buckets = {
+			[GRID_BUCKETS.ON]: createBucket(),
+			[GRID_BUCKETS.OFF]: createBucket()
+		};
+		let systemNameCandidate = null;
+
+		for (const entry of parsed.entries) {
+			const metadata = metadataMap.get(entry.typeId);
+			if (!metadata) {
+				missingTypes.add(entry.typeId);
+			}
+
+			const resolvedMetadata = metadata ?? {
+				typeId: entry.typeId,
+				typeName: entry.typeName,
+				mass: 0,
+				groupId: `unknown-group-${entry.typeId}`,
+				groupName: `${UNKNOWN_LABEL} Group`,
+				anchorable: false,
+				anchored: false,
+				categoryId: `unknown-category-${entry.typeId}`,
+				categoryName: `${UNKNOWN_LABEL} Category`
+			};
+
+			const categoryId =
+				typeof resolvedMetadata.categoryId === 'number' ? resolvedMetadata.categoryId : null;
+			if (!systemNameCandidate && categoryId === 65) {
+				systemNameCandidate = extractSystemName(entry.name);
+			}
+
+			const bucketKey = entry.isOnGrid ? GRID_BUCKETS.ON : GRID_BUCKETS.OFF;
+			const bucket = buckets[bucketKey];
+			accumulateEntry(bucket, entry, resolvedMetadata);
+		}
+
+		span.setAttributes({
+			'scan.unique_type_ids': metadataMap.size,
+			'scan.missing_type_ids': missingTypes.size,
+			'scan.on_grid_objects': buckets[GRID_BUCKETS.ON].totalObjects,
+			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects
+		});
+
+		scansProcessedCounter.add(1, { type: 'directional' });
+
+		let systemDetails;
+		if (systemNameCandidate) {
+			const systemRow = await getSystemByName(systemNameCandidate);
+			if (systemRow) {
+				systemDetails = {
+					id: systemRow.id,
+					name: systemRow.name,
+					constellation: systemRow.constellation,
+					region: systemRow.region,
+					security: Number(systemRow.secStatus)
+				};
+			}
+		}
+
+		const result = {
+			[GRID_BUCKETS.ON]: finalizeBucket(buckets[GRID_BUCKETS.ON]),
+			[GRID_BUCKETS.OFF]: finalizeBucket(buckets[GRID_BUCKETS.OFF])
+		};
+
+		if (systemDetails) {
+			result.system = systemDetails;
+		}
+
+		return result;
+	});
+}
+
+function parseDirectionalLines(rawData) {
+	const lines = normalizeLines(rawData);
+	if (lines.length === 0) {
+		return { rawCount: 0, entries: [] };
+	}
+
+	const entries = [];
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+
+		const parts = trimmed.split('\t');
+		if (parts.length < 4) {
+			logger.warn({ msg: 'Directional scan line skipped (insufficient columns)', line: trimmed });
+			continue;
+		}
+
+		const [typeIdRaw, nameRaw, typeNameRaw, distanceRaw] = parts;
+		const typeId = Number(typeIdRaw);
+		if (!Number.isFinite(typeId) || typeId <= 0) {
+			logger.warn({ msg: 'Directional scan line skipped (invalid type id)', line: trimmed });
+			continue;
+		}
+
+		entries.push({
+			typeId,
+			name: (nameRaw || '').trim() || UNKNOWN_LABEL,
+			typeName: (typeNameRaw || '').trim() || UNKNOWN_LABEL,
+			distance: (distanceRaw || '').trim(),
+			isOnGrid: isOnGrid((distanceRaw || '').trim())
+		});
+	}
+
+	return { rawCount: lines.length, entries };
+}
+
+function normalizeLines(rawData) {
+	if (Array.isArray(rawData)) {
+		return rawData.map((line) => {
+			if (typeof line === 'string') return line;
+			if (line == null) return '';
+			return String(line);
+		});
+	}
+
+	if (typeof rawData === 'string') {
+		return rawData.replace(/\r/g, '').split('\n');
+	}
+
+	return [];
+}
+
+function isOnGrid(distance) {
+	if (!distance) return false;
+	const normalized = distance.toLowerCase();
+	if (normalized === '-') return false;
+	if (normalized.endsWith('au')) return false;
+	if (normalized.endsWith('m')) return true;
+	if (normalized.endsWith('km')) {
+		const numeric = Number(normalized.replace('km', '').trim().replace(/,/g, ''));
+		return Number.isFinite(numeric);
+	}
+	return false;
+}
+
+function createBucket() {
+	return {
+		totalObjects: 0,
+		totalMass: 0,
+		categories: new Map()
+	};
+}
+
+function accumulateEntry(bucket, entry, metadata) {
+	const objectMass = metadata.mass || 0;
+	bucket.totalObjects += 1;
+	bucket.totalMass += objectMass;
+
+	const categoryKey = metadata.categoryId ?? `unknown-category-${metadata.typeId}`;
+	let category = bucket.categories.get(categoryKey);
+	if (!category) {
+		category = {
+			id: metadata.categoryId,
+			name: metadata.categoryName,
+			totalObjects: 0,
+			totalMass: 0,
+			groups: new Map()
+		};
+		bucket.categories.set(categoryKey, category);
+	}
+	category.totalObjects += 1;
+	category.totalMass += objectMass;
+
+	const groupKey = metadata.groupId ?? `unknown-group-${metadata.typeId}`;
+	let group = category.groups.get(groupKey);
+	if (!group) {
+		group = {
+			id: metadata.groupId,
+			name: metadata.groupName,
+			anchored: Boolean(metadata.anchorable || metadata.anchored),
+			totalObjects: 0,
+			totalMass: 0,
+			types: new Map()
+		};
+		category.groups.set(groupKey, group);
+	}
+	group.totalObjects += 1;
+	group.totalMass += objectMass;
+
+	let typeEntry = group.types.get(metadata.typeId);
+	if (!typeEntry) {
+		typeEntry = {
+			id: metadata.typeId,
+			name: metadata.typeName,
+			mass: objectMass,
+			totalMass: 0,
+			count: 0
+		};
+		group.types.set(metadata.typeId, typeEntry);
+	}
+	typeEntry.count += 1;
+	typeEntry.totalMass += objectMass;
+}
+
+function finalizeBucket(bucket) {
+	return {
+		total_objects: bucket.totalObjects,
+		total_mass: bucket.totalMass,
+		objects: Array.from(bucket.categories.values())
+			.sort((a, b) => b.totalObjects - a.totalObjects)
+			.map((category) => ({
+				id: category.id,
+				name: category.name,
+				total_objects: category.totalObjects,
+				total_mass: category.totalMass,
+				objects: Array.from(category.groups.values())
+					.sort((a, b) => b.totalObjects - a.totalObjects)
+					.map((group) => ({
+						id: group.id,
+						name: group.name,
+						anchored: group.anchored,
+						total_objects: group.totalObjects,
+						total_mass: group.totalMass,
+						objects: Array.from(group.types.values())
+							.sort((a, b) => b.count - a.count)
+							.map((type) => ({
+								id: type.id,
+								name: type.name,
+								count: type.count,
+								total_mass: type.totalMass
+							}))
+					}))
+			}))
+	};
+}
+
+function buildResult() {
+	return {
+		[GRID_BUCKETS.ON]: finalizeBucket(createBucket()),
+		[GRID_BUCKETS.OFF]: finalizeBucket(createBucket())
+	};
+}
+
+function extractSystemName(entryName) {
+	if (!entryName || entryName === UNKNOWN_LABEL) return null;
+	const delimiter = ' - ';
+	const delimiterIndex = entryName.indexOf(delimiter);
+	const candidate =
+		delimiterIndex === -1 ? entryName.trim() : entryName.slice(0, delimiterIndex).trim();
+	return candidate.length > 0 ? candidate : null;
+}
