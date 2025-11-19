@@ -20,7 +20,7 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"dependencies": {
-		"@eslint/compat": "^1.4.1",
+		"@eslint/compat": "^2.0.0",
 		"@eslint/js": "^9.18.0",
 		"@flowbite-svelte-plugins/datatable": "^0.4.1",
 		"@opentelemetry/api": "^1.9.0",
