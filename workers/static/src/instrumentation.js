@@ -26,7 +26,21 @@ const sdk = new NodeSDK({
 		'deployment.environment': environment
 	}),
 	traceExporter,
-	instrumentations: [getNodeAutoInstrumentations()]
+	instrumentations: [
+		getNodeAutoInstrumentations({
+			// Disable the noisiest ones completely
+			'@opentelemetry/instrumentation-dns': { enabled: false },
+			'@opentelemetry/instrumentation-net': { enabled: false },
+			'@opentelemetry/instrumentation-fs': { enabled: false },
+			'@opentelemetry/instrumentation-fetch': { enabled: false },
+			'@opentelemetry/instrumentation-undici': { enabled: false },
+			'@opentelemetry/instrumentation-http': { enabled: false },
+			// Enable PostgreSQL instrumentation with metrics
+			'@opentelemetry/instrumentation-pg': {
+				enabled: true
+			}
+		})
+	]
 });
 
 export function startInstrumentation() {

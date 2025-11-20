@@ -210,9 +210,8 @@ async function downloadAndExtractSDE(url, files = []) {
 					fileStream.write(value);
 					downloadedBytes += value.length;
 
-					// Yield control periodically during download (every ~1MB)
+					// Log progress periodically during download (every ~1MB)
 					if (downloadedBytes % (1024 * 1024) === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
 						span.addEvent('Download progress', {
 							downloadedBytes,
 							totalBytes: contentLength,
@@ -355,11 +354,6 @@ async function updateNPCCorps() {
 					alliance_id: null, // NPC corps don't have alliances
 					npc: true // Mark as NPC corporation
 				});
-
-				// Yield control every 50 corporations to prevent blocking the event loop
-				if (totalCorps % 50 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
-				}
 			}
 
 			span.setAttributes({
@@ -441,7 +435,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapRegions.jsonl file');
 			const regionLines = await readJSONLAsync(regionsPath);
 
-			let regionCount = 0;
 			for (const line of regionLines) {
 				if (!line.trim()) continue;
 				const regionData = JSON.parse(line);
@@ -450,12 +443,6 @@ async function updateUniverse() {
 
 				if (regionId && regionName) {
 					regionMap.set(regionId, regionName);
-					regionCount++;
-				}
-
-				// Yield control every 10 regions
-				if (regionCount % 10 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -473,7 +460,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapConstellations.jsonl file');
 			const constellationLines = await readJSONLAsync(constellationsPath);
 
-			let constellationCount = 0;
 			for (const line of constellationLines) {
 				if (!line.trim()) continue;
 				const constellationData = JSON.parse(line);
@@ -482,12 +468,6 @@ async function updateUniverse() {
 
 				if (constellationId && constellationName) {
 					constellationMap.set(constellationId, constellationName);
-					constellationCount++;
-				}
-
-				// Yield control every 20 constellations
-				if (constellationCount % 20 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -567,11 +547,6 @@ async function updateUniverse() {
 					});
 
 					processedSystems++;
-
-					// Yield control every 50 systems to prevent blocking the event loop
-					if (processedSystems % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 
 					// Log progress every 1000 systems
 					if (processedSystems % 1000 === 0) {
@@ -697,11 +672,6 @@ async function updateItems() {
 					});
 
 					categoryCount++;
-
-					// Yield control every 50 categories
-					if (categoryCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing category line: ${parseError.message}`);
 					skippedCategories++;
@@ -772,11 +742,6 @@ async function updateItems() {
 					});
 
 					groupCount++;
-
-					// Yield control every 50 groups
-					if (groupCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing group line: ${parseError.message}`);
 					skippedGroups++;
@@ -850,11 +815,6 @@ async function updateItems() {
 					});
 
 					typeCount++;
-
-					// Yield control every 50 types
-					if (typeCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing type line: ${parseError.message}`);
 					skippedTypes++;
