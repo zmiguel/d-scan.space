@@ -39,7 +39,6 @@
 		"@types/node": "^24.10.1",
 		"@types/pg": "^8.15.6",
 		"adm-zip": "^0.5.16",
-		"croner": "^9.1.0",
 		"drizzle-kit": "^0.31.7",
 		"drizzle-orm": "^0.44.7",
 		"eslint": "^9.39.1",
