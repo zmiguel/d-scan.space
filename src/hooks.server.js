@@ -1,9 +1,5 @@
-import { Cron } from 'croner';
-import { updateDynamicData } from '$lib/cron/dynamic';
 import { USER_AGENT } from '$lib/server/constants';
 import logger from '$lib/logger';
-import { env } from '$env/dynamic/private';
-import { updateStaticData } from '$lib/cron/static';
 import { recordHttpRequest } from '$lib/server/metrics';
 import { withSpan } from '$lib/server/tracer';
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
@@ -11,47 +7,6 @@ import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
 	logger.info('Current User-Agent: ' + USER_AGENT);
-
-	// update dynamic data once per day, after downtime
-	const dynamicSchedule = env.DYNAMIC_UPDATE_CRON || '* * * * *';
-	new Cron(dynamicSchedule, async () => {
-		try {
-			logger.info('[CRON] Updating dynamic data...');
-			await withSpan(
-				'cron.updateDynamicData',
-				async (span) => {
-					span.setAttributes({ 'cron.schedule': dynamicSchedule });
-					await updateDynamicData();
-					span.addEvent('cron.completed');
-				},
-				{},
-				{ kind: SpanKind.INTERNAL }
-			);
-			logger.info('[CRON] Dynamic data updated successfully');
-		} catch (error) {
-			logger.error('[CRON] Failed to update dynamic data:', error);
-		}
-	});
-
-	const staticSchedule = env.STATIC_UPDATE_CRON || '30 11,12 * * *';
-	new Cron(staticSchedule, async () => {
-		try {
-			logger.info('[CRON] Update SDE...');
-			await withSpan(
-				'cron.updateStaticData',
-				async (span) => {
-					span.setAttributes({ 'cron.schedule': staticSchedule });
-					await updateStaticData();
-					span.addEvent('cron.completed');
-				},
-				{},
-				{ kind: SpanKind.INTERNAL }
-			);
-			logger.info('[CRON] SDE update completed successfully');
-		} catch (error) {
-			logger.error('[CRON] SDE update failed:', error);
-		}
-	});
 }
 
 /**

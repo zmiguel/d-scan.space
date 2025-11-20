@@ -1,5 +1,5 @@
-import { withSpan } from '$lib/server/tracer';
-import logger from '$lib/logger';
+import { withSpan } from '../../../../src/lib/server/tracer.js';
+import logger from '../../../../src/lib/logger.js';
 import {
 	getLastInstalledSDEVersion,
 	addSDEDataEntry,
@@ -7,14 +7,14 @@ import {
 	addOrUpdateCategoriesDB,
 	addOrUpdateGroupsDB,
 	addOrUpdateTypesDB
-} from '$lib/database/sde';
-import { SDE_FILE, SDE_VERSION } from '$lib/server/constants';
+} from '../../../../src/lib/database/sde.js';
+import { SDE_FILE, SDE_VERSION } from '../../../../src/lib/server/constants.js';
 import fs from 'fs';
 import path from 'path';
-import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
-import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
-import { fetchGET } from '$lib/server/wrappers';
-import { recordCronJob } from '$lib/server/metrics';
+import { extractZipNonBlocking } from '../utils/extract.js';
+import { addOrUpdateCorporationsDB } from '../../../../src/lib/database/corporations.js';
+import { fetchGET } from '../../../../src/lib/server/wrappers.js';
+import { recordCronJob } from '../../../../src/lib/server/metrics.js';
 
 export async function updateStaticData() {
 	const startTime = Date.now();
@@ -136,16 +136,26 @@ async function getOnlineVersion() {
 			// fetch the version data from the SDE Links
 			const response = await fetchGET(SDE_VERSION);
 
-			if (!response.ok) {
-				throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
+			if (!response) {
+				throw new Error(`Failed to fetch SDE version`);
 			}
 
-			// Get the JSONL content
-			const jsonlContent = await response.text();
+			// response from fetchGET is already parsed JSON or text
+			// But fetchGET in esi.js returns parsed JSON or text.
+			// SDE_VERSION is a jsonl file, so it might be text.
 
-			// Parse the JSONL (assuming single line for SDE data)
-			const lines = jsonlContent.trim().split('\n');
-			const sdeData = JSON.parse(lines[0]); // Get first line
+			let sdeData;
+			if (typeof response === 'string') {
+				const lines = response.trim().split('\n');
+				sdeData = JSON.parse(lines[0]); // Get first line
+			} else {
+				// If it was parsed as JSON, it might be an object if it was a single JSON object,
+				// but JSONL is multiple objects. fetchGET tries to parse as JSON.
+				// If it's JSONL, JSON.parse might fail on the whole file if it has multiple lines.
+				// But fetchGET catches parse error and returns text.
+				// So if it's an object, it means it was valid JSON (maybe single line).
+				sdeData = response;
+			}
 
 			// Extract version information
 			const buildNumber = sdeData.buildNumber;

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
-import { env } from '$env/dynamic/private';
+
+const env = process.env;
 
 export const version = pkg.version;
 export const DOOMHEIM_ID = 1000001;

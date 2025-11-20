@@ -1,22 +1,22 @@
 /**
  *  Functions related to characters
  */
-import { addOrUpdateCorporations } from '$lib/server/corporations.js';
-import { addOrUpdateAlliances } from '$lib/server/alliances.js';
+import { addOrUpdateCorporations } from './corporations.js';
+import { addOrUpdateAlliances } from './alliances.js';
 import {
 	addOrUpdateCharactersDB,
 	biomassCharacter,
 	getCharactersByName
-} from '$lib/database/characters.js';
+} from '../database/characters.js';
 
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
-import logger from '$lib/logger.js';
+import logger from '../logger.js';
 import {
 	CHARACTER_REQUEST_BATCH_SIZE,
 	CHARACTER_BATCH_CONCURRENCY,
 	DOOMHEIM_ID
-} from '$lib/server/constants.js';
+} from './constants.js';
 
 async function getCharacterFromESI(id) {
 	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);

@@ -106,15 +106,20 @@ const prometheusExporter = new PrometheusExporter(
 
 // Create resource for metrics
 const environment =
+	env.DB_ENV ||
 	env.DEPLOYMENT_ENV ||
 	env.VERCEL_ENV ||
 	env.NODE_ENV ||
+	process.env.DB_ENV ||
 	process.env.DEPLOYMENT_ENV ||
 	process.env.NODE_ENV ||
-	'local';
+	'dev';
+
+const serviceBasename = env.OTEL_SERVICE_NAME || process.env.OTEL_SERVICE_NAME || 'd-scan.space';
+const serviceName = `${serviceBasename}_app_${environment}`;
 
 const resource = resourceFromAttributes({
-	[ATTR_SERVICE_NAME]: 'd-scan.space',
+	[ATTR_SERVICE_NAME]: serviceName,
 	[ATTR_SERVICE_VERSION]: pkg.version,
 	'deployment.environment': environment
 });

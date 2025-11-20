@@ -1,8 +1,8 @@
 /**
  *  Functions related to alliances
  */
-import { getAlliancesByID, addOrUpdateAlliancesDB } from '$lib/database/alliances.js';
-import logger from '$lib/logger.js';
+import { getAlliancesByID, addOrUpdateAlliancesDB } from '../database/alliances.js';
+import logger from '../logger.js';
 import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 

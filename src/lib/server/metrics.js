@@ -1,6 +1,6 @@
 import { metrics } from '@opentelemetry/api';
-import logger from '$lib/logger.js';
-import { pool } from '$lib/database/client.js';
+import logger from '../logger.js';
+import { pool } from '../database/client.js';
 
 // Get the meter for creating metrics
 const meter = metrics.getMeter('d-scan.space');

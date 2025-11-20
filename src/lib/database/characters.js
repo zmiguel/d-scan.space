@@ -1,11 +1,11 @@
 /**
  * All DB functions related to characters
  */
-import { db } from '$lib/database/client';
-import logger from '$lib/logger';
-import { DOOMHEIM_ID } from '$lib/server/constants';
-import { withSpan } from '$lib/server/tracer';
-import { characters, corporations, alliances } from '../database/schema';
+import { db } from './client.js';
+import logger from '../logger.js';
+import { DOOMHEIM_ID } from '../server/constants.js';
+import { withSpan } from '../server/tracer.js';
+import { characters, corporations, alliances } from './schema.js';
 import { asc, eq, inArray, sql, and, lt, gt, isNull } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {

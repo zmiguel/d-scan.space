@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
-import logger from '$lib/logger';
+import logger from '../../../../src/lib/logger.js';
 
 export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
 	logger.info(`[ExtractWorker] Starting extraction from ${zipPath} to ${tempDir}`);
@@ -98,14 +98,8 @@ export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
 				throw error;
 			}
 		}
-
-		logger.info(
-			`[ExtractWorker] Specific file extraction complete: ${extractedCount}/${files.length} files extracted`
-		);
-
 		return {
 			extractedFiles: extractedCount,
-			totalFiles: files.length,
 			requestedFiles: files.length,
 			method: 'admzip'
 		};

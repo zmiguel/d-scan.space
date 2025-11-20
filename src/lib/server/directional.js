@@ -1,10 +1,10 @@
 /**
  * File for all Directional Scan related functions
  */
-import logger from '$lib/logger';
-import { withSpan } from './tracer';
-import { scansProcessedCounter, scanItemsCount, scanDuration } from './metrics';
-import { getTypeHierarchyMetadata, getSystemByName } from '$lib/database/sde';
+import logger from '../logger.js';
+import { withSpan } from './tracer.js';
+import { scansProcessedCounter, scanItemsCount, scanDuration } from './metrics.js';
+import { getTypeHierarchyMetadata, getSystemByName } from '../database/sde.js';
 
 const GRID_BUCKETS = {
 	ON: 'on_grid',

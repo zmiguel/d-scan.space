@@ -1,7 +1,7 @@
-import { biomassCharacter } from '$lib/database/characters';
-import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants';
+import { biomassCharacter } from '../database/characters.js';
+import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants.js';
 import { withSpan } from './tracer.js';
-import { recordEsiRequest, esiConcurrentRequests } from './metrics';
+import { recordEsiRequest, esiConcurrentRequests } from './metrics.js';
 import { Agent } from 'undici';
 
 const esiAgent = new Agent({

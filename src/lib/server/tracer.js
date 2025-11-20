@@ -1,7 +1,7 @@
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
 import { readFileSync } from 'fs';
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
-import logger from '$lib/logger';
+import logger from '../logger.js';
 
 // Get a tracer instance for your application
 const tracer = trace.getTracer('d-scan.space', pkg.version);
