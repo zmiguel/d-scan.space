@@ -1,11 +1,15 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { AggregationType } from '@opentelemetry/sdk-metrics';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { config } from './config.js';
 import logger from '../../../src/lib/logger.js';
 import { readFileSync } from 'fs';
+import { CRON_DURATION_BOUNDARIES } from '../../../src/lib/server/histogram-boundaries.js';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 
@@ -25,6 +29,25 @@ const sdk = new NodeSDK({
 			Authorization: config.OTEL_EXPORTER_OTLP_AUTHORIZATION
 		}
 	}),
+	metricReader: new PeriodicExportingMetricReader({
+		exporter: new OTLPMetricExporter({
+			url: `${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics`,
+			headers: {
+				Authorization: config.OTEL_EXPORTER_OTLP_AUTHORIZATION
+			}
+		}),
+		exportIntervalMillis: 1000
+	}),
+	views: [
+		{
+			instrumentName: 'cron_job_duration_seconds',
+			meterName: 'd-scan.space',
+			aggregation: {
+				type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+				options: { boundaries: CRON_DURATION_BOUNDARIES }
+			}
+		}
+	],
 	instrumentations: [
 		getNodeAutoInstrumentations({
 			// Disable the noisiest ones completely
