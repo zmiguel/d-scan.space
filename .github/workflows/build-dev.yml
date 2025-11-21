@@ -11,34 +11,70 @@ env:
   IMAGE_NAME: zmiguel/d-scan-space
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build_matrix: ${{ steps.set-matrix.outputs.build_matrix }}
+      merge_matrix: ${{ steps.set-matrix.outputs.merge_matrix }}
+      should_run: ${{ steps.set-matrix.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            main:
+              - 'src/**'
+              - 'static/**'
+              - 'drizzle/**'
+              - 'Dockerfile'
+              - 'package.json'
+              - '*.config.js'
+              - '.github/workflows/build-dev.yml'
+            updater:
+              - 'workers/updater/**'
+              - 'src/lib/**'
+              - 'drizzle/**'
+              - '.github/workflows/build-dev.yml'
+
+      - id: set-matrix
+        run: |
+          BUILD_INCLUDE="[]"
+          MERGE_INCLUDE="[]"
+          SHOULD_RUN="false"
+
+          if [[ "${{ steps.changes.outputs.main }}" == "true" ]]; then
+            SHOULD_RUN="true"
+            BUILD_INCLUDE=$(echo $BUILD_INCLUDE | jq -c '. + [
+              {platform: "linux/amd64", runner: "ubuntu-latest", context: ".", image_suffix: "", dockerfile: "Dockerfile", image_key: "main"},
+              {platform: "linux/arm64", runner: "ubuntu-24.04-arm", context: ".", image_suffix: "", dockerfile: "Dockerfile", image_key: "main"}
+            ]')
+            MERGE_INCLUDE=$(echo $MERGE_INCLUDE | jq -c '. + [
+              {image_suffix: "", image_key: "main"}
+            ]')
+          fi
+
+          if [[ "${{ steps.changes.outputs.updater }}" == "true" ]]; then
+            SHOULD_RUN="true"
+            BUILD_INCLUDE=$(echo $BUILD_INCLUDE | jq -c '. + [
+              {platform: "linux/amd64", runner: "ubuntu-latest", context: ".", image_suffix: "-updater", dockerfile: "workers/updater/Dockerfile", image_key: "updater"},
+              {platform: "linux/arm64", runner: "ubuntu-24.04-arm", context: ".", image_suffix: "-updater", dockerfile: "workers/updater/Dockerfile", image_key: "updater"}
+            ]')
+            MERGE_INCLUDE=$(echo $MERGE_INCLUDE | jq -c '. + [
+              {image_suffix: "-updater", image_key: "updater"}
+            ]')
+          fi
+
+          echo "build_matrix={\"include\":$BUILD_INCLUDE}" >> $GITHUB_OUTPUT
+          echo "merge_matrix={\"include\":$MERGE_INCLUDE}" >> $GITHUB_OUTPUT
+          echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+
   multiplatform-build:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_run == 'true'
     strategy:
-      matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-latest
-            context: .
-            image_suffix: ''
-            dockerfile: Dockerfile
-            image_key: 'main'
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            context: .
-            image_suffix: ''
-            dockerfile: Dockerfile
-            image_key: 'main'
-          - platform: linux/amd64
-            runner: ubuntu-latest
-            context: .
-            image_suffix: '-updater'
-            dockerfile: workers/updater/Dockerfile
-            image_key: 'updater'
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            context: .
-            image_suffix: '-updater'
-            dockerfile: workers/updater/Dockerfile
-            image_key: 'updater'
+      matrix: ${{ fromJson(needs.check-changes.outputs.build_matrix) }}
 
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -118,15 +154,10 @@ jobs:
 
   merge-manifests:
     runs-on: ubuntu-latest
-    needs: multiplatform-build
-    if: github.event_name != 'pull_request'
+    needs: [check-changes, multiplatform-build]
+    if: needs.check-changes.outputs.should_run == 'true' && github.event_name != 'pull_request'
     strategy:
-      matrix:
-        include:
-          - image_suffix: ''
-            image_key: 'main'
-          - image_suffix: '-updater'
-            image_key: 'updater'
+      matrix: ${{ fromJson(needs.check-changes.outputs.merge_matrix) }}
     permissions:
       contents: read
       packages: write
