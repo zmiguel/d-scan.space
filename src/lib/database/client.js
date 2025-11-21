@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+import logger from '../logger.js';
 
 const env = process.env;
 
@@ -34,10 +35,20 @@ export const pool = new Pool({
 
 export const db = drizzle(env.BUILD ? '' : pool);
 
-if (!env.BUILD) {
+if (!env.BUILD && !env.SKIP_MIGRATIONS) {
+	logger.info('Starting database migrations...');
 	migrate(db, {
 		migrationsFolder: './drizzle'
-	});
+	})
+		.then(() => {
+			logger.info('Database migrations completed successfully.');
+		})
+		.catch((err) => {
+			logger.error({ err }, 'Database migration failed');
+			process.exit(1);
+		});
+} else {
+	logger.info('Skipping database migrations (BUILD or SKIP_MIGRATIONS set).');
 }
 
 // Graceful shutdown

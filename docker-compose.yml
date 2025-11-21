@@ -46,6 +46,7 @@ services:
       CONTACT_EVE: 'your name'
       CONTACT_DISCORD: 'your name'
       DB_ENV: 'dev'
+      SKIP_MIGRATIONS: 'true'
       #DYNAMIC_UPDATE_CRON: ""
       #STATIC_UPDATE_CRON: ""
     depends_on:

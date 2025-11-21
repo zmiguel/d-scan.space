@@ -12,11 +12,13 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 setInterval(() => {}, 1 << 30);
 
 process.on('uncaughtException', (error) => {
+	console.error('Uncaught Exception:', error);
 	logger.error(error, 'Uncaught Exception');
 	process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
+	console.error('Unhandled Rejection:', reason);
 	logger.error(reason, 'Unhandled Rejection');
 	process.exit(1);
 });
