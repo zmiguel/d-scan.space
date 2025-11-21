@@ -8,6 +8,8 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { createAddHookMessageChannel } from 'import-in-the-middle';
+import { register } from 'node:module';
 import { metrics } from '@opentelemetry/api';
 import { ExportResultCode } from '@opentelemetry/core';
 import { createAllowListAttributesProcessor } from '@opentelemetry/sdk-metrics/build/src/view/AttributesProcessor.js';
@@ -19,6 +21,10 @@ import {
 	ESI_DURATION_BOUNDARIES,
 	HTTP_DURATION_BOUNDARIES
 } from '../../../src/lib/server/histogram-boundaries.js';
+
+// Set up import-in-the-middle for better instrumentation
+const { registerOptions } = createAddHookMessageChannel();
+register('import-in-the-middle/hook.mjs', import.meta.url, registerOptions);
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 
@@ -197,6 +203,8 @@ const metricReaders = [
 		exportIntervalMillis: 1000
 	})
 ];
+
+logger.info('OTLP metric exporter configured');
 
 const meterProvider = new MeterProvider({
 	resource: resource,
