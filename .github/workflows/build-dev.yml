@@ -30,27 +30,15 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
             context: .
-            image_suffix: '-dynamic-worker'
-            dockerfile: workers/dynamic/Dockerfile
-            image_key: 'dynamic-worker'
+            image_suffix: '-updater'
+            dockerfile: workers/updater/Dockerfile
+            image_key: 'updater'
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
             context: .
-            image_suffix: '-dynamic-worker'
-            dockerfile: workers/dynamic/Dockerfile
-            image_key: 'dynamic-worker'
-          - platform: linux/amd64
-            runner: ubuntu-latest
-            context: .
-            image_suffix: '-static-worker'
-            dockerfile: workers/static/Dockerfile
-            image_key: 'static-worker'
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            context: .
-            image_suffix: '-static-worker'
-            dockerfile: workers/static/Dockerfile
-            image_key: 'static-worker'
+            image_suffix: '-updater'
+            dockerfile: workers/updater/Dockerfile
+            image_key: 'updater'
 
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -137,10 +125,8 @@ jobs:
         include:
           - image_suffix: ''
             image_key: 'main'
-          - image_suffix: '-dynamic-worker'
-            image_key: 'dynamic-worker'
-          - image_suffix: '-static-worker'
-            image_key: 'static-worker'
+          - image_suffix: '-updater'
+            image_key: 'updater'
     permissions:
       contents: read
       packages: write
