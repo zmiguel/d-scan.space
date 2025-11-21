@@ -153,7 +153,7 @@ async function updateCharacterData() {
 		const characterIds = charactersToUpdate.map((c) => c.id);
 
 		// Update affiliations (this fetches from ESI and updates DB)
-		await updateAffiliationsFromESI(characterIds);
+		await updateAffiliationsFromESI(charactersToUpdate);
 
 		// Update last_seen for these characters
 		await updateCharactersLastSeen(characterIds);
