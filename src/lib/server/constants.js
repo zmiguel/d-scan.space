@@ -16,7 +16,7 @@ export const USER_AGENT = isUpdater
 
 // BATCH SETTINGS
 export const BATCH_UNIVERSE = 50;
-export const BATCH_CHARACTERS = 50;
+export const BATCH_CHARACTERS = 1000;
 export const BATCH_CORPORATIONS = 50;
 export const BATCH_ALLIANCES = 50;
 export const CHARACTER_REQUEST_BATCH_SIZE = 250;
