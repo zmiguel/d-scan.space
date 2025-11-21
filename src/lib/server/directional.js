@@ -39,7 +39,7 @@ export async function createNewDirectionalScan(rawData) {
 			[GRID_BUCKETS.ON]: createBucket(),
 			[GRID_BUCKETS.OFF]: createBucket()
 		};
-		let systemNameCandidate = null;
+		const systemNameCounts = new Map();
 
 		for (const entry of parsed.entries) {
 			const metadata = metadataMap.get(entry.typeId);
@@ -64,8 +64,9 @@ export async function createNewDirectionalScan(rawData) {
 			const groupId =
 				typeof resolvedMetadata.groupId === 'number' ? resolvedMetadata.groupId : null;
 
-			if (!systemNameCandidate) {
-				systemNameCandidate = determineSystemName(entry.name, categoryId, groupId);
+			const candidate = determineSystemName(entry.name, categoryId, groupId);
+			if (candidate) {
+				systemNameCounts.set(candidate, (systemNameCounts.get(candidate) || 0) + 1);
 			}
 
 			const bucketKey = entry.isOnGrid ? GRID_BUCKETS.ON : GRID_BUCKETS.OFF;
@@ -73,11 +74,23 @@ export async function createNewDirectionalScan(rawData) {
 			accumulateEntry(bucket, entry, resolvedMetadata);
 		}
 
+		// Find most common system name
+		let systemNameCandidate = null;
+		let maxCount = 0;
+		for (const [name, count] of systemNameCounts) {
+			if (count > maxCount) {
+				maxCount = count;
+				systemNameCandidate = name;
+			}
+		}
+
 		span.setAttributes({
 			'scan.unique_type_ids': metadataMap.size,
 			'scan.missing_type_ids': missingTypes.size,
 			'scan.on_grid_objects': buckets[GRID_BUCKETS.ON].totalObjects,
-			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects
+			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects,
+			'scan.system_candidates_count': systemNameCounts.size,
+			'scan.system_candidate': systemNameCandidate
 		});
 
 		const duration = Date.now() - startTime;
@@ -326,6 +339,10 @@ function determineSystemName(name, categoryId, groupId) {
 
 	// Category 65: Structure (Player)
 	if (categoryId === 65) {
+		// Group 1408: Ansiblex Jump Bridge
+		if (groupId === 1408) {
+			return extractSystemFromAnsiblexName(name);
+		}
 		return extractSystemFromStructureName(name);
 	}
 
@@ -347,6 +364,13 @@ function determineSystemName(name, categoryId, groupId) {
 	}
 
 	return null;
+}
+
+function extractSystemFromAnsiblexName(name) {
+	const delimiter = ' » ';
+	const delimiterIndex = name.indexOf(delimiter);
+	const candidate = delimiterIndex === -1 ? null : name.slice(0, delimiterIndex).trim();
+	return candidate && candidate.length > 0 ? candidate : null;
 }
 
 function extractSystemFromStructureName(name) {
