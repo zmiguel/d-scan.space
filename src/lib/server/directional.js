@@ -77,7 +77,9 @@ export async function createNewDirectionalScan(rawData) {
 		// Find most common system name
 		let systemNameCandidate = null;
 		let maxCount = 0;
+		let totalCandidates = 0;
 		for (const [name, count] of systemNameCounts) {
+			totalCandidates += count;
 			if (count > maxCount) {
 				maxCount = count;
 				systemNameCandidate = name;
@@ -89,7 +91,8 @@ export async function createNewDirectionalScan(rawData) {
 			'scan.missing_type_ids': missingTypes.size,
 			'scan.on_grid_objects': buckets[GRID_BUCKETS.ON].totalObjects,
 			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects,
-			'scan.system_candidates_count': systemNameCounts.size,
+			'scan.system_candidates_count': totalCandidates,
+			'scan.unique_system_candidates_count': systemNameCounts.size,
 			'scan.system_candidate': systemNameCandidate
 		});
 
@@ -357,8 +360,8 @@ function determineSystemName(name, categoryId, groupId) {
 		if (groupId === 6) {
 			return extractSystemFromSunName(name);
 		}
-		// Group 7: Planet, 8: Moon
-		if (groupId === 7 || groupId === 8) {
+		// Group 7: Planet, 8: Moon, 9: Asteroid Belt
+		if (groupId === 7 || groupId === 8 || groupId === 9) {
 			return extractSystemFromCelestialName(name);
 		}
 	}
