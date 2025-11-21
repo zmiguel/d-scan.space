@@ -33,7 +33,7 @@ const resource = resourceFromAttributes({
 
 // Create trace exporter with retry logic
 const traceExporter = new OTLPTraceExporter({
-	url: `${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+	url: config.OTEL_EXPORTER_OTLP_ENDPOINT,
 	headers: {
 		Authorization: config.OTEL_EXPORTER_OTLP_AUTHORIZATION
 	}
@@ -176,7 +176,7 @@ const viewOptions = [dbOperationViewOptions, cronViewOptions, esiViewOptions, ht
 const metricReaders = [
 	new PeriodicExportingMetricReader({
 		exporter: new OTLPMetricExporter({
-			url: `${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics`,
+			url: config.OTEL_EXPORTER_OTLP_ENDPOINT.replace('/v1/traces', '/v1/metrics'),
 			headers: {
 				Authorization: config.OTEL_EXPORTER_OTLP_AUTHORIZATION
 			}
@@ -224,7 +224,7 @@ export function startInstrumentation() {
 		logger.info('Starting OpenTelemetry SDK...');
 		sdk.start();
 		logger.info(
-			`OpenTelemetry SDK started successfully\n URL: ${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`
+			`OpenTelemetry SDK started successfully\n URL: ${config.OTEL_EXPORTER_OTLP_ENDPOINT}`
 		);
 	} catch (error) {
 		logger.error('Failed to start OpenTelemetry SDK:', error);
