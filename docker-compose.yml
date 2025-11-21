@@ -35,8 +35,8 @@ services:
     depends_on:
       - postgres-main
 
-  dynamic-worker:
-    image: ghcr.io/zmiguel/d-scan-space-dynamic-worker:preview
+  updater:
+    image: ghcr.io/zmiguel/d-scan-space-updater:preview
     restart: always
     environment:
       DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
@@ -47,21 +47,7 @@ services:
       CONTACT_DISCORD: 'your name'
       DB_ENV: 'dev'
       #DYNAMIC_UPDATE_CRON: ""
-    depends_on:
-      - postgres-main
-
-  static-worker:
-    image: ghcr.io/zmiguel/d-scan-space-static-worker:preview
-    restart: always
-    environment:
-      DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
-      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://trace.example.com/v1/traces'
-      OTEL_EXPORTER_OTLP_AUTHORIZATION: 'Basic example=='
-      CONTACT_EMAIL: 'your@email.com'
-      CONTACT_EVE: 'your name'
-      CONTACT_DISCORD: 'your name'
-      DB_ENV: 'dev'
-      #DYNAMIC_UPDATE_CRON: ""
+      #STATIC_UPDATE_CRON: ""
     depends_on:
       - postgres-main
 

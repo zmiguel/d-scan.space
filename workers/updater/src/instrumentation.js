@@ -11,7 +11,7 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 
 const environment = config.DB_ENV || config.NODE_ENV || 'dev';
 const serviceBasename = config.OTEL_SERVICE_NAME || 'd-scan.space';
-const serviceName = `${serviceBasename}_dynamic_${environment}`;
+const serviceName = `${serviceBasename}_updater_${environment}`;
 
 const sdk = new NodeSDK({
 	resource: new Resource({
@@ -20,7 +20,10 @@ const sdk = new NodeSDK({
 		'deployment.environment': environment
 	}),
 	traceExporter: new OTLPTraceExporter({
-		url: `${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`
+		url: `${config.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+		headers: {
+			Authorization: config.OTEL_EXPORTER_OTLP_AUTHORIZATION
+		}
 	}),
 	instrumentations: [
 		getNodeAutoInstrumentations({
