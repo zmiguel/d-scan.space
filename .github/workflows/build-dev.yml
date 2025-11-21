@@ -34,7 +34,9 @@ jobs:
               - '.github/workflows/build-dev.yml'
             updater:
               - 'workers/updater/**'
-              - 'src/lib/**'
+              - 'src/lib/database/**'
+              - 'src/lib/server/**'
+              - 'src/lib/logger.js'
               - 'drizzle/**'
               - '.github/workflows/build-dev.yml'
 
