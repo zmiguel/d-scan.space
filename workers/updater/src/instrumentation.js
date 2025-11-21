@@ -4,7 +4,7 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { AggregationType } from '@opentelemetry/sdk-metrics';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { config } from './config.js';
 import logger from '../../../src/lib/logger.js';
@@ -18,7 +18,7 @@ const serviceBasename = config.OTEL_SERVICE_NAME || 'd-scan.space';
 const serviceName = `${serviceBasename}_updater_${environment}`;
 
 const sdk = new NodeSDK({
-	resource: new Resource({
+	resource: resourceFromAttributes({
 		[ATTR_SERVICE_NAME]: serviceName,
 		[ATTR_SERVICE_VERSION]: pkg.version,
 		'deployment.environment': environment
