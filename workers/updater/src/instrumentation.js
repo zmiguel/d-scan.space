@@ -171,12 +171,7 @@ logger.info({
 	httpViewOptions
 });
 
-const viewOptions = [
-	dbOperationViewOptions,
-	cronViewOptions,
-	esiViewOptions,
-	httpViewOptions
-];
+const viewOptions = [dbOperationViewOptions, cronViewOptions, esiViewOptions, httpViewOptions];
 
 const metricReaders = [
 	new PeriodicExportingMetricReader({
