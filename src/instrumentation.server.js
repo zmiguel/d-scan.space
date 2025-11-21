@@ -19,8 +19,7 @@ import { createAllowListAttributesProcessor } from '@opentelemetry/sdk-metrics/b
 import { ExportResultCode } from '@opentelemetry/core';
 import {
 	ESI_DURATION_BOUNDARIES,
-	HTTP_DURATION_BOUNDARIES,
-	CRON_DURATION_BOUNDARIES
+	HTTP_DURATION_BOUNDARIES
 } from '$lib/server/histogram-boundaries.js';
 
 // Set up import-in-the-middle for better instrumentation
@@ -106,15 +105,20 @@ const prometheusExporter = new PrometheusExporter(
 
 // Create resource for metrics
 const environment =
+	env.DB_ENV ||
 	env.DEPLOYMENT_ENV ||
 	env.VERCEL_ENV ||
 	env.NODE_ENV ||
+	process.env.DB_ENV ||
 	process.env.DEPLOYMENT_ENV ||
 	process.env.NODE_ENV ||
-	'local';
+	'dev';
+
+const serviceBasename = env.OTEL_SERVICE_NAME || process.env.OTEL_SERVICE_NAME || 'd-scan.space';
+const serviceName = `${serviceBasename}_app_${environment}`;
 
 const resource = resourceFromAttributes({
-	[ATTR_SERVICE_NAME]: 'd-scan.space',
+	[ATTR_SERVICE_NAME]: serviceName,
 	[ATTR_SERVICE_VERSION]: pkg.version,
 	'deployment.environment': environment
 });
@@ -205,24 +209,14 @@ const httpViewOptions = {
 	}
 };
 
-const cronViewOptions = {
-	instrumentName: 'cron_job_duration_seconds',
-	meterName: 'd-scan.space',
-	aggregation: {
-		type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-		options: { boundaries: CRON_DURATION_BOUNDARIES }
-	}
-};
-
 logger.info({
 	msg: 'Configuring metric views',
 	dbOperationViewOptions,
 	esiViewOptions,
-	httpViewOptions,
-	cronViewOptions
+	httpViewOptions
 });
 
-const viewOptions = [dbOperationViewOptions, esiViewOptions, httpViewOptions, cronViewOptions];
+const viewOptions = [dbOperationViewOptions, esiViewOptions, httpViewOptions];
 
 const meterProvider = new MeterProvider({
 	resource: resource,

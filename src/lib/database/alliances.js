@@ -1,10 +1,10 @@
 /**
  * All DB functions related to alliances
  */
-import { db } from '$lib/database/client';
-import { alliances } from '$lib/database/schema';
-import logger from '$lib/logger';
-import { withSpan } from '$lib/server/tracer';
+import { db } from './client.js';
+import { alliances } from './schema.js';
+import logger from '../logger.js';
+import { withSpan } from '../server/tracer.js';
 import { inArray, sql } from 'drizzle-orm';
 
 export async function getAlliancesByID(ids) {

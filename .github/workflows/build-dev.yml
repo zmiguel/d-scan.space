@@ -17,8 +17,28 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-latest
+            context: .
+            image_suffix: ''
+            dockerfile: Dockerfile
+            image_key: 'main'
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+            context: .
+            image_suffix: ''
+            dockerfile: Dockerfile
+            image_key: 'main'
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            context: .
+            image_suffix: '-updater'
+            dockerfile: workers/updater/Dockerfile
+            image_key: 'updater'
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            context: .
+            image_suffix: '-updater'
+            dockerfile: workers/updater/Dockerfile
+            image_key: 'updater'
 
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -60,7 +80,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
 
       # Build and push Docker image for specific platform
       # https://github.com/docker/build-push-action
@@ -68,14 +88,15 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ matrix.platform }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=build-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=build-${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=${{ github.event_name != 'pull_request' }},name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=build-${{ matrix.image_key }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.image_key }}-${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }},push-by-digest=${{ github.event_name != 'pull_request' }},name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
       # Export digest for manifest creation
       - name: Export digest
@@ -90,7 +111,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          name: digests-${{ matrix.image_key }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -99,6 +120,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: multiplatform-build
     if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        include:
+          - image_suffix: ''
+            image_key: 'main'
+          - image_suffix: '-updater'
+            image_key: 'updater'
     permissions:
       contents: read
       packages: write
@@ -131,14 +159,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
 
       # Download digest artifacts
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digests-*
+          pattern: digests-${{ matrix.image_key }}-*
           merge-multiple: true
 
       # Create and push multi-platform manifest
@@ -146,7 +174,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}@sha256:%s ' *)
 
           # Get the digest of the created manifest
           DIGEST=$(docker buildx imagetools inspect ${{ steps.meta.outputs.tags }} --raw | sha256sum | cut -d' ' -f1)

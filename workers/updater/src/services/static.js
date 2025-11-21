@@ -1,5 +1,5 @@
-import { withSpan } from '$lib/server/tracer';
-import logger from '$lib/logger';
+import { withSpan } from '../../../../src/lib/server/tracer.js';
+import logger from '../../../../src/lib/logger.js';
 import {
 	getLastInstalledSDEVersion,
 	addSDEDataEntry,
@@ -7,14 +7,14 @@ import {
 	addOrUpdateCategoriesDB,
 	addOrUpdateGroupsDB,
 	addOrUpdateTypesDB
-} from '$lib/database/sde';
-import { SDE_FILE, SDE_VERSION } from '$lib/server/constants';
+} from '../../../../src/lib/database/sde.js';
+import { SDE_FILE, SDE_VERSION } from '../../../../src/lib/server/constants.js';
 import fs from 'fs';
 import path from 'path';
-import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
-import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
-import { fetchGET } from '$lib/server/wrappers';
-import { recordCronJob } from '$lib/server/metrics';
+import { extractZipNonBlocking } from '../utils/extract.js';
+import { addOrUpdateCorporationsDB } from '../../../../src/lib/database/corporations.js';
+import { fetchGET } from '../../../../src/lib/server/wrappers.js';
+import { recordCronJob } from '../../../../src/lib/server/metrics.js';
 
 export async function updateStaticData() {
 	const startTime = Date.now();
@@ -136,16 +136,26 @@ async function getOnlineVersion() {
 			// fetch the version data from the SDE Links
 			const response = await fetchGET(SDE_VERSION);
 
-			if (!response.ok) {
-				throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
+			if (!response) {
+				throw new Error(`Failed to fetch SDE version`);
 			}
 
-			// Get the JSONL content
-			const jsonlContent = await response.text();
+			// response from fetchGET is already parsed JSON or text
+			// But fetchGET in esi.js returns parsed JSON or text.
+			// SDE_VERSION is a jsonl file, so it might be text.
 
-			// Parse the JSONL (assuming single line for SDE data)
-			const lines = jsonlContent.trim().split('\n');
-			const sdeData = JSON.parse(lines[0]); // Get first line
+			let sdeData;
+			if (typeof response === 'string') {
+				const lines = response.trim().split('\n');
+				sdeData = JSON.parse(lines[0]); // Get first line
+			} else {
+				// If it was parsed as JSON, it might be an object if it was a single JSON object,
+				// but JSONL is multiple objects. fetchGET tries to parse as JSON.
+				// If it's JSONL, JSON.parse might fail on the whole file if it has multiple lines.
+				// But fetchGET catches parse error and returns text.
+				// So if it's an object, it means it was valid JSON (maybe single line).
+				sdeData = response;
+			}
 
 			// Extract version information
 			const buildNumber = sdeData.buildNumber;
@@ -200,9 +210,8 @@ async function downloadAndExtractSDE(url, files = []) {
 					fileStream.write(value);
 					downloadedBytes += value.length;
 
-					// Yield control periodically during download (every ~1MB)
+					// Log progress periodically during download (every ~1MB)
 					if (downloadedBytes % (1024 * 1024) === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
 						span.addEvent('Download progress', {
 							downloadedBytes,
 							totalBytes: contentLength,
@@ -345,11 +354,6 @@ async function updateNPCCorps() {
 					alliance_id: null, // NPC corps don't have alliances
 					npc: true // Mark as NPC corporation
 				});
-
-				// Yield control every 50 corporations to prevent blocking the event loop
-				if (totalCorps % 50 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
-				}
 			}
 
 			span.setAttributes({
@@ -431,7 +435,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapRegions.jsonl file');
 			const regionLines = await readJSONLAsync(regionsPath);
 
-			let regionCount = 0;
 			for (const line of regionLines) {
 				if (!line.trim()) continue;
 				const regionData = JSON.parse(line);
@@ -440,12 +443,6 @@ async function updateUniverse() {
 
 				if (regionId && regionName) {
 					regionMap.set(regionId, regionName);
-					regionCount++;
-				}
-
-				// Yield control every 10 regions
-				if (regionCount % 10 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -463,7 +460,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapConstellations.jsonl file');
 			const constellationLines = await readJSONLAsync(constellationsPath);
 
-			let constellationCount = 0;
 			for (const line of constellationLines) {
 				if (!line.trim()) continue;
 				const constellationData = JSON.parse(line);
@@ -472,12 +468,6 @@ async function updateUniverse() {
 
 				if (constellationId && constellationName) {
 					constellationMap.set(constellationId, constellationName);
-					constellationCount++;
-				}
-
-				// Yield control every 20 constellations
-				if (constellationCount % 20 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -557,11 +547,6 @@ async function updateUniverse() {
 					});
 
 					processedSystems++;
-
-					// Yield control every 50 systems to prevent blocking the event loop
-					if (processedSystems % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 
 					// Log progress every 1000 systems
 					if (processedSystems % 1000 === 0) {
@@ -687,11 +672,6 @@ async function updateItems() {
 					});
 
 					categoryCount++;
-
-					// Yield control every 50 categories
-					if (categoryCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing category line: ${parseError.message}`);
 					skippedCategories++;
@@ -762,11 +742,6 @@ async function updateItems() {
 					});
 
 					groupCount++;
-
-					// Yield control every 50 groups
-					if (groupCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing group line: ${parseError.message}`);
 					skippedGroups++;
@@ -840,11 +815,6 @@ async function updateItems() {
 					});
 
 					typeCount++;
-
-					// Yield control every 50 types
-					if (typeCount % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
 				} catch (parseError) {
 					logger.warn(`Error parsing type line: ${parseError.message}`);
 					skippedTypes++;

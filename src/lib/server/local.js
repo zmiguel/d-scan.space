@@ -2,15 +2,15 @@
  * File for all Local Scan related functions
  */
 
-import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
-import { updateCorporationsLastSeen } from '$lib/database/corporations.js';
-import { updateAlliancesLastSeen } from '$lib/database/alliances.js';
+import { getCharactersByName, updateCharactersLastSeen } from '../database/characters.js';
+import { updateCorporationsLastSeen } from '../database/corporations.js';
+import { updateAlliancesLastSeen } from '../database/alliances.js';
 import {
 	addCharactersFromESI,
 	updateAffiliationsFromESI,
 	updateCharactersFromESI
-} from '$lib/server/characters.js';
-import logger from '$lib/logger';
+} from './characters.js';
+import logger from '../logger.js';
 import { withSpan } from './tracer';
 import {
 	cacheHitCounter,

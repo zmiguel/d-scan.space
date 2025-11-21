@@ -1,7 +1,7 @@
 /**
  *  Functions related to corporations
  */
-import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
+import { addOrUpdateCorporationsDB, getCorporationsByID } from '../database/corporations.js';
 import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 

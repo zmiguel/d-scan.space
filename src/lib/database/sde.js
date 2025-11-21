@@ -1,6 +1,6 @@
-import { db } from '$lib/database/client';
-import { withSpan } from '$lib/server/tracer';
-import { sde, systems, invCategories, invGroups, invTypes } from './schema';
+import { db } from './client.js';
+import { withSpan } from '../server/tracer.js';
+import { sde, systems, invCategories, invGroups, invTypes } from './schema.js';
 import { desc, eq, sql, inArray } from 'drizzle-orm';
 
 /**

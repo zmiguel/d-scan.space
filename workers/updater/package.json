@@ -1,0 +1,24 @@
+{
+	"name": "d-scan-space-updater",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "src/index.js",
+	"scripts": {
+		"start": "node src/index.js"
+	},
+	"dependencies": {
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/auto-instrumentations-node": "^0.65.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.208.0",
+		"@opentelemetry/resources": "^2.0.1",
+		"@opentelemetry/sdk-node": "^0.208.0",
+		"@opentelemetry/semantic-conventions": "^1.38.0",
+		"adm-zip": "^0.5.16",
+		"croner": "^9.1.0",
+		"dotenv": "^17.2.3",
+		"drizzle-orm": "^0.44.7",
+		"pg": "^8.16.3",
+		"pino": "^10.1.0",
+		"undici": "^7.16.0"
+	}
+}
