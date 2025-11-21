@@ -1,6 +1,7 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
 import { PeriodicExportingMetricReader, MeterProvider } from '@opentelemetry/sdk-metrics';
 import { AggregationType } from '@opentelemetry/sdk-metrics';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
@@ -173,7 +174,19 @@ logger.info({
 
 const viewOptions = [dbOperationViewOptions, cronViewOptions, esiViewOptions, httpViewOptions];
 
+const prometheusPort = parseInt(config.PROMETHEUS_PORT || 9464);
+const prometheusExporter = new PrometheusExporter(
+	{
+		port: prometheusPort,
+		endpoint: '/metrics'
+	},
+	() => {
+		logger.info(`Prometheus metrics available at http://localhost:${prometheusPort}/metrics`);
+	}
+);
+
 const metricReaders = [
+	prometheusExporter,
 	new PeriodicExportingMetricReader({
 		exporter: new OTLPMetricExporter({
 			url: config.OTEL_EXPORTER_OTLP_ENDPOINT.replace('/v1/traces', '/v1/metrics'),
