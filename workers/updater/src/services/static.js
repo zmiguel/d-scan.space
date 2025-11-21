@@ -140,21 +140,22 @@ async function getOnlineVersion() {
 				throw new Error(`Failed to fetch SDE version`);
 			}
 
-			// response from fetchGET is already parsed JSON or text
-			// But fetchGET in esi.js returns parsed JSON or text.
-			// SDE_VERSION is a jsonl file, so it might be text.
-
+			const text = await response.text();
 			let sdeData;
-			if (typeof response === 'string') {
-				const lines = response.trim().split('\n');
-				sdeData = JSON.parse(lines[0]); // Get first line
-			} else {
-				// If it was parsed as JSON, it might be an object if it was a single JSON object,
-				// but JSONL is multiple objects. fetchGET tries to parse as JSON.
-				// If it's JSONL, JSON.parse might fail on the whole file if it has multiple lines.
-				// But fetchGET catches parse error and returns text.
-				// So if it's an object, it means it was valid JSON (maybe single line).
-				sdeData = response;
+
+			try {
+				// Try to parse the whole text as JSON first
+				sdeData = JSON.parse(text);
+			} catch {
+				// If that fails, assume it's JSONL and take the first line
+				const lines = text.trim().split('\n');
+				if (lines.length > 0) {
+					sdeData = JSON.parse(lines[0]);
+				}
+			}
+
+			if (!sdeData) {
+				throw new Error('Failed to parse SDE version data');
 			}
 
 			// Extract version information
