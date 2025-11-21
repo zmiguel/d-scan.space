@@ -92,7 +92,7 @@ async function namesToCharacters(names) {
 	}
 
 	// Run all batch requests in parallel
-	const allCharacters = await withSpan('namesToCharacters.nameToId', async (span) => {
+	const allCharacters = await withSpan('server.characters.names_to_ids', async (span) => {
 		const batchPromises = idsBatches.map(async (batch) => {
 			const response = await fetchPOST('https://esi.evetech.net/universe/ids', batch);
 
@@ -144,7 +144,7 @@ async function namesToCharacters(names) {
 	}
 
 	// Kick off both long-running operations in parallel
-	const affiliationsPromise = withSpan('namesToCharacters.characterAffiliation', async (span) => {
+	const affiliationsPromise = withSpan('server.characters.get_affiliations', async (span) => {
 		const batchPromises = affiliationBatches.map(async (batch) => {
 			const response = await fetchPOST(
 				'https://esi.evetech.net/characters/affiliation',
@@ -174,7 +174,7 @@ async function namesToCharacters(names) {
 		return flatResults;
 	});
 
-	const charactersPromise = withSpan('namesToCharacters.fetchCharacterData', async (span) => {
+	const charactersPromise = withSpan('server.characters.fetch_data', async (span) => {
 		const effectiveConcurrency = Math.min(
 			characterBatches.length || 1,
 			Math.max(1, CHARACTER_BATCH_CONCURRENCY)
@@ -226,7 +226,7 @@ async function namesToCharacters(names) {
 
 export async function idsToCharacters(ids) {
 	return await withSpan(
-		'idsToCharacters',
+		'server.characters.ids_to_characters',
 		async () => {
 			// Prepare affiliation batches (ESI accepts arrays of ids)
 			const affBatchSize = 50;
@@ -236,32 +236,38 @@ export async function idsToCharacters(ids) {
 			}
 
 			// Fire off affiliations in parallel batches
-			const affiliationsPromise = withSpan('idsToCharacters.characterAffiliation', async (span) => {
-				const batchPromises = affiliationBatches.map(async (batch) => {
-					const response = await fetchPOST('https://esi.evetech.net/characters/affiliation', batch);
-
-					if (!response.ok) {
-						const errorText = await response.text();
-						logger.error(
-							`Failed to get character affiliations from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
+			const affiliationsPromise = withSpan(
+				'server.characters.ids_to_characters.affiliations',
+				async (span) => {
+					const batchPromises = affiliationBatches.map(async (batch) => {
+						const response = await fetchPOST(
+							'https://esi.evetech.net/characters/affiliation',
+							batch
 						);
-						return [];
-					}
 
-					const data = await response.json();
-					return data || [];
-				});
+						if (!response.ok) {
+							const errorText = await response.text();
+							logger.error(
+								`Failed to get character affiliations from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
+							);
+							return [];
+						}
 
-				const batchResults = await Promise.all(batchPromises);
-				const flatResults = batchResults.flat();
+						const data = await response.json();
+						return data || [];
+					});
 
-				span.setAttributes({
-					'batch.total_batches': affiliationBatches.length,
-					'batch.affiliations_found': flatResults.length
-				});
+					const batchResults = await Promise.all(batchPromises);
+					const flatResults = batchResults.flat();
 
-				return flatResults;
-			});
+					span.setAttributes({
+						'batch.total_batches': affiliationBatches.length,
+						'batch.affiliations_found': flatResults.length
+					});
+
+					return flatResults;
+				}
+			);
 
 			// Split ids into character fetch batches
 			const batches = [];
@@ -270,38 +276,41 @@ export async function idsToCharacters(ids) {
 			}
 
 			// Fetch character data (sequential batches) under a parent span
-			const charactersPromise = withSpan('idsToCharacters.characterData', async (span) => {
-				const effectiveConcurrency = Math.min(
-					batches.length || 1,
-					Math.max(1, CHARACTER_BATCH_CONCURRENCY)
-				);
+			const charactersPromise = withSpan(
+				'server.characters.ids_to_characters.fetch_data',
+				async (span) => {
+					const effectiveConcurrency = Math.min(
+						batches.length || 1,
+						Math.max(1, CHARACTER_BATCH_CONCURRENCY)
+					);
 
-				const allResults = await runBatchesWithConcurrency(
-					batches,
-					CHARACTER_BATCH_CONCURRENCY,
-					async (batch, batchIndex) =>
-						withSpan(
-							`idsToCharacters.batch.${batchIndex + 1}`,
-							async () => Promise.all(batch.map((id) => getCharacterFromESI(id))),
-							{
-								'batch.size': batch.length,
-								'batch.start_id': batch[0],
-								'batch.end_id': batch[batch.length - 1],
-								'batch.index': batchIndex + 1,
-								'batch.total': batches.length
-							}
-						)
-				);
+					const allResults = await runBatchesWithConcurrency(
+						batches,
+						CHARACTER_BATCH_CONCURRENCY,
+						async (batch, batchIndex) =>
+							withSpan(
+								`server.characters.ids_to_characters.batch.${batchIndex + 1}`,
+								async () => Promise.all(batch.map((id) => getCharacterFromESI(id))),
+								{
+									'batch.size': batch.length,
+									'batch.start_id': batch[0],
+									'batch.end_id': batch[batch.length - 1],
+									'batch.index': batchIndex + 1,
+									'batch.total': batches.length
+								}
+							)
+					);
 
-				span.setAttributes({
-					'batch.character_batches': batches.length,
-					'batch.characters_to_fetch': ids.length,
-					'batch.characters_fetched': allResults.length,
-					'batch.character_concurrency': effectiveConcurrency
-				});
+					span.setAttributes({
+						'batch.character_batches': batches.length,
+						'batch.characters_to_fetch': ids.length,
+						'batch.characters_fetched': allResults.length,
+						'batch.character_concurrency': effectiveConcurrency
+					});
 
-				return allResults;
-			});
+					return allResults;
+				}
+			);
 
 			const [allCharacterAffiliations, allResults] = await Promise.all([
 				affiliationsPromise,
@@ -353,7 +362,7 @@ async function idsToAffiliations(ids) {
 	}
 
 	// Fire off affiliations in parallel batches
-	return await withSpan('idsToAffiliations', async (span) => {
+	return await withSpan('server.characters.ids_to_affiliations', async (span) => {
 		const batchPromises = affiliationBatches.map(async (batch) => {
 			const response = await fetchPOST('https://esi.evetech.net/characters/affiliation', batch);
 
@@ -382,7 +391,7 @@ async function idsToAffiliations(ids) {
 }
 
 async function addOrUpdateCharacters(data) {
-	await withSpan('addOrUpdateCharacters', async () => {
+	await withSpan('server.characters.add_or_update', async () => {
 		// get list of all corp ids
 		const corpIDs = data
 			.map((char) => char.corporation_id)
@@ -409,7 +418,7 @@ async function addOrUpdateCharacters(data) {
 
 export async function addCharactersFromESI(characters, sanityCheck = false) {
 	await withSpan(
-		'addCharactersFromESI',
+		'server.characters.add_from_esi',
 		async () => {
 			// check if characters is empty
 			if (characters.length === 0 || !characters) {
@@ -426,7 +435,7 @@ export async function addCharactersFromESI(characters, sanityCheck = false) {
 			}
 
 			// Get Character IDS
-			const charactersData = await withSpan('namesToCharacters', async () => {
+			const charactersData = await withSpan('server.characters.names_to_characters', async () => {
 				return await namesToCharacters(characters);
 			});
 
@@ -449,7 +458,7 @@ export async function updateCharactersFromESI(data) {
 	// data is a list of characters, not ids.
 	// we need to extract the ids from the characters
 	await withSpan(
-		'updateCharactersFromESI',
+		'server.characters.update_from_esi',
 		async () => {
 			const ids = data.map((char) => char.id);
 			const charactersData = await idsToCharacters(ids);
@@ -465,7 +474,7 @@ export async function updateAffiliationsFromESI(data) {
 	// data is a list of characters, not ids.
 	// we need to extract the ids from the characters
 	await withSpan(
-		'updateAffiliationsFromESI',
+		'server.characters.update_affiliations_from_esi',
 		async () => {
 			const ids = data.map((char) => char.id);
 			const affiliationsData = await idsToAffiliations(ids);

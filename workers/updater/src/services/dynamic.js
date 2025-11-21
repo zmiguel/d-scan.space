@@ -46,7 +46,7 @@ export async function updateDynamicData() {
 
 	try {
 		logger.info('[DynUpdater] Updating dynamic data...');
-		await withSpan('CRON Dynamic', async () => {
+		await withSpan('worker.dynamic.cron', async () => {
 			// first we check if the server is up before doing anything
 			const status = await getTQStatus();
 			if (!status) {
@@ -90,7 +90,7 @@ export async function updateDynamicData() {
  * @returns {Promise<boolean>} true if the server is up and available, false otherwise
  */
 async function getTQStatus() {
-	return await withSpan('Get TQ Status', async (span) => {
+	return await withSpan('worker.dynamic.get_tq_status', async (span) => {
 		try {
 			const res = await fetchGET('https://esi.evetech.net/status');
 			if (!res.ok) {
@@ -137,7 +137,7 @@ async function getTQStatus() {
  * and refreshing their information from ESI.
  */
 async function updateCharacterData() {
-	await withSpan('Update Character Data', async (span) => {
+	await withSpan('worker.dynamic.update_characters', async (span) => {
 		// Get characters that haven't been updated in 23.5h
 		const charactersToUpdate = await getLeastRecentlyUpdatedCharacters(BATCH_CHARACTERS);
 
@@ -166,7 +166,7 @@ async function updateCharacterData() {
  * Updates corporation data by fetching corporations that haven't been updated recently.
  */
 async function updateCorporationData() {
-	await withSpan('Update Corporation Data', async (span) => {
+	await withSpan('worker.dynamic.update_corporations', async (span) => {
 		const allCorporations = await getAllCorporations();
 		const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 		const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);
@@ -200,7 +200,7 @@ async function updateCorporationData() {
  * Updates alliance data by fetching alliances that haven't been updated recently.
  */
 async function updateAllianceData() {
-	await withSpan('Update Alliance Data', async (span) => {
+	await withSpan('worker.dynamic.update_alliances', async (span) => {
 		const allAlliances = await getAllAlliances();
 		const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 		const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);

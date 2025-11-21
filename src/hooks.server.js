@@ -17,7 +17,7 @@ export async function init() {
  */
 export async function handle({ event, resolve }) {
 	return await withSpan(
-		'http.request',
+		'server.hooks.handle_request',
 		async (span) => {
 			const startTime = Date.now();
 			const method = event.request.method;

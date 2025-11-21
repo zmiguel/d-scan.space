@@ -3,7 +3,7 @@ import { withSpan } from '$lib/server/tracer.js';
 
 export async function load({ params, event }) {
 	return await withSpan(
-		'page.load.scan_detail',
+		'route.scan_detail.load',
 		async (span) => {
 			const { group, scan } = params;
 
@@ -14,7 +14,7 @@ export async function load({ params, event }) {
 			});
 
 			const getScanResult = await withSpan(
-				'database.get_scan_by_id',
+				'route.scan_detail.fetch_scan',
 				async () => {
 					return await getScanByID(scan);
 				},
@@ -37,7 +37,7 @@ export async function load({ params, event }) {
 
 			const thisScan = getScanResult[0];
 			const groupScans = await withSpan(
-				'database.get_scans_by_group_id',
+				'route.scan_detail.fetch_group_scans',
 				async () => {
 					return await getScansByGroupID(group);
 				},
@@ -73,7 +73,7 @@ export async function load({ params, event }) {
 
 			if (priorOppositeScan) {
 				const priorScanResult = await withSpan(
-					'database.get_scan_by_id.prior',
+					'route.scan_detail.fetch_prior_scan',
 					async () => {
 						return await getScanByID(priorOppositeScan.id);
 					},

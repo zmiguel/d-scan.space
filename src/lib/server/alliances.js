@@ -22,7 +22,7 @@ async function getAllianceFromESI(id) {
 }
 
 export async function idsToAlliances(ids) {
-	return await withSpan('idsToAlliances', async () => {
+	return await withSpan('server.alliances.ids_to_alliances', async () => {
 		// get all alliances from esi and return them
 		let allianceData = [];
 		const alliancePromises = ids.map(async (id) => {
@@ -37,7 +37,7 @@ export async function idsToAlliances(ids) {
 }
 
 export async function addOrUpdateAlliances(data) {
-	await withSpan('addOrUpdateAlliances', async (span) => {
+	await withSpan('server.alliances.add_or_update', async (span) => {
 		const alliancesInDB = await getAlliancesByID(data);
 
 		// find missing alliances

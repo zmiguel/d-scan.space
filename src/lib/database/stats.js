@@ -8,7 +8,7 @@ import { eq, sql } from 'drizzle-orm';
 
 export async function getScanStats() {
 	// get stats for scans, how many scans, how many groups
-	return await withSpan('getScanStats', async () => {
+	return await withSpan('database.stats.get_scan_stats', async () => {
 		const stats = await db
 			.select({
 				totalScans: sql`COUNT(DISTINCT ${scans.id})`.mapWith(Number),
@@ -42,7 +42,7 @@ export async function getScanStats() {
 }
 
 export async function getCharacterStats() {
-	return await withSpan('getCharacterStats', async () => {
+	return await withSpan('database.stats.get_character_stats', async () => {
 		const stats = await db
 			.select({
 				totalCharacters: sql`COUNT(DISTINCT ${characters.id})`.mapWith(Number),
@@ -82,7 +82,7 @@ export async function getCharacterStats() {
 }
 
 export async function getCorporationStats() {
-	return await withSpan('getCorporationStats', async () => {
+	return await withSpan('database.stats.get_corporation_stats', async () => {
 		const stats = await db
 			.select({
 				totalCorporations: sql`COUNT(DISTINCT ${corporations.id})`.mapWith(Number),
@@ -122,7 +122,7 @@ export async function getCorporationStats() {
 }
 
 export async function getAllianceStats() {
-	return await withSpan('getAllianceStats', async () => {
+	return await withSpan('database.stats.get_alliance_stats', async () => {
 		const stats = await db
 			.select({
 				totalAlliances: sql`COUNT(DISTINCT ${alliances.id})`.mapWith(Number),

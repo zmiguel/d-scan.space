@@ -7,7 +7,7 @@ import { eq, desc, and, isNull } from 'drizzle-orm';
 import { withSpan } from '$lib/server/tracer';
 
 export async function getScanByID(id) {
-	return await withSpan('db.getScanByID', async (span) => {
+	return await withSpan('database.scans.get_by_id', async (span) => {
 		span.setAttributes({ 'db.scan_id': id });
 		return db
 			.select({
@@ -24,7 +24,7 @@ export async function getScanByID(id) {
 }
 
 export async function getScansByGroupID(id) {
-	return await withSpan('db.getScansByGroupID', async (span) => {
+	return await withSpan('database.scans.get_by_group_id', async (span) => {
 		span.setAttributes({ 'db.group_id': id });
 		return db
 			.select({
@@ -38,7 +38,7 @@ export async function getScansByGroupID(id) {
 }
 
 export async function createNewScan(data) {
-	return await withSpan('db.createNewScan', async (span) => {
+	return await withSpan('database.scans.create', async (span) => {
 		span.setAttributes({
 			'db.scan_id': data.scanId,
 			'db.group_id': data.scanGroupId,
@@ -68,7 +68,7 @@ export async function createNewScan(data) {
 }
 
 export async function updateScan(data) {
-	return await withSpan('db.updateScan', async (span) => {
+	return await withSpan('database.scans.update', async (span) => {
 		span.setAttributes({
 			'db.scan_id': data.scanId,
 			'db.group_id': data.scanGroupId,
@@ -98,7 +98,7 @@ export async function updateScan(data) {
 }
 
 export async function getPublicScans() {
-	return await withSpan('db.getPublicScans', async () => {
+	return await withSpan('database.scans.get_public', async () => {
 		return db
 			.select({
 				id: scans.id,

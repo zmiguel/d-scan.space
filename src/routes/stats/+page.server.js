@@ -8,13 +8,13 @@ import { withSpan } from '$lib/server/tracer';
 
 export async function load(event) {
 	return await withSpan(
-		'page.load.stats',
+		'route.stats.load',
 		async (span) => {
 			const [scanStats, characterStats, corporationStats, allianceStats] = await Promise.all([
-				withSpan('stats.load.scans', async () => getScanStats()),
-				withSpan('stats.load.characters', async () => getCharacterStats()),
-				withSpan('stats.load.corporations', async () => getCorporationStats()),
-				withSpan('stats.load.alliances', async () => getAllianceStats())
+				withSpan('route.stats.fetch_scans', async () => getScanStats()),
+				withSpan('route.stats.fetch_characters', async () => getCharacterStats()),
+				withSpan('route.stats.fetch_corporations', async () => getCorporationStats()),
+				withSpan('route.stats.fetch_alliances', async () => getAllianceStats())
 			]);
 
 			span.setAttributes({

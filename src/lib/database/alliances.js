@@ -16,7 +16,7 @@ export async function getAllAlliances() {
 }
 
 export async function addOrUpdateAlliancesDB(data) {
-	await withSpan('addOrUpdateAlliancesDB', async (span) => {
+	await withSpan('database.alliances.upsert', async (span) => {
 		if (!data || data.length === 0) {
 			span.setAttributes({
 				'alliances.data.length': 0

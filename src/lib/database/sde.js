@@ -8,13 +8,15 @@ import { desc, eq, sql, inArray } from 'drizzle-orm';
  * @returns {Promise<Object|null>}
  */
 export async function getLastInstalledSDEVersion() {
-	return await withSpan('getLastInstalledSDEVersion', async () => {
-		return await db
+	return await withSpan('database.sde.get_last_installed_version', async () => {
+		const result = await db
 			.select()
 			.from(sde)
 			.where(eq(sde.success, true))
 			.orderBy(desc(sde.run_date))
 			.limit(1);
+
+		return result[0];
 	});
 }
 
@@ -23,7 +25,7 @@ export async function getLastInstalledSDEVersion() {
  * @param {Object} data
  */
 export async function addSDEDataEntry(data) {
-	await withSpan('addSDEDataEntry', async () => {
+	await withSpan('database.sde.add_data_entry', async () => {
 		await db.insert(sde).values({
 			release_date: new Date(data.release_date),
 			release_version: String(data.release_version),
@@ -38,7 +40,7 @@ export async function addSDEDataEntry(data) {
  * @param {Array<Object>} data
  */
 export async function addOrUpdateSystemsDB(data) {
-	await withSpan('addOrUpdateSystemsDB', async (span) => {
+	await withSpan('database.sde.upsert_systems', async (span) => {
 		if (!data || data.length === 0) {
 			return;
 		}
@@ -116,7 +118,7 @@ export async function updateSystemsLastSeen(systemIds) {
  * @param {Array<Object>} data
  */
 export async function addOrUpdateCategoriesDB(data) {
-	await withSpan('addOrUpdateCategoriesDB', async (span) => {
+	await withSpan('database.sde.upsert_categories', async (span) => {
 		if (!data || data.length === 0) {
 			return;
 		}
@@ -168,7 +170,7 @@ export async function addOrUpdateCategoriesDB(data) {
  * @param {Array<Object>} data
  */
 export async function addOrUpdateGroupsDB(data) {
-	await withSpan('addOrUpdateGroupsDB', async (span) => {
+	await withSpan('database.sde.upsert_groups', async (span) => {
 		if (!data || data.length === 0) {
 			return;
 		}
@@ -230,7 +232,7 @@ export async function addOrUpdateGroupsDB(data) {
  * @param {Array<Object>} data
  */
 export async function addOrUpdateTypesDB(data) {
-	await withSpan('addOrUpdateTypesDB', async (span) => {
+	await withSpan('database.sde.upsert_types', async (span) => {
 		if (!data || data.length === 0) {
 			return;
 		}
@@ -299,7 +301,7 @@ export async function addOrUpdateTypesDB(data) {
  * @returns {Promise<Map<number, Object>>}
  */
 export async function getTypeHierarchyMetadata(typeIds) {
-	return await withSpan('getTypeHierarchyMetadata', async (span) => {
+	return await withSpan('database.sde.get_type_hierarchy', async (span) => {
 		if (!typeIds || typeIds.length === 0) {
 			return new Map();
 		}
@@ -365,7 +367,7 @@ export async function getTypeHierarchyMetadata(typeIds) {
  * @returns {Promise<Object|null>}
  */
 export async function getSystemByName(name) {
-	return await withSpan('getSystemByName', async (span) => {
+	return await withSpan('database.sde.get_system_by_name', async (span) => {
 		const trimmed = name?.trim();
 		if (!trimmed) {
 			return null;

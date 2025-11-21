@@ -10,7 +10,7 @@ import { asc, eq, inArray, sql, and, lt, gt, isNull } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
 	return await withSpan(
-		'getCharactersByName',
+		'database.characters.get_by_name',
 		async () => {
 			return db
 				.select({
@@ -43,7 +43,7 @@ export async function getAllCharacters() {
 }
 
 export async function addOrUpdateCharactersDB(data) {
-	await withSpan('addOrUpdateCharactersDB', async (span) => {
+	await withSpan('database.characters.upsert', async (span) => {
 		if (!data || data.length === 0) {
 			logger.warn('Tried to add characters from ESI but characters array was empty');
 			return;
@@ -97,7 +97,7 @@ export async function updateCharactersLastSeen(characterIDs) {
 export async function getLeastRecentlyUpdatedCharacters(limit) {
 	// this is used to find characters that haven't been updated in 23.5h
 	// but we only care about the characters seen in the last 1 year
-	return await withSpan('getLeastRecentlyUpdatedCharacters', async () => {
+	return await withSpan('database.characters.get_least_recently_updated', async () => {
 		return await db
 			.select()
 			.from(characters)
@@ -115,7 +115,7 @@ export async function getLeastRecentlyUpdatedCharacters(limit) {
 
 export async function biomassCharacter(id) {
 	// When a character is deleted we need to move it to the DOOMHEIM corporation
-	await withSpan('biomassCharacter', async () => {
+	await withSpan('database.characters.biomass', async () => {
 		await db
 			.update(characters)
 			.set({

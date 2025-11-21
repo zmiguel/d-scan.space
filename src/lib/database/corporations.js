@@ -16,7 +16,7 @@ export async function getAllCorporations() {
 }
 
 export async function addOrUpdateCorporationsDB(data) {
-	await withSpan('addOrUpdateCorporationsDB', async (span) => {
+	await withSpan('database.corporations.upsert', async (span) => {
 		if (!data || data.length === 0) {
 			logger.warn('Tried to add corporations from ESI but corporations array was empty');
 			return;

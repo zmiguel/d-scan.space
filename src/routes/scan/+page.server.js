@@ -11,7 +11,7 @@ import { scansProcessedCounter } from '$lib/server/metrics';
 export const actions = {
 	create: async ({ request, event }) => {
 		return await withSpan(
-			'Create Scan',
+			'route.scan.create',
 			async (span) => {
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
@@ -60,7 +60,7 @@ export const actions = {
 
 				try {
 					await withSpan(
-						'Create New Scan',
+						'route.scan.persist_new_scan',
 						async () => {
 							return await createNewScan({
 								scanGroupId,
@@ -102,7 +102,7 @@ export const actions = {
 
 	update: async ({ request, event }) => {
 		return await withSpan(
-			'Update Scan',
+			'route.scan.update',
 			async (span) => {
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
@@ -149,7 +149,7 @@ export const actions = {
 
 				try {
 					await withSpan(
-						'Update Scan',
+						'route.scan.persist_update_scan',
 						async () => {
 							return await updateScan({
 								scanGroupId,

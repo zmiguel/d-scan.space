@@ -19,7 +19,7 @@ const UNKNOWN_LABEL = 'Unknown';
  * @returns {Promise<Object>} The structured scan result.
  */
 export async function createNewDirectionalScan(rawData) {
-	return await withSpan('directional_scan.create_new', async (span) => {
+	return await withSpan('server.directional.create_new', async (span) => {
 		const startTime = Date.now();
 		const parsed = parseDirectionalLines(rawData);
 		span.setAttributes({

@@ -70,7 +70,7 @@ async function handleDelete(response, span, attempt, fullResponse) {
 
 export async function fetchGET(url, maxRetries = 3) {
 	return await withSpan(
-		`fetchGET`,
+		`server.wrappers.fetch_get`,
 		async (span) => {
 			let lastError;
 			const startTime = Date.now();
@@ -205,7 +205,7 @@ export async function fetchGET(url, maxRetries = 3) {
 
 export async function fetchPOST(url, body, maxRetries = 3) {
 	return await withSpan(
-		`fetchPOST`,
+		`server.wrappers.fetch_post`,
 		async (span) => {
 			let lastError;
 			const startTime = Date.now();

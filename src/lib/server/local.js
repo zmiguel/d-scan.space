@@ -27,7 +27,7 @@ import {
  */
 async function getCharacters(data) {
 	return await withSpan(
-		'local_scan.get_characters',
+		'server.local.get_characters',
 		async (span) => {
 			span.setAttributes({
 				'characters.requested_count': data.length,
@@ -43,7 +43,7 @@ async function getCharacters(data) {
 				outdatedExpiredCharacters,
 				outdatedCachedCharacters,
 				goodCharacters
-			} = await withSpan('local_scan.filter_characters', async (span) => {
+			} = await withSpan('server.local.filter_characters', async (span) => {
 				const missingCharacters = data.filter((l) => !charactersInDBNames.has(l));
 
 				const nowSeconds = Math.floor(Date.now() / 1000);
@@ -156,7 +156,7 @@ async function getCharacters(data) {
 
 export async function createNewLocalScan(data) {
 	return await withSpan(
-		'local_scan.create_new',
+		'server.local.create_new',
 		async (span) => {
 			const startTime = Date.now();
 			// Remove duplicates
@@ -300,7 +300,7 @@ export async function createNewLocalScan(data) {
 }
 async function updateLastSeen(characters) {
 	// extract all character ids, corp ids and alliance ids to update the last seen timestamp
-	await withSpan('updateLastSeen', async (span) => {
+	await withSpan('server.local.update_last_seen', async (span) => {
 		const characterIDs = characters.map((c) => c.id);
 		const uniqueCorporationIDs = [...new Set(characters.map((c) => c.corporation_id))];
 		const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];

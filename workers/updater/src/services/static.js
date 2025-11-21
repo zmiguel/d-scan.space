@@ -21,9 +21,9 @@ export async function updateStaticData() {
 
 	try {
 		logger.info('[SDEUpdater] Updating static data...');
-		await withSpan('CRON Static', async () => {
+		await withSpan('worker.static.cron', async () => {
 			// Get SDE version and compare it to the last entry in DB
-			const [updated, version] = await withSpan('SDE Version Check', async (span) => {
+			const [updated, version] = await withSpan('worker.static.check_version', async (span) => {
 				let lastInstalledVersion = await getLastInstalledSDEVersion();
 				const latestOnlineVersion = await getOnlineVersion();
 
@@ -131,7 +131,7 @@ export async function updateStaticData() {
 }
 
 async function getOnlineVersion() {
-	return await withSpan('Get Online Version', async (span) => {
+	return await withSpan('worker.static.get_online_version', async (span) => {
 		try {
 			// fetch the version data from the SDE Links
 			const response = await fetchGET(SDE_VERSION);
@@ -179,7 +179,7 @@ async function getOnlineVersion() {
 }
 
 async function downloadAndExtractSDE(url, files = []) {
-	await withSpan('Download and Extract SDE', async (span) => {
+	await withSpan('worker.static.download_extract', async (span) => {
 		const tempDir = './temp';
 		const zipPath = path.join(tempDir, 'sde_download.zip');
 
@@ -266,7 +266,7 @@ async function cleanupTemp() {
 }
 
 async function updateNPCCorps() {
-	return await withSpan('Update NPC Corps', async (span) => {
+	return await withSpan('worker.static.update_npc_corps', async (span) => {
 		try {
 			const jsonlFilePath = path.join('./temp', 'npcCorporations.jsonl');
 
@@ -386,7 +386,7 @@ async function updateNPCCorps() {
 }
 
 async function updateUniverse() {
-	return await withSpan('Update Universe', async (span) => {
+	return await withSpan('worker.static.update_universe', async (span) => {
 		try {
 			const tempDir = './temp';
 			const systemsData = [];
@@ -596,7 +596,7 @@ async function updateUniverse() {
 }
 
 async function updateItems() {
-	return await withSpan('Update Items', async (span) => {
+	return await withSpan('worker.static.update_items', async (span) => {
 		try {
 			const tempDir = './temp';
 
