@@ -42,4 +42,25 @@ describe('logger', () => {
 
         expect(levelResult).toEqual({ level: 'info', priority: 30 });
     });
+
+    it('should determine app name correctly', async () => {
+        const { getAppName } = await import('../../src/lib/logger.js');
+
+        // Default (MAIN)
+        expect(getAppName()).toBe('MAIN');
+
+        // Updater
+        const originalArgv = process.argv;
+        Object.defineProperty(process, 'argv', {
+            value: ['node', 'updater.js'],
+            writable: true
+        });
+
+        expect(getAppName()).toBe('UPDATER');
+
+        Object.defineProperty(process, 'argv', {
+            value: originalArgv,
+            writable: true
+        });
+    });
 });

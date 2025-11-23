@@ -131,4 +131,39 @@ describe('local', () => {
         expect(result.alliances[0].corporations[0].characters).toHaveLength(1);
         expect(result.alliances[0].corporations[0].characters[0].name).toBe('Char1');
     });
+    it('should handle outdated characters correctly', async () => {
+        const rawData = ['Good', 'Expired', 'Cached', 'Missing'];
+        const now = Date.now();
+        const oneDay = 86400 * 1000;
+
+        const dbChars = [
+            {
+                name: 'Good',
+                updated_at: new Date(now).toISOString(), // Recent
+                esi_cache_expires: null
+            },
+            {
+                name: 'Expired',
+                updated_at: new Date(now - oneDay * 2).toISOString(), // Old
+                esi_cache_expires: new Date(now - 1000) // Expired
+            },
+            {
+                name: 'Cached',
+                updated_at: (now - oneDay * 2) / 1000, // Old (timestamp seconds)
+                esi_cache_expires: new Date(now + oneDay).toISOString() // Valid
+            }
+        ];
+
+        getCharactersByName
+            .mockResolvedValueOnce(dbChars)
+            .mockResolvedValueOnce([]); // Second call
+
+        const { updateCharactersFromESI, updateAffiliationsFromESI } = await import('../../../src/lib/server/characters.js');
+
+        await createNewLocalScan(rawData);
+
+        expect(addCharactersFromESI).toHaveBeenCalledWith(['Missing']);
+        expect(updateCharactersFromESI).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Expired' })]));
+        expect(updateAffiliationsFromESI).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Cached' })]));
+    });
 });

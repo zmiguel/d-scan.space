@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { trace } from '@opentelemetry/api';
 
 const { mockTracer, mockSpan } = vi.hoisted(() => {
     const mockSpan = {
@@ -47,6 +48,7 @@ import { withSpan, createSpan, getCurrentSpan, addAttributes, addEvent, getSvelt
 describe('tracer', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        trace.getActiveSpan.mockReturnValue(mockSpan);
     });
 
     describe('withSpan', () => {
@@ -96,6 +98,32 @@ describe('tracer', () => {
             expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
             expect(mockSpan.end).toHaveBeenCalled();
         });
+
+        it('should use SvelteKit event for parent context and attributes', async () => {
+            const mockEvent = {
+                tracing: { current: mockSpan },
+                route: { id: 'test-route' },
+                url: { pathname: '/test' }
+            };
+            const fn = vi.fn().mockResolvedValue('result');
+
+            await withSpan('test-span', fn, {}, {}, mockEvent);
+
+            expect(mockSpan.setAttributes).toHaveBeenCalledWith(expect.objectContaining({
+                'sveltekit.route.id': 'test-route',
+                'sveltekit.url.pathname': '/test'
+            }));
+        });
+
+        it('should handle missing route/url in SvelteKit event', async () => {
+            const mockEvent = { tracing: { current: mockSpan } };
+            const fn = vi.fn();
+            await withSpan('test-span', fn, {}, {}, mockEvent);
+            expect(mockSpan.setAttributes).toHaveBeenCalledWith(expect.objectContaining({
+                'sveltekit.route.id': 'unknown',
+                'sveltekit.url.pathname': 'unknown'
+            }));
+        });
     });
 
     describe('createSpan', () => {
@@ -103,6 +131,12 @@ describe('tracer', () => {
             const span = createSpan('manual-span', { 'manual.attr': 'yes' });
             expect(mockTracer.startSpan).toHaveBeenCalledWith('manual-span', {});
             expect(span.setAttributes).toHaveBeenCalledWith({ 'manual.attr': 'yes' });
+        });
+
+        it('should create a span without attributes', () => {
+            const span = createSpan('manual-span');
+            expect(mockTracer.startSpan).toHaveBeenCalledWith('manual-span', {});
+            expect(span.setAttributes).not.toHaveBeenCalled();
         });
     });
 
@@ -132,10 +166,22 @@ describe('tracer', () => {
             expect(mockSpan.setAttributes).toHaveBeenCalledWith({ 'test.attr': 'val' });
         });
 
+        it('should handle no active span in addAttributes', () => {
+            trace.getActiveSpan.mockReturnValue(undefined);
+            addAttributes({ 'test.attr': 'val' });
+            expect(mockSpan.setAttributes).not.toHaveBeenCalled();
+        });
+
         it('should add event to SvelteKit span', () => {
             const mockEvent = { tracing: { current: mockSpan } };
             addEvent('test-event', { 'attr': 'val' }, mockEvent);
             expect(mockSpan.addEvent).toHaveBeenCalledWith('test-event', { 'attr': 'val' });
+        });
+
+        it('should handle no active span in addEvent', () => {
+            trace.getActiveSpan.mockReturnValue(undefined);
+            addEvent('test-event', { 'attr': 'val' });
+            expect(mockSpan.addEvent).not.toHaveBeenCalled();
         });
     });
 });

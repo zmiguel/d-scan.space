@@ -148,4 +148,59 @@ describe('DB Pool Metrics', () => {
         expect(values).toContain(5);  // In use (appears twice: both in-use and idle are 5)
         expect(values).toContain(0);  // Waiting
     });
+
+    it('should handle error in pool metrics observation', async () => {
+        vi.resetModules();
+        await import('../../../src/lib/server/metrics.js');
+        const { default: logger } = await import('../../../src/lib/logger.js');
+
+        const calls = mockMeter.addBatchObservableCallback.mock.calls;
+        // Find the DB pool callback (it's the first one usually, or verify by args)
+        const callback = calls.find(c => c[1].some(g => g.name === 'db_connection_pool_size'))[0];
+
+        const mockObservableResult = {
+            observe: vi.fn().mockImplementation(() => { throw new Error('Observe Error'); })
+        };
+
+        callback(mockObservableResult);
+        expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it('should log debug if pool is not initialized', async () => {
+        vi.resetModules();
+        vi.doMock('../../../src/lib/database/client.js', () => ({ pool: null }));
+        const { default: logger } = await import('../../../src/lib/logger.js');
+
+        await import('../../../src/lib/server/metrics.js');
+
+        expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('disabled'));
+    });
+});
+
+describe('ESI Metrics', () => {
+    it('should observe ESI rate limits', async () => {
+        vi.resetModules();
+        const { recordEsiRequest } = await import('../../../src/lib/server/metrics.js');
+
+        // Set values
+        recordEsiRequest('GET', 200, 100, 50, 60);
+
+        const calls = mockMeter.addBatchObservableCallback.mock.calls;
+        expect(calls.length).toBeGreaterThanOrEqual(2);
+
+        // Find ESI callback (use the last one registered, as resetModules causes re-registration)
+        const matchingCalls = calls.filter(c => c[1].some(g => g.name === 'esi_error_limit_remain'));
+        const callback = matchingCalls[matchingCalls.length - 1][0];
+
+        const mockObservableResult = {
+            observe: vi.fn()
+        };
+
+        callback(mockObservableResult);
+
+        expect(mockObservableResult.observe).toHaveBeenCalledTimes(2); // remain and reset
+        const values = mockObservableResult.observe.mock.calls.map(c => c[1]);
+        expect(values).toContain(50);
+        expect(values).toContain(60);
+    });
 });

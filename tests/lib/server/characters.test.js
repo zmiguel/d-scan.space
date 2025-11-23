@@ -102,75 +102,176 @@ describe('characters', () => {
 
             expect(fetchPOST).not.toHaveBeenCalled();
         });
-        expect(fetchPOST).not.toHaveBeenCalled();
-    });
 
-    it('should handle empty input gracefully', async () => {
-        await addCharactersFromESI([]);
-        expect(fetchPOST).not.toHaveBeenCalled();
-    });
-
-    it('should handle ESI error in names to ids', async () => {
-        fetchPOST.mockResolvedValueOnce({
-            ok: false,
-            status: 500,
-            text: async () => 'Internal Server Error',
-            url: 'https://esi.evetech.net/universe/ids'
+        it('should handle empty input gracefully', async () => {
+            await addCharactersFromESI([]);
+            expect(fetchPOST).not.toHaveBeenCalled();
         });
 
-        await addCharactersFromESI(['Char1']);
+        it('should handle ESI error in names to ids', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                text: async () => 'Internal Server Error',
+                url: 'https://esi.evetech.net/universe/ids'
+            });
 
-        expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
-    });
-});
+            await addCharactersFromESI(['Char1']);
 
-describe('updateCharactersFromESI', () => {
-    it('should update characters from ESI', async () => {
-        const data = [{ id: 1 }];
-
-        // Mock idsToCharacters flow
-        // 1. ids -> affiliations
-        fetchPOST.mockResolvedValueOnce({
-            ok: true,
-            json: async () => [{ character_id: 1, corporation_id: 10 }]
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
         });
 
-        // 2. ids -> character details
-        fetchGET.mockResolvedValue({
-            ok: true,
-            json: async () => ({ name: 'Char1', security_status: 0.1 }),
-            headers: { get: () => null }
+        it('should handle getCharacterFromESI failure', async () => {
+            const names = ['Char1'];
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+            fetchGET.mockResolvedValue({
+                ok: false,
+                status: 404,
+                statusText: 'Not Found'
+            });
+
+            await addCharactersFromESI(names);
+
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
         });
 
-        await updateCharactersFromESI(data);
+        it('should handle namesToCharacters affiliations failure', async () => {
+            const names = ['Char1'];
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            // Affiliations failure
+            fetchPOST.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                text: async () => 'Error',
+                url: 'url'
+            });
+            // Mock fetchGET to avoid crash
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
+            });
 
-        expect(addOrUpdateCharactersDB).toHaveBeenCalled();
-    });
-});
-
-describe('updateAffiliationsFromESI', () => {
-    it('should update affiliations only', async () => {
-        const data = [{ id: 1, name: 'Char1' }];
-
-        fetchPOST.mockResolvedValueOnce({
-            ok: true,
-            json: async () => [{ character_id: 1, corporation_id: 99, alliance_id: 999 }]
+            await addCharactersFromESI(names);
+            // Should return empty affiliations, so no characters added
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
         });
 
-        await updateAffiliationsFromESI(data);
+        it('should handle empty affiliations from ESI', async () => {
+            const names = ['Char1'];
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            // Empty affiliations
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => []
+            });
+            // Mock fetchGET to avoid crash
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
+            });
 
-
-        expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([
-            expect.objectContaining({
-                id: 1,
-                corporation_id: 99,
-                alliance_id: 999
-            })
-        ]);
+            await addCharactersFromESI(names);
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+        });
     });
 
+    describe('updateCharactersFromESI', () => {
+        it('should update characters from ESI', async () => {
+            const data = [{ id: 1 }];
+
+            // Mock idsToCharacters flow
+            // 1. ids -> affiliations
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+
+            // 2. ids -> character details
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0.1 }),
+                headers: { get: () => null }
+            });
+
+            await updateCharactersFromESI(data);
+
+            expect(addOrUpdateCharactersDB).toHaveBeenCalled();
+        });
+    });
+
+    describe('updateAffiliationsFromESI', () => {
+        it('should update affiliations only', async () => {
+            const data = [{ id: 1, name: 'Char1' }];
+
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 99, alliance_id: 999 }]
+            });
+
+            await updateAffiliationsFromESI(data);
+
+
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([
+                expect.objectContaining({
+                    id: 1,
+                    corporation_id: 99,
+                    alliance_id: 999
+                })
+            ]);
+        });
+
+        it('should handle Doomheim characters in updateAffiliationsFromESI', async () => {
+            const data = [{ id: 1, name: 'Char1' }];
+
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 1000001 }]
+            });
+
+            await updateAffiliationsFromESI(data);
+
+            const { biomassCharacter } = await import('../../../src/lib/database/characters.js');
+            expect(biomassCharacter).toHaveBeenCalledWith(1);
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+        });
+
+        it('should handle failure in updateAffiliationsFromESI', async () => {
+            const data = [{ id: 1, name: 'Char1' }];
+
+            fetchPOST.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                text: async () => 'Error',
+                url: 'url'
+            });
+
+            await updateAffiliationsFromESI(data);
+
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+        });
+    });
 
     describe('idsToCharacters', () => {
+        it('should handle empty input', async () => {
+            const result = await idsToCharacters([]);
+            expect(result).toEqual([]);
+        });
+
         it('should handle Doomheim characters (biomass)', async () => {
             // 1. affiliations -> Doomheim
             fetchPOST.mockResolvedValueOnce({
@@ -189,7 +290,6 @@ describe('updateAffiliationsFromESI', () => {
 
             expect(result).toHaveLength(0);
             // biomassCharacter is mocked, check if it was called
-            // Note: biomassCharacter is imported from database/characters.js which is mocked
             const { biomassCharacter } = await import('../../../src/lib/database/characters.js');
             expect(biomassCharacter).toHaveBeenCalledWith(1);
         });
@@ -221,6 +321,12 @@ describe('updateAffiliationsFromESI', () => {
                 status: 500,
                 text: async () => 'Error',
                 url: 'url'
+            });
+            // Mock fetchGET to avoid crash
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
             });
 
             const result = await idsToCharacters([1]);

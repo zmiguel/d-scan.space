@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Hoist mocks
+// Mock dependencies
 const { mockSpan, mockDb } = vi.hoisted(() => {
     const mockSpan = {
         setAttributes: vi.fn(),
-        addEvent: vi.fn(),
-        end: vi.fn()
+        setStatus: vi.fn(),
+        addEvent: vi.fn()
     };
 
     const mockDb = {
@@ -69,7 +69,8 @@ import {
     addOrUpdateGroupsDB,
     addOrUpdateTypesDB,
     getTypeHierarchyMetadata,
-    getSystemByName
+    getSystemByName,
+    updateSystemsLastSeen
 } from '../../../src/lib/database/sde.js';
 
 describe('sde', () => {
@@ -129,12 +130,46 @@ describe('sde', () => {
             expect(mockDb.insert).not.toHaveBeenCalled();
         });
 
+        it('should batch insert/update systems', async () => {
+            const data = [{ id: 1, name: 'System' }];
+            await addOrUpdateSystemsDB(data);
+
+            expect(mockDb.insert).toHaveBeenCalledTimes(1);
+            expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+        });
+    });
+
+    describe('addOrUpdateCategoriesDB', () => {
+        it('should do nothing if data is empty', async () => {
+            await addOrUpdateCategoriesDB([]);
+            expect(mockDb.insert).not.toHaveBeenCalled();
+        });
+
         it('should batch insert/update categories', async () => {
             const data = [{ id: 1, name: 'Cat' }];
             await addOrUpdateCategoriesDB(data);
 
             expect(mockDb.insert).toHaveBeenCalledTimes(1);
             expect(mockDb.onConflictDoUpdate).toHaveBeenCalled();
+        });
+    });
+
+    describe('updateSystemsLastSeen', () => {
+        it('should do nothing if systemIds is empty', async () => {
+            await updateSystemsLastSeen([]);
+            expect(mockDb.update).not.toHaveBeenCalled();
+        });
+
+        it('should update last_seen for given systems', async () => {
+            const systemIds = [1, 2, 3];
+            // Mock inArray to return a dummy value or just ensure it's called
+            await updateSystemsLastSeen(systemIds);
+
+            expect(mockDb.update).toHaveBeenCalled();
+            expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({
+                last_seen: expect.anything()
+            }));
+            expect(mockDb.where).toHaveBeenCalled();
         });
     });
 
@@ -174,6 +209,11 @@ describe('sde', () => {
             expect(result.size).toBe(0);
         });
 
+        it('should return empty map for invalid IDs', async () => {
+            const result = await getTypeHierarchyMetadata(['invalid', -1, null]);
+            expect(result.size).toBe(0);
+        });
+
         it('should return hierarchy metadata', async () => {
             const mockRows = [
                 {
@@ -204,6 +244,19 @@ describe('sde', () => {
                 categoryId: 100,
                 categoryName: 'Category1'
             });
+        });
+
+        it('should filter out invalid rows from DB', async () => {
+            const mockRows = [
+                { typeId: 1, typeName: 'Valid' },
+                { typeId: 'invalid', typeName: 'Invalid' }, // Should be skipped
+                { typeId: -1, typeName: 'Negative' } // Should be skipped
+            ];
+            mockDb.where.mockResolvedValue(mockRows);
+
+            const result = await getTypeHierarchyMetadata([1]);
+            expect(result.size).toBe(1);
+            expect(result.has(1)).toBe(true);
         });
     });
 

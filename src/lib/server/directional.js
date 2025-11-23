@@ -210,9 +210,12 @@ function isOnGrid(distance) {
 	const normalized = distance.toLowerCase();
 	if (normalized === '-') return false;
 	if (normalized.endsWith('au')) return false;
-	if (normalized.endsWith('m')) return true;
 	if (normalized.endsWith('km')) {
 		const numeric = Number(normalized.replace('km', '').trim().replace(/,/g, ''));
+		return Number.isFinite(numeric);
+	}
+	if (normalized.endsWith('m')) {
+		const numeric = Number(normalized.replace('m', '').trim().replace(/,/g, ''));
 		return Number.isFinite(numeric);
 	}
 	return false;

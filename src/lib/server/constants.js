@@ -10,9 +10,9 @@ const isUpdater = typeof process !== 'undefined' && process.argv?.[1]?.includes(
 // Example user agent:     D-Scan.Space/0.0.5 (production; Dev-Branch; +https://dev.d-scan.space) (+https://github.com/zmiguel/d-scan.space; mail:<email>; eve:<ign>; discord:<discord>) Node/24.11.1 (linux; x64)
 export const USER_AGENT = isUpdater
 	? `D-Scan.Space-Updater/${version} (+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`
-	: `D-Scan.Space/${version} (${env.NODE_ENV}; ${env.AGENT}; +${env.ORIGIN || 'undefined'}) ` +
-		`(+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) ` +
-		`Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
+	: `D-Scan.Space/${version} (${env.NODE_ENV || 'development'}; ${env.AGENT || 'unknown'}; +${env.ORIGIN || 'undefined'}) ` +
+	`(+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) ` +
+	`Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
 
 // BATCH SETTINGS
 export const BATCH_UNIVERSE = 50;

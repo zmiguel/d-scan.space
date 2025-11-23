@@ -83,23 +83,102 @@ describe('scans', () => {
                 is_public: false
             };
 
+            // Mock transaction to immediately execute the callback
             mockDb.transaction.mockImplementation(async (callback) => {
                 const tx = {
                     insert: vi.fn().mockReturnThis(),
                     values: vi.fn().mockResolvedValue()
                 };
                 await callback(tx);
-                expect(tx.insert).toHaveBeenCalledTimes(2); // scanGroups and scans
+
+                // Verify logic inside transaction
+                expect(tx.insert).toHaveBeenCalledTimes(2);
+                // First insert: scanGroups
+                expect(tx.insert).toHaveBeenNthCalledWith(1, expect.objectContaining({
+                    id: 'scanGroups.id',
+                    system: 'scanGroups.system',
+                    public: 'scanGroups.public',
+                    created_at: 'scanGroups.created_at'
+                }));
+                expect(tx.values).toHaveBeenNthCalledWith(1, expect.objectContaining({
+                    id: 'group1',
+                    public: false
+                }));
+
+                // Second insert: scans
+                expect(tx.insert).toHaveBeenNthCalledWith(2, expect.objectContaining({
+                    id: 'scans.id',
+                    group_id: 'scans.group_id',
+                    scan_type: 'scans.scan_type',
+                    created_at: 'scans.created_at',
+                    data: 'scans.data',
+                    raw_data: 'scans.raw_data'
+                }));
+                expect(tx.values).toHaveBeenNthCalledWith(2, expect.objectContaining({
+                    id: 'scan1',
+                    group_id: 'group1',
+                    scan_type: 'local'
+                }));
             });
 
             await createNewScan(data);
 
             expect(mockDb.transaction).toHaveBeenCalled();
         });
+        it('should create new scan without system info', async () => {
+            const data = {
+                scanId: 'scan-123',
+                scanGroupId: 'group-123',
+                type: 'directional',
+                is_public: true,
+                data: {}, // No system info
+                raw_data: 'raw'
+            };
+
+            const mockTx = {
+                insert: vi.fn().mockReturnThis(),
+                values: vi.fn().mockResolvedValue()
+            };
+            mockDb.transaction.mockImplementation(async (cb) => await cb(mockTx));
+
+            await createNewScan(data);
+
+            expect(mockTx.insert).toHaveBeenCalledTimes(2);
+            // Verify system is null in scanGroups insert
+            expect(mockTx.values).toHaveBeenCalledWith(expect.objectContaining({
+                id: 'group-123',
+                system: null
+            }));
+        });
+
+        it('should create new scan with system info', async () => {
+            const data = {
+                scanId: 'scan-sys',
+                scanGroupId: 'group-sys',
+                type: 'directional',
+                is_public: true,
+                data: { system: { name: 'Jita' } },
+                raw_data: 'raw'
+            };
+
+            const mockTx = {
+                insert: vi.fn().mockReturnThis(),
+                values: vi.fn().mockResolvedValue()
+            };
+            mockDb.transaction.mockImplementation(async (cb) => await cb(mockTx));
+
+            await createNewScan(data);
+
+            expect(mockTx.insert).toHaveBeenCalledTimes(2);
+            expect(mockTx.values).toHaveBeenCalledWith(expect.objectContaining({
+                id: 'group-sys',
+                system: { name: 'Jita' }
+            }));
+        });
     });
 
     describe('updateScan', () => {
-        it('should update scan in transaction', async () => {
+        it('should update scan in transaction with system info', async () => {
             const data = {
                 scanId: 'scan2',
                 scanGroupId: 'group1',
@@ -117,8 +196,15 @@ describe('scans', () => {
                     where: vi.fn().mockResolvedValue()
                 };
                 await callback(tx);
+
                 expect(tx.insert).toHaveBeenCalled();
-                expect(tx.update).toHaveBeenCalled(); // Should update system info
+                expect(tx.update).toHaveBeenCalledWith(expect.objectContaining({
+                    id: 'scanGroups.id',
+                    system: 'scanGroups.system',
+                    public: 'scanGroups.public',
+                    created_at: 'scanGroups.created_at'
+                }));
+                expect(tx.set).toHaveBeenCalledWith({ system: { name: 'Jita' } });
             });
 
             await updateScan(data);
@@ -126,28 +212,57 @@ describe('scans', () => {
             expect(mockDb.transaction).toHaveBeenCalled();
         });
 
-    });
-
-
-    describe('getPublicScans', () => {
-        it('should fetch public scans', async () => {
-            const mockSelect = {
-                from: vi.fn().mockReturnThis(),
-                leftJoin: vi.fn().mockReturnThis(),
-                where: vi.fn().mockReturnThis(),
-                orderBy: vi.fn().mockResolvedValue([{ id: 1 }])
+        it('should update scan in transaction without system info', async () => {
+            const data = {
+                scanId: 'scan3',
+                scanGroupId: 'group2',
+                type: 'local',
+                data: {}, // No system info
+                raw_data: []
             };
-            mockDb.select.mockReturnValue(mockSelect);
 
-            const result = await getPublicScans();
+            mockDb.transaction.mockImplementation(async (callback) => {
+                const tx = {
+                    insert: vi.fn().mockReturnThis(),
+                    values: vi.fn().mockResolvedValue(),
+                    update: vi.fn().mockReturnThis(),
+                    set: vi.fn().mockReturnThis(),
+                    where: vi.fn().mockResolvedValue()
+                };
+                await callback(tx);
 
-            expect(mockDb.select).toHaveBeenCalled();
-            expect(mockSelect.from).toHaveBeenCalled();
-            expect(mockSelect.leftJoin).toHaveBeenCalled();
-            expect(mockSelect.where).toHaveBeenCalled();
-            expect(mockSelect.orderBy).toHaveBeenCalled();
-            expect(result).toHaveLength(1);
+                expect(tx.insert).toHaveBeenCalled();
+                expect(tx.update).not.toHaveBeenCalled(); // Should NOT update system info
+            });
+
+            await updateScan(data);
+
+            expect(mockDb.transaction).toHaveBeenCalled();
         });
     });
+
 });
+
+
+describe('getPublicScans', () => {
+    it('should fetch public scans', async () => {
+        const mockSelect = {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            orderBy: vi.fn().mockResolvedValue([{ id: 1 }])
+        };
+        mockDb.select.mockReturnValue(mockSelect);
+
+        const result = await getPublicScans();
+
+        expect(mockDb.select).toHaveBeenCalled();
+        expect(mockSelect.from).toHaveBeenCalled();
+        expect(mockSelect.leftJoin).toHaveBeenCalled();
+        expect(mockSelect.where).toHaveBeenCalled();
+        expect(mockSelect.orderBy).toHaveBeenCalled();
+        expect(result).toHaveLength(1);
+    });
+});
+
 

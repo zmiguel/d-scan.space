@@ -20,8 +20,16 @@ vi.mock('../../../src/lib/database/characters.js', () => ({
     biomassCharacter: vi.fn()
 }));
 
+const mocks = vi.hoisted(() => ({
+    agentClose: vi.fn()
+}));
+
 vi.mock('undici', () => ({
-    Agent: vi.fn()
+    Agent: class {
+        constructor() {
+            this.close = mocks.agentClose;
+        }
+    }
 }));
 
 import { fetchGET, fetchPOST } from '../../../src/lib/server/wrappers.js';
@@ -116,6 +124,35 @@ describe('wrappers', () => {
             expect(biomassCharacter).toHaveBeenCalledWith(123);
             expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 0 });
         });
+
+        it('should handle JSON parse error by falling back to text', async () => {
+            const errorResponse = {
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                headers: { entries: () => [], get: () => null },
+                clone: () => ({
+                    json: async () => { throw new Error('Invalid JSON'); },
+                    text: async () => 'Raw Text Error'
+                }),
+                url: 'http://test.com'
+            };
+            global.fetch.mockResolvedValue(errorResponse);
+
+            try {
+                await fetchGET('http://test.com');
+            } catch (e) {
+                expect(e.message).toContain('Raw Text Error');
+            }
+        });
+
+        it('should handle network error (fetch throws) and decrement concurrency', async () => {
+            global.fetch.mockRejectedValue(new TypeError('Network Error'));
+            const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
+
+            await expect(fetchGET('http://test.com')).rejects.toThrow('Network Error');
+            expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
+        });
     });
 
     describe('fetchPOST', () => {
@@ -201,6 +238,61 @@ describe('wrappers', () => {
 
             expect(biomassCharacter).toHaveBeenCalledWith(123);
             expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 0 });
+        });
+
+        it('should truncate large error response previews', async () => {
+            const largeError = 'x'.repeat(1000);
+            const errorResponse = {
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                headers: { entries: () => [], get: () => null },
+                clone: () => ({
+                    json: async () => ({ error: largeError }),
+                    text: async () => largeError
+                }),
+                url: 'http://test.com'
+            };
+            global.fetch.mockResolvedValue(errorResponse);
+
+            await expect(fetchPOST('http://test.com', {})).rejects.toThrow();
+        });
+
+        it('should handle JSON parse error by falling back to text', async () => {
+            const errorResponse = {
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                headers: { entries: () => [], get: () => null },
+                clone: () => ({
+                    json: async () => { throw new Error('Invalid JSON'); },
+                    text: async () => 'Raw Text Error'
+                }),
+                url: 'http://test.com'
+            };
+            global.fetch.mockResolvedValue(errorResponse);
+
+            try {
+                await fetchPOST('http://test.com', {});
+            } catch (e) {
+                expect(e.message).toContain('Raw Text Error');
+            }
+        });
+
+        it('should handle network error (fetch throws) and decrement concurrency', async () => {
+            global.fetch.mockRejectedValue(new TypeError('Network Error'));
+            const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
+
+            await expect(fetchPOST('http://test.com', {})).rejects.toThrow('Network Error');
+            expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
+        });
+    });
+
+    describe('beforeExit handler', () => {
+        it('should close agent on beforeExit', async () => {
+            // Trigger the beforeExit event manually
+            process.emit('beforeExit');
+            expect(mocks.agentClose).toHaveBeenCalled();
         });
     });
 });

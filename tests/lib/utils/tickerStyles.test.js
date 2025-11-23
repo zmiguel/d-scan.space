@@ -89,6 +89,25 @@ describe('tickerStyles', () => {
             expect(document.createElement).not.toHaveBeenCalled();
             expect(document.head.appendChild).not.toHaveBeenCalled();
         });
+
+        it('should not add style element if already in cache', () => {
+            const mockStyle = {};
+            document.createElement.mockReturnValue(mockStyle);
+            document.getElementById.mockReturnValue(null);
+
+            // First call adds to cache
+            ensureTickerStyles('CACHED');
+
+            // Reset mocks to verify second call
+            document.createElement.mockClear();
+            document.head.appendChild.mockClear();
+
+            // Second call should hit cache
+            ensureTickerStyles('CACHED');
+
+            expect(document.createElement).not.toHaveBeenCalled();
+            expect(document.head.appendChild).not.toHaveBeenCalled();
+        });
     });
 
     describe('getHoverClass', () => {

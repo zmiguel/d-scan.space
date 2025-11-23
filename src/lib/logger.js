@@ -1,7 +1,11 @@
 import pino from 'pino';
 
-const isUpdater = typeof process !== 'undefined' && process.argv?.[1]?.includes('updater');
-const appName = isUpdater ? 'UPDATER' : 'MAIN';
+export const getAppName = () => {
+	const isUpdater = typeof process !== 'undefined' && process.argv?.[1]?.includes('updater');
+	return isUpdater ? 'UPDATER' : 'MAIN';
+};
+
+const appName = getAppName();
 
 export default pino({
 	level: process.env.LOG_LEVEL || 'info',

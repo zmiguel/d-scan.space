@@ -29,7 +29,7 @@ vi.mock('../../../src/lib/database/schema.js', () => ({
     alliances: { id: 'alliances.id', name: 'alliances.name', ticker: 'alliances.ticker', updated_at: 'alliances.updated_at', last_seen: 'alliances.last_seen' }
 }));
 
-import { getAlliancesByID, addOrUpdateAlliancesDB, updateAlliancesLastSeen } from '../../../src/lib/database/alliances.js';
+import { getAlliancesByID, addOrUpdateAlliancesDB, updateAlliancesLastSeen, getAllAlliances } from '../../../src/lib/database/alliances.js';
 
 describe('database/alliances', () => {
     beforeEach(() => {
@@ -49,6 +49,21 @@ describe('database/alliances', () => {
             expect(mockDb.select).toHaveBeenCalled();
             expect(mockSelect.where).toHaveBeenCalled();
             expect(result).toEqual([{ id: 1, name: 'Alliance1' }]);
+        });
+    });
+
+    describe('getAllAlliances', () => {
+        it('should fetch all alliances', async () => {
+            const mockSelect = {
+                from: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }])
+            };
+            mockDb.select.mockReturnValue(mockSelect);
+
+            const result = await getAllAlliances();
+
+            expect(mockDb.select).toHaveBeenCalled();
+            expect(mockSelect.from).toHaveBeenCalled();
+            expect(result).toHaveLength(2);
         });
     });
 
