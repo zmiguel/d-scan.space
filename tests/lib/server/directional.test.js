@@ -246,4 +246,94 @@ describe('directional', () => {
         expect(result.on_grid.total_objects).toBe(2);
         expect(result.off_grid.total_objects).toBe(2);
     });
+
+    describe('System Name Detection Edge Cases', () => {
+        it('should handle conflicting system candidates', async () => {
+            const rawData = [
+                '1\tJita - Station\tStation\t10 km',
+                '2\tAmarr - Station\tStation\t10 km',
+                '3\tJita - Gate\tGate\t10 km'
+            ];
+            // Need correct category/group IDs for detection to work
+            // Station: Cat 3
+            // Gate: Cat 0? Gate isn't in the list of detected types in determineSystemName?
+            // determineSystemName supports:
+            // Cat 65 (Structure), Cat 3 (Station), Cat 2 (Celestial)
+            // Let's use Station (Cat 3) for all to be safe, or Celestial (Cat 2)
+            const mockMetadata = new Map([
+                [1, { typeId: 1, typeName: 'Station', categoryId: 3, groupId: 1 }],
+                [2, { typeId: 2, typeName: 'Station', categoryId: 3, groupId: 1 }],
+                [3, { typeId: 3, typeName: 'Gate', categoryId: 3, groupId: 1 }] // Pretend gate is station for detection
+            ]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockImplementation(async (name) => ({ name }));
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system.name).toBe('Jita');
+        });
+
+        it('should handle determineSystemName with null/unknown name', async () => {
+            const rawData = '1\tUnknown System - Station\tStation\t10 km';
+            const mockMetadata = new Map([[1, { typeId: 1, typeName: 'Station', categoryId: 3 }]]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockResolvedValue(null);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system).toBeUndefined();
+        });
+
+        it('should handle extraction edge cases (missing delimiters)', async () => {
+            const rawData = [
+                '1\tAnsiblexNoDelimiter\tAnsiblex Jump Gate\t10 km',
+                '2\tStructureNoDelimiter\tAstrahus\t10 km',
+                '3\tSunNoDelimiter\tSun G5\t10 AU',
+                '4\tMoonNoDelimiter\tMoon\t10 AU'
+            ];
+            const mockMetadata = new Map([
+                [1, { typeId: 1, typeName: 'Ansiblex Jump Gate', categoryId: 65, groupId: 1408 }],
+                [2, { typeId: 2, typeName: 'Astrahus', categoryId: 65, groupId: 1657 }],
+                [3, { typeId: 3, typeName: 'Sun G5', categoryId: 2, groupId: 6 }],
+                [4, { typeId: 4, typeName: 'Moon', categoryId: 2, groupId: 8 }]
+            ]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockResolvedValue(null);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system).toBeUndefined();
+        });
+
+        it('should handle structure name starting with delimiter', async () => {
+            const rawData = '1\t - Structure Name\tAstrahus\t10 km';
+            const mockMetadata = new Map([
+                [1, { typeId: 1, typeName: 'Astrahus', categoryId: 65, groupId: 1657 }]
+            ]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockResolvedValue(null);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system).toBeUndefined();
+        });
+    });
+
+    describe('Parsing Edge Cases', () => {
+        it('should handle empty/null name/type/distance in parseDirectionalLines', async () => {
+            // Add dummy char at end to survive trim()
+            const rawData = '123\t\t\t\tx';
+            const mockMetadata = new Map([[123, { typeId: 123 }]]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.off_grid.total_objects).toBe(1);
+            expect(result.on_grid.total_objects).toBe(0);
+        });
+
+        it('should handle isOnGrid with empty distance (via extra column)', async () => {
+            const rawData = '123\tName\tType\t\tExtra';
+            const mockMetadata = new Map([[123, { typeId: 123 }]]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.off_grid.total_objects).toBe(1);
+        });
+    });
 });

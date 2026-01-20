@@ -92,8 +92,8 @@ async function getCharacters(data) {
 				// Missing + outdated = cache miss (need to fetch from ESI)
 				cacheMissCounter.add(
 					missingCharacters.length +
-						outdatedExpiredCharacters.length +
-						outdatedCachedCharacters.length,
+					outdatedExpiredCharacters.length +
+					outdatedCachedCharacters.length,
 					{ resource: 'character' }
 				);
 
@@ -270,7 +270,7 @@ export async function createNewLocalScan(data) {
 
 			const totalAlliances = formattedData.alliances.length;
 			const totalCorporations = formattedData.alliances.reduce(
-				(acc, alliance) => acc + (alliance.corporation_count ?? 0),
+				(acc, alliance) => acc + alliance.corporation_count,
 				0
 			);
 			const totalPilots = allCharacters.length;

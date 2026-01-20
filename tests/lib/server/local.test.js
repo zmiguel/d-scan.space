@@ -166,4 +166,32 @@ describe('local', () => {
         expect(updateCharactersFromESI).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Expired' })]));
         expect(updateAffiliationsFromESI).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'Cached' })]));
     });
+
+    it('should handle invalid timestamp types gracefully', async () => {
+        const rawData = ['Character A'];
+        // Mock getCharactersByName to return a character with invalid dates
+        getCharactersByName.mockResolvedValue([
+            {
+                id: 1,
+                name: 'Character A',
+                updated_at: null, // Invalid
+                esi_cache_expires: {}, // Invalid
+                corporation_id: 10,
+                corporation_name: 'Corp A',
+                alliance_id: 100,
+                alliance_name: 'Alliance A'
+            }
+        ]);
+
+        // We need to import the mocked function to check if it was called
+        const { updateCharactersFromESI } = await import('../../../src/lib/server/characters.js');
+
+        await createNewLocalScan(rawData);
+
+        // If updated_at is invalid (0), it is < now - 1 day.
+        // If esi_cache_expires is invalid (0), it is < now.
+        // So it should be considered "outdatedExpired".
+        // So it should trigger updateCharactersFromESI.
+        expect(updateCharactersFromESI).toHaveBeenCalled();
+    });
 });

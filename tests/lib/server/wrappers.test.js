@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies
 const mockSpan = {
@@ -37,11 +37,12 @@ import { recordEsiRequest } from '../../../src/lib/server/metrics.js';
 import { biomassCharacter } from '../../../src/lib/database/characters.js';
 
 // Mock global fetch
-global.fetch = vi.fn();
+// global.fetch = vi.fn(); // Move to beforeEach
 
 describe('wrappers', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
+        global.fetch = vi.fn();
     });
 
     describe('fetchGET', () => {
@@ -147,10 +148,10 @@ describe('wrappers', () => {
         });
 
         it('should handle network error (fetch throws) and decrement concurrency', async () => {
-            global.fetch.mockRejectedValue(new TypeError('Network Error'));
+            global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
             const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
-            await expect(fetchGET('http://test.com')).rejects.toThrow('Network Error');
+            await expect(fetchGET('http://test.com', 1)).rejects.toThrow('Network Error');
             expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
         });
     });
@@ -280,11 +281,25 @@ describe('wrappers', () => {
         });
 
         it('should handle network error (fetch throws) and decrement concurrency', async () => {
-            global.fetch.mockRejectedValue(new TypeError('Network Error'));
+            global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
             const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
-            await expect(fetchPOST('http://test.com', {})).rejects.toThrow('Network Error');
+            await expect(fetchPOST('http://test.com', {}, 1)).rejects.toThrow('Network Error');
             expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
+        });
+
+        it('should handle POST network error fallback', async () => {
+            const error = new Error('Network Error');
+            global.fetch.mockRejectedValueOnce(error);
+            global.fetch.mockRejectedValueOnce(error);
+            global.fetch.mockRejectedValueOnce(error);
+
+            await expect(fetchPOST('https://esi.evetech.net/v1/post', {})).rejects.toThrow('Network Error');
+
+            // Verify span.addEvent fallback
+            expect(mockSpan.addEvent).toHaveBeenCalledWith('Fetch Failed', expect.objectContaining({
+                error: 'Network Error'
+            }));
         });
     });
 
@@ -293,6 +308,72 @@ describe('wrappers', () => {
             // Trigger the beforeExit event manually
             process.emit('beforeExit');
             expect(mocks.agentClose).toHaveBeenCalled();
+        });
+    });
+
+    describe('createPreview', () => {
+        it('should handle null payload in error preview', async () => {
+            global.fetch.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                statusText: 'Internal Server Error',
+                headers: new Map(),
+                json: async () => null,
+                clone: () => ({
+                    json: async () => null,
+                    text: async () => 'null'
+                }),
+                url: 'https://esi.evetech.net/v1/test'
+            });
+
+            try {
+                await fetchGET('https://esi.evetech.net/v1/test');
+            } catch (e) {
+                const msg = e.message;
+                const hasNullOrUndefined = msg.includes('null') || msg.includes('undefined');
+                expect(hasNullOrUndefined).toBe(true);
+            }
+        });
+    });
+
+    describe('getResourceType', () => {
+        it('should identify resource types correctly', async () => {
+            const types = [
+                { url: '/characters/', type: 'character' },
+                { url: '/corporations/', type: 'corporation' },
+                { url: '/alliances/', type: 'alliance' },
+                { url: '/universe/systems/', type: 'system' },
+                { url: '/universe/types/', type: 'type' },
+                { url: '/universe/groups/', type: 'group' },
+                { url: '/universe/categories/', type: 'category' },
+                { url: '/status/', type: 'status' },
+                { url: '/search/', type: 'search' },
+                { url: '/other/', type: 'other' }
+            ];
+
+            for (const { url, type } of types) {
+                vi.clearAllMocks();
+                global.fetch.mockResolvedValueOnce({
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    headers: new Map(),
+                    json: async () => ({}),
+                    clone: () => ({ json: async () => ({}) }),
+                    url: `https://esi.evetech.net${url}`
+                });
+
+                await fetchGET(`https://esi.evetech.net${url}`);
+
+                expect(recordEsiRequest).toHaveBeenCalledWith(
+                    'GET',
+                    200,
+                    expect.any(Number),
+                    undefined, // limitRemain (undefined because map.get returns undefined)
+                    undefined, // limitReset
+                    type
+                );
+            }
         });
     });
 });

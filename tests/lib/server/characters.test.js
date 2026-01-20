@@ -332,5 +332,146 @@ describe('characters', () => {
             const result = await idsToCharacters([1]);
             expect(result).toHaveLength(0);
         });
+
+        it('should handle invalid expires header in getCharacterFromESI', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1' }),
+                headers: { get: () => 'Invalid Date' }
+            });
+
+            const result = await idsToCharacters([1]);
+            expect(result[0].esi_cache_expires).toBeUndefined();
+        });
+
+        it('should handle idsToCharacters with null character result', async () => {
+            // Affiliation ok
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+            // Character fetch fails (returns null from getCharacterFromESI)
+            fetchGET.mockResolvedValue({
+                ok: false,
+                status: 404,
+                statusText: 'Not Found'
+            });
+
+            const result = await idsToCharacters([1]);
+            expect(result).toHaveLength(0);
+        });
+
+        it('should handle missing affiliation in namesToCharacters', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            // Affiliations return affiliation for a DIFFERENT character (so id 1 is missing)
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 999, corporation_id: 10 }]
+            });
+            // Character fetch
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1' }),
+                headers: { get: () => null }
+            });
+
+            await addCharactersFromESI(['Char1']);
+
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([
+                expect.objectContaining({ id: 1 })
+            ]);
+        });
+
+        it('should handle missing affiliation in idsToCharacters', async () => {
+            // Affiliations return empty
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => []
+            });
+            // Character fetch
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1' }),
+                headers: { get: () => null }
+            });
+
+            const result = await idsToCharacters([1]);
+            expect(result).toHaveLength(0);
+        });
+
+        it('should handle missing affiliation in updateAffiliationsFromESI', async () => {
+            const data = [{ id: 1, name: 'Char1' }];
+            // Affiliations return empty
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => []
+            });
+
+            await updateAffiliationsFromESI(data);
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+        });
+    });
+
+    describe('Edge Cases', () => {
+        it('should handle namesToCharacters with missing characters property', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({}) // No characters array
+            });
+
+            await addCharactersFromESI(['Char1']);
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+        });
+
+        it('should handle namesToCharacters where affiliation lookup returns no match', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            // Affiliations return empty or mismatch
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => []
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1' }),
+                headers: { get: () => null }
+            });
+
+            await addCharactersFromESI(['Char1']);
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+        });
+
+        it('should handle addCharactersFromESI sanity check mismatch', async () => {
+            const names = ['Char1', 'Char2'];
+            // DB has only 1
+            getCharactersByName.mockResolvedValue([{ name: 'Char1' }]);
+
+            // Proceed to fetch
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }, { id: 2, name: 'Char2' }] })
+            });
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }, { character_id: 2, corporation_id: 20 }]
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char' }),
+                headers: { get: () => null }
+            });
+
+            await addCharactersFromESI(names, true);
+            expect(fetchPOST).toHaveBeenCalled();
+        });
     });
 });

@@ -75,6 +75,7 @@ export async function fetchGET(url, maxRetries = 3) {
 			let lastError;
 			const startTime = Date.now();
 			const resourceType = getResourceType(url);
+			console.log(`[DEBUG] fetchGET url=${url} resourceType=${resourceType}`);
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {

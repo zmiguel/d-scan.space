@@ -1,43 +1,42 @@
 # D-Scan Space – Copilot Instructions
 
-## Architecture
+## Big picture
 
-- SvelteKit app; UI lives in `src/routes` with Svelte 5 runes and Flowbite components under `src/lib/components`.
-- Server logic is colocated in `src/routes/**/+page.server.js` and shared helpers under `src/lib/server` (wrappers, tracer, metrics) and `src/lib/database` (Drizzle queries).
-- PostgreSQL via Drizzle ORM; `src/lib/database/client.js` wires the pool and auto-migrates on boot unless `env.BUILD` is set.
-- Background maintenance is decoupled into a standalone Node.js worker located in `workers/updater`. It consumes shared logic from `src/lib` (database, metrics, ESI wrappers) but runs independently from the SvelteKit app.
-- OpenTelemetry is first-class: `src/instrumentation.server.js` starts OTLP + Prometheus exporters and the custom tracer in `src/lib/server/tracer.js` wraps most async work.
+- SvelteKit + Svelte 5 app. UI routes live in `src/routes/**/+page.svelte`; server actions/loaders live beside them in `src/routes/**/+page.server.js`.
+- Shared “business logic” sits in `src/lib/server/*` (scan parsing, ESI calls, tracing/metrics) and is reused by the Node worker in `workers/updater/`.
+- PostgreSQL via Drizzle. DB wiring/migrations: `src/lib/database/client.js`; schema: `src/lib/database/schema.js`; queries/helpers: `src/lib/database/*.js`.
 
-## Data Flows
+## Core flows (examples)
 
-- Local scan uploads hit `src/routes/scan/+page.server.js`, which calls `createNewLocalScan` in `src/lib/server/local.js`.
-- `local.js` de-duplicates pilot names, queries cached data, refreshes stale records with ESI (`fetchGET`/`fetchPOST` wrappers), updates `last_seen`, then returns alliance→corporation→character hierarchy.
-- Scan persistence goes through Drizzle helpers in `src/lib/database/scans.js`; new groups use a transaction, updates append immutable rows.
-- Dynamic cron (`updateDynamicData`) runs in the updater worker, fetches Tranquility status, batches character/corp/alliance refresh by last seen/updated timestamps, and records metrics via `metrics.js`.
-- Static cron (`updateStaticData`) runs in the updater worker, compares SDE versions, downloads specific JSONL slices, decompresses through `workers/updater/src/utils/extract.js`, and bulk upserts systems/categories/groups/types via `sde.js` helpers.
+- Scan ingest: `src/routes/scan/+page.server.js` detects local vs directional (tab-separated lines; 50% threshold), then calls:
+	- Local: `createNewLocalScan` in `src/lib/server/local.js` (dedupe → cache checks → ESI refresh → update `last_seen` → alliance→corp→character tree).
+	- Directional: `createNewDirectionalScan` in `src/lib/server/directional.js` (parse lines → enrich via SDE `getTypeHierarchyMetadata` → bucket on/off grid → optional system inference).
+- Persistence: `src/lib/database/scans.js` uses a transaction; “updates” append a new scan row and only set `scan_groups.system` if it was null.
+- Updater worker: `workers/updater/src/index.js` runs cron jobs:
+	- Dynamic: `workers/updater/src/services/dynamic.js` (TQ status gate → batch refresh characters/corps/alliances using constants in `src/lib/server/constants.js`).
+	- Static: `workers/updater/src/services/static.js` (SDE version compare → download/extract JSONL slices into `./temp` → bulk upsert via `src/lib/database/sde.js` helpers → cleanup).
 
-## Workflows
+## Observability is not optional here
 
-- Install deps with `npm ci`; start dev server using `npm run dev` (or `npm run dev-win` on Windows).
-- Build output lives in `build/`; production entry is `npm run prod` which executes the built server (`node build`).
-- Type and lint checks: `npm run check`, `npm run lint`, `npm run format`; tests run with `npm test` (Vitest configured in `vite.config.js`).
-- Drizzle CLI commands (`npm run db:generate`, `db:push`, `db:migrate`, `db:studio`) require `DATABASE_URL`; migrations also auto-run on startup, so set `BUILD=true` where you need to skip that.
-- The updater worker is built separately (`workers/updater/Dockerfile`) but copies `src/lib/` during build to share business logic.
-- Cron jobs execute automatically in the worker; override cadence with `DYNAMIC_UPDATE_CRON` / `STATIC_UPDATE_CRON` to avoid hammering ESI during local testing.
+- Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes (route IDs, counts, IDs).
+- In SvelteKit hooks/routes, pass the `event` to `withSpan(..., event)` to parent spans to SvelteKit’s request trace (see `src/hooks.server.js`).
+- App OTEL setup: `src/instrumentation.server.js` (Prometheus exporter + optional OTLP metrics + OTLP traces with retry).
+- Worker OTEL setup: `workers/updater/src/instrumentation.js`.
 
-## Conventions
+## ESI / HTTP conventions
 
-- Code in `src/lib/` is shared between the SvelteKit app and the updater worker. Ensure changes are compatible with both environments (e.g., avoid SvelteKit-specific imports like `$app/*` in shared database/utility modules unless strictly necessary and mocked).
-- Always wrap long-running or I/O-heavy server work with `withSpan` and add high-value attributes/events for observability.
-- Use `fetchGET`/`fetchPOST` from `src/lib/server/wrappers.js` for ESI calls to inherit retries, headers, metrics, and deletion handling.
-- Bulk database writes rely on `.onConflictDoUpdate` with explicit column lists; mirror existing patterns in `characters.js`, `corporations.js`, `sde.js`, etc.
-- Maintain batching strategy constants from `src/lib/server/constants.js` when tuning performance-sensitive loops.
-- Frontend uses Tailwind classes and Flowbite widgets; follow the layout split in `ScanTabs.svelte`, `TopBar.svelte`, and friends for new UI work.
+- Use `fetchGET` / `fetchPOST` from `src/lib/server/wrappers.js` instead of raw `fetch` for ESI: undici pooling, retries/backoff, metrics (`recordEsiRequest`), and “deleted character” handling (calls `biomassCharacter`).
+- USER_AGENT is constructed in `src/lib/server/constants.js` and expects env contact fields (`CONTACT_EMAIL`, `CONTACT_EVE`, `CONTACT_DISCORD`) plus `AGENT`/`ORIGIN`.
 
-## Integrations & Env
+## DB / schema conventions
 
-- USER_AGENT is assembled from env metadata (`AGENT`, `ORIGIN`, contact fields) in `constants.js`; populate these before hitting ESI in prod.
-- Metrics are exported to Prometheus on `PROMETHEUS_PORT` and optionally OTLP (`OTEL_EXPORTER_OTLP_*`); align new meters with the patterns in `metrics.js` and registered views in `instrumentation.server.js`.
-- Database schema definitions live in `src/lib/database/schema.js`; migrations in `drizzle/` are generated from there.
-- Temporary SDE artifacts land in `./temp`; `updateStaticData` cleans them—avoid persisting data there across runs.
-- The repository ships a two-stage `Dockerfile` that builds with `BUILD=true`, prunes dev deps, then copies `build/`, `node_modules/`, and `drizzle/` into the runtime image.
+- The `scans` + `scan_groups` tables live in a schema named by `DB_ENV` (see `pgSchema(dbEnvSchema)` in `src/lib/database/schema.js`). Most other tables are in `public`.
+- Drizzle tooling uses `drizzle.config.js` and filters schemas to `public` + `DB_ENV`.
+- Migrations auto-run on boot unless `BUILD` or `SKIP_MIGRATIONS` is set (see `src/lib/database/client.js`).
+
+## Dev workflows (repo-specific)
+
+- Dev server: `npm run dev` (same as `dev-win`). Build: `npm run build`. Prod: `npm run prod` (runs `node build`).
+- Checks/tests: `npm run check`, `npm run lint`, `npm run format`, `npm test` (Vitest).
+- DB: set `DATABASE_URL` then `npm run db:generate|db:push|db:migrate|db:studio`.
+- Docker: root `Dockerfile` builds with `BUILD=true`; `docker-compose.yml` runs `app` + `postgres` + `updater` (worker typically sets `SKIP_MIGRATIONS=true`).
