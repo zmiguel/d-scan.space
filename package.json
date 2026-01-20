@@ -44,7 +44,7 @@
 		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.14.0",
-		"espree": "^10.4.0",
+		"espree": "^11.1.0",
 		"flowbite": "^3.1.2",
 		"flowbite-svelte": "^1.31.0",
 		"flowbite-svelte-icons": "^3.1.0",
