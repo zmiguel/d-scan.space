@@ -11,8 +11,8 @@ const isUpdater = typeof process !== 'undefined' && process.argv?.[1]?.includes(
 export const USER_AGENT = isUpdater
 	? `D-Scan.Space-Updater/${version} (+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`
 	: `D-Scan.Space/${version} (${env.NODE_ENV || 'development'}; ${env.AGENT || 'unknown'}; +${env.ORIGIN || 'undefined'}) ` +
-	`(+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) ` +
-	`Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
+		`(+https://github.com/zmiguel/d-scan.space; mail:${env.CONTACT_EMAIL || 'undefined'}; eve:${env.CONTACT_EVE || 'undefined'}; discord:${env.CONTACT_DISCORD || 'undefined'}) ` +
+		`Node/${process.version.replace('v', '')} (${process.platform}; ${process.arch})`;
 
 // BATCH SETTINGS
 export const BATCH_UNIVERSE = 50;

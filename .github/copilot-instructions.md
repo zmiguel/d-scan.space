@@ -9,12 +9,12 @@
 ## Core flows (examples)
 
 - Scan ingest: `src/routes/scan/+page.server.js` detects local vs directional (tab-separated lines; 50% threshold), then calls:
-	- Local: `createNewLocalScan` in `src/lib/server/local.js` (dedupe → cache checks → ESI refresh → update `last_seen` → alliance→corp→character tree).
-	- Directional: `createNewDirectionalScan` in `src/lib/server/directional.js` (parse lines → enrich via SDE `getTypeHierarchyMetadata` → bucket on/off grid → optional system inference).
+  - Local: `createNewLocalScan` in `src/lib/server/local.js` (dedupe → cache checks → ESI refresh → update `last_seen` → alliance→corp→character tree).
+  - Directional: `createNewDirectionalScan` in `src/lib/server/directional.js` (parse lines → enrich via SDE `getTypeHierarchyMetadata` → bucket on/off grid → optional system inference).
 - Persistence: `src/lib/database/scans.js` uses a transaction; “updates” append a new scan row and only set `scan_groups.system` if it was null.
 - Updater worker: `workers/updater/src/index.js` runs cron jobs:
-	- Dynamic: `workers/updater/src/services/dynamic.js` (TQ status gate → batch refresh characters/corps/alliances using constants in `src/lib/server/constants.js`).
-	- Static: `workers/updater/src/services/static.js` (SDE version compare → download/extract JSONL slices into `./temp` → bulk upsert via `src/lib/database/sde.js` helpers → cleanup).
+  - Dynamic: `workers/updater/src/services/dynamic.js` (TQ status gate → batch refresh characters/corps/alliances using constants in `src/lib/server/constants.js`).
+  - Static: `workers/updater/src/services/static.js` (SDE version compare → download/extract JSONL slices into `./temp` → bulk upsert via `src/lib/database/sde.js` helpers → cleanup).
 
 ## Observability is not optional here
 

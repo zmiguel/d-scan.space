@@ -55,8 +55,8 @@
 					class="text-blue-500 hover:underline dark:text-blue-400"
 					href="https://store.eveonline.com/"
 					target="_blank"
-					>Use code <span class="font-bold text-red-500 italic dark:text-red-400">OXED</span> on the
-					EVE Online Store</FooterLink
+					>Use code <span class="font-bold text-red-500 italic dark:text-red-400">OXED</span> on the EVE
+					Online Store</FooterLink
 				>
 			</FooterLinkGroup>
 			<FooterBrand

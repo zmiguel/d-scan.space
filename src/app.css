@@ -17,8 +17,8 @@
 	--color-primary-900: #0c4a6e;
 }
 
-@source "../node_modules/flowbite-svelte/dist";
-@source "../node_modules/flowbite-svelte-icons/dist";
+@source '../node_modules/flowbite-svelte/dist';
+@source '../node_modules/flowbite-svelte-icons/dist';
 
 @layer base {
 	/* disable chrome cancel button */
@@ -31,8 +31,8 @@
 **              Data tables            **
 ****************************************/
 
-@source "../node_modules/simple-datatables/dist";
-@source "../node_modules/@flowbite-svelte-plugins/datatable/dist";
+@source '../node_modules/simple-datatables/dist';
+@source '../node_modules/@flowbite-svelte-plugins/datatable/dist';
 
 .dark .datatable-pagination-list-item-link:hover,
 .datatable-pagination-list-item-link:hover {

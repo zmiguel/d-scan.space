@@ -92,8 +92,8 @@ async function getCharacters(data) {
 				// Missing + outdated = cache miss (need to fetch from ESI)
 				cacheMissCounter.add(
 					missingCharacters.length +
-					outdatedExpiredCharacters.length +
-					outdatedCachedCharacters.length,
+						outdatedExpiredCharacters.length +
+						outdatedCachedCharacters.length,
 					{ resource: 'character' }
 				);
 
