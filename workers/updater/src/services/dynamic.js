@@ -1,20 +1,16 @@
 import {
 	getAllAlliances,
 	addOrUpdateAlliancesDB,
-	updateAlliancesLastSeen
+	getAlliancesByID
 } from '../../../../src/lib/database/alliances.js';
-import {
-	getLeastRecentlyUpdatedCharacters,
-	updateCharactersLastSeen
-} from '../../../../src/lib/database/characters.js';
+import { getLeastRecentlyUpdatedCharacters } from '../../../../src/lib/database/characters.js';
 import {
 	addOrUpdateCorporationsDB,
-	getAllCorporations,
-	updateCorporationsLastSeen
+	getAllCorporations
 } from '../../../../src/lib/database/corporations.js';
 import { idsToAlliances } from '../../../../src/lib/server/alliances.js';
 import { idsToCorporations } from '../../../../src/lib/server/corporations.js';
-import { updateAffiliationsFromESI } from '../../../../src/lib/server/characters.js';
+import { updateCharactersFromESI, updateAffiliationsFromESI } from '../../../../src/lib/server/characters.js';
 import { withSpan } from '../../../../src/lib/server/tracer.js';
 import logger from '../../../../src/lib/logger.js';
 import {
@@ -137,95 +133,272 @@ async function getTQStatus() {
  * and refreshing their information from ESI.
  */
 async function updateCharacterData() {
-	await withSpan('worker.dynamic.update_characters', async (span) => {
-		// Get characters that haven't been updated in 23.5h
-		const charactersToUpdate = await getLeastRecentlyUpdatedCharacters(BATCH_CHARACTERS);
+	return await withSpan(
+		'worker.dynamic.update_characters',
+		async (span) => {
+			logger.info('[DynUpdater] Updating Character data...');
+			// Get from DB the least recently updated characters
+			const charactersToUpdate = await getLeastRecentlyUpdatedCharacters(BATCH_CHARACTERS);
+			if (!charactersToUpdate || charactersToUpdate.length === 0) {
+				logger.info('[DynUpdater] No characters found to update.');
+				span.setAttributes({
+					'cron.task.update_characters.to_update': 0
+				});
+				return;
+			}
 
-		if (charactersToUpdate.length === 0) {
-			logger.info('[DynUpdater] No characters to update.');
-			span.setAttributes({ 'cron.task.update_characters.count': 0 });
-			return;
+			span.setAttributes({
+				'cron.task.update_characters.to_update': charactersToUpdate.length
+			});
+
+			logger.info(`[DynUpdater] Found ${charactersToUpdate.length} characters to update.`);
+
+			const expiredCharacters = charactersToUpdate.filter(
+				(char) =>
+					char.esi_cache_expires < Date.now() ||
+					!char.esi_cache_expires ||
+					char.esi_cache_expires === null
+			);
+			const cachedCharacters = charactersToUpdate.filter(
+				(char) => char.esi_cache_expires >= Date.now()
+			);
+
+			span.setAttributes({
+				'cron.task.update_characters.expired': expiredCharacters.length,
+				'cron.task.update_characters.cached': cachedCharacters.length
+			});
+
+			const expiredPromise = withSpan(
+				'worker.dynamic.update_characters.expired',
+				async () => {
+					for (let i = 0; i < expiredCharacters.length; i += BATCH_CHARACTERS) {
+						await withSpan(
+							`worker.dynamic.update_characters.expired_batch.${i / BATCH_CHARACTERS + 1}`,
+							async (batchSpan) => {
+								const batch = expiredCharacters.slice(i, i + BATCH_CHARACTERS);
+								await updateCharactersFromESI(batch);
+								batchSpan.setAttributes({
+									'cron.task.update_characters.expired_batch_size': batch.length
+								});
+
+								charactersUpdatedCounter.add(batch.length);
+							}
+						);
+					}
+				},
+				{
+					'cron.task.update_characters.expired_total': expiredCharacters.length
+				}
+			);
+
+			const cachedPromise = withSpan(
+				'worker.dynamic.update_characters.cached',
+				async () => {
+					for (let i = 0; i < cachedCharacters.length; i += BATCH_CHARACTERS) {
+						await withSpan(
+							`worker.dynamic.update_characters.cached_batch.${i / BATCH_CHARACTERS + 1}`,
+							async (batchSpan) => {
+								const batch = cachedCharacters.slice(i, i + BATCH_CHARACTERS);
+								await updateAffiliationsFromESI(batch);
+								batchSpan.setAttributes({
+									'cron.task.update_characters.cached_batch_size': batch.length
+								});
+
+								charactersUpdatedCounter.add(batch.length);
+							}
+						);
+					}
+				},
+				{
+					'cron.task.update_characters.cached_total': cachedCharacters.length
+				}
+			);
+
+			await Promise.all([expiredPromise, cachedPromise]);
+
+			logger.info('[DynUpdater] Character data update completed.');
+			return true;
+		},
+		{
+			'cron.task': 'update_characters'
 		}
-
-		logger.info(`[DynUpdater] Updating ${charactersToUpdate.length} characters...`);
-		span.setAttributes({ 'cron.task.update_characters.count': charactersToUpdate.length });
-
-		const characterIds = charactersToUpdate.map((c) => c.id);
-
-		// Update affiliations (this fetches from ESI and updates DB)
-		await updateAffiliationsFromESI(charactersToUpdate);
-
-		// Update last_seen for these characters
-		await updateCharactersLastSeen(characterIds);
-
-		charactersUpdatedCounter.add(charactersToUpdate.length);
-	});
+	);
 }
 
 /**
  * Updates corporation data by fetching corporations that haven't been updated recently.
  */
 async function updateCorporationData() {
-	await withSpan('worker.dynamic.update_corporations', async (span) => {
-		const allCorporations = await getAllCorporations();
-		const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-		const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);
+	return await withSpan(
+		'worker.dynamic.update_corporations',
+		async (span) => {
+			logger.info('[DynUpdater] Updating Corporation data...');
+			const allCorporations = await getAllCorporations();
+			if (!allCorporations || allCorporations.length === 0) {
+				logger.warn('[DynUpdater] No corporations found to update.');
+				return;
+			}
 
-		// Filter corporations: last_seen > 1 year ago AND updated_at < 23.5 hours ago
-		const corporationsToUpdate = allCorporations
-			.filter((c) => new Date(c.last_seen) > oneYearAgo)
-			.filter((c) => new Date(c.updated_at) < twentyThreeHoursAgo)
-			.slice(0, BATCH_CORPORATIONS);
+			const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+			const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);
+			const corporationsToUpdate = allCorporations
+				.filter((c) => new Date(c.last_seen) > oneYearAgo)
+				.filter((c) => new Date(c.updated_at) < twentyThreeHoursAgo);
 
-		if (corporationsToUpdate.length === 0) {
-			logger.info('[DynUpdater] No corporations to update.');
-			span.setAttributes({ 'cron.task.update_corporations.count': 0 });
-			return;
+			span.setAttributes({
+				'cron.task.update_corporations.to_update': corporationsToUpdate.length
+			});
+
+			if (corporationsToUpdate.length === 0) {
+				logger.info('[DynUpdater] No corporations to update at this time.');
+				return;
+			}
+
+			logger.info(`[DynUpdater] Found ${corporationsToUpdate.length} corporations to update`);
+
+			await withSpan(
+				'worker.dynamic.update_corporations.batches',
+				async () => {
+					for (let i = 0; i < corporationsToUpdate.length; i += BATCH_CORPORATIONS) {
+						await withSpan(
+							`worker.dynamic.update_corporations.batch.${i / BATCH_CORPORATIONS + 1}`,
+							async (batchSpan) => {
+								const batch = corporationsToUpdate.slice(i, i + BATCH_CORPORATIONS);
+								const corporationIDs = batch.map((corporation) => corporation.id);
+								const corporationsData = await idsToCorporations(corporationIDs);
+								const validCorporationsData = corporationsData.filter(
+									(corporation) => corporation !== null && corporation !== undefined
+								);
+								if (!validCorporationsData || validCorporationsData.length === 0) {
+									logger.warn(
+										`[DynUpdater] No corporation data fetched from ESI for batch starting at index ${i}.`
+									);
+									batchSpan.setAttributes({
+										'cron.task.update_corporations.batch_fetched_data_length': 0
+									});
+									return;
+								}
+								batchSpan.setAttributes({
+									'cron.task.update_corporations.batch_fetched_data_length':
+										validCorporationsData.length
+								});
+
+								await withSpan('worker.dynamic.update_corporations.fetch_alliances', async (span) => {
+									const allianceIDs = validCorporationsData
+										.map((corporation) => corporation.alliance_id)
+										.filter((id) => id !== undefined && id !== null);
+
+									const uniqueAllianceIDs = [...new Set(allianceIDs)];
+
+									const existingAlliances = await getAlliancesByID(uniqueAllianceIDs);
+									const existingAllianceIDs = existingAlliances.map((alliance) => alliance.id);
+									const newAllianceIDs = uniqueAllianceIDs.filter(
+										(id) => !existingAllianceIDs.includes(id)
+									);
+
+									span.setAttributes({
+										'cron.task.update_corporations.new_alliances': newAllianceIDs.length
+									});
+
+									if (newAllianceIDs.length > 0) {
+										const alliancesData = await idsToAlliances(newAllianceIDs);
+										await addOrUpdateAlliancesDB(alliancesData);
+									}
+								});
+
+								await addOrUpdateCorporationsDB(validCorporationsData);
+								corporationsUpdatedCounter.add(validCorporationsData.length);
+							}
+						);
+					}
+				},
+				{
+					'cron.task.update_corporations.batch_size': corporationsToUpdate.length
+				}
+			);
+
+			logger.info('[DynUpdater] Corporation data update completed.');
+			return true;
+		},
+		{
+			'cron.task': 'update_corporations'
 		}
-
-		logger.info(`[DynUpdater] Updating ${corporationsToUpdate.length} corporations...`);
-		span.setAttributes({ 'cron.task.update_corporations.count': corporationsToUpdate.length });
-
-		const corporationIds = corporationsToUpdate.map((c) => c.id);
-		const corporationData = await idsToCorporations(corporationIds);
-
-		await addOrUpdateCorporationsDB(corporationData);
-		await updateCorporationsLastSeen(corporationIds);
-
-		corporationsUpdatedCounter.add(corporationsToUpdate.length);
-	});
+	);
 }
 
 /**
  * Updates alliance data by fetching alliances that haven't been updated recently.
  */
 async function updateAllianceData() {
-	await withSpan('worker.dynamic.update_alliances', async (span) => {
-		const allAlliances = await getAllAlliances();
-		const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-		const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);
+	return await withSpan(
+		'worker.dynamic.update_alliances',
+		async (span) => {
+			logger.info('[DynUpdater] Updating Alliance data...');
+			const allAlliances = await getAllAlliances();
+			if (!allAlliances || allAlliances.length === 0) {
+				logger.warn('[DynUpdater] No alliances found to update.');
+				return;
+			}
 
-		// Filter alliances: last_seen > 1 year ago AND updated_at < 23.5 hours ago
-		const alliancesToUpdate = allAlliances
-			.filter((a) => new Date(a.last_seen) > oneYearAgo)
-			.filter((a) => new Date(a.updated_at) < twentyThreeHoursAgo)
-			.slice(0, BATCH_ALLIANCES);
+			const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+			const twentyThreeHoursAgo = new Date(Date.now() - 23.5 * 60 * 60 * 1000);
+			const alliancesToUpdate = allAlliances
+				.filter((a) => new Date(a.last_seen) > oneYearAgo)
+				.filter((a) => new Date(a.updated_at) < twentyThreeHoursAgo);
 
-		if (alliancesToUpdate.length === 0) {
-			logger.info('[DynUpdater] No alliances to update.');
-			span.setAttributes({ 'cron.task.update_alliances.count': 0 });
-			return;
+			span.setAttributes({
+				'cron.task.update_alliances.to_update': alliancesToUpdate.length
+			});
+
+			if (alliancesToUpdate.length === 0) {
+				logger.info('[DynUpdater] No alliances to update at this time.');
+				return;
+			}
+
+			logger.info(`[DynUpdater] Found ${alliancesToUpdate.length} alliances to update.`);
+
+			await withSpan(
+				'worker.dynamic.update_alliances.batches',
+				async () => {
+					for (let i = 0; i < alliancesToUpdate.length; i += BATCH_ALLIANCES) {
+						await withSpan(
+							`worker.dynamic.update_alliances.batch.${i / BATCH_ALLIANCES + 1}`,
+							async (batchSpan) => {
+								const batch = alliancesToUpdate.slice(i, i + BATCH_ALLIANCES);
+								const allianceIDs = batch.map((alliance) => alliance.id);
+								const alliancesData = await idsToAlliances(allianceIDs);
+								const validAlliancesData = alliancesData.filter(
+									(alliance) => alliance !== null && alliance !== undefined
+								);
+								if (!validAlliancesData || validAlliancesData.length === 0) {
+									logger.warn(
+										`[DynUpdater] No alliance data fetched from ESI for batch starting at index ${i}.`
+									);
+									batchSpan.setAttributes({
+										'cron.task.update_alliances.batch_fetched_data_length': 0
+									});
+									return;
+								}
+								batchSpan.setAttributes({
+									'cron.task.update_alliances.batch_fetched_data_length': validAlliancesData.length
+								});
+
+								await addOrUpdateAlliancesDB(validAlliancesData);
+								alliancesUpdatedCounter.add(validAlliancesData.length);
+							}
+						);
+					}
+				},
+				{
+					'cron.task.update_alliances.batch_size': alliancesToUpdate.length
+				}
+			);
+
+			logger.info('[DynUpdater] Alliance data update completed.');
+			return true;
+		},
+		{
+			'cron.task': 'update_alliances'
 		}
-
-		logger.info(`[DynUpdater] Updating ${alliancesToUpdate.length} alliances...`);
-		span.setAttributes({ 'cron.task.update_alliances.count': alliancesToUpdate.length });
-
-		const allianceIds = alliancesToUpdate.map((a) => a.id);
-		const allianceData = await idsToAlliances(allianceIds);
-
-		await addOrUpdateAlliancesDB(allianceData);
-		await updateAlliancesLastSeen(allianceIds);
-
-		alliancesUpdatedCounter.add(alliancesToUpdate.length);
-	});
+	);
 }
