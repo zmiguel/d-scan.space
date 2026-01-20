@@ -94,6 +94,28 @@ export async function updateCharactersLastSeen(characterIDs) {
 		.where(inArray(characters.id, characterIDs));
 }
 
+export async function updateCharactersAllianceByCorporation(corporationId, allianceId) {
+	if (!corporationId && corporationId !== 0) {
+		logger.warn('Tried to update characters alliance but corporation id was empty');
+		return;
+	}
+
+	await withSpan('database.characters.update_alliance_by_corporation', async (span) => {
+		span.setAttributes({
+			'db.characters.update_alliance.corporation_id': corporationId,
+			'db.characters.update_alliance.alliance_id': allianceId ?? null
+		});
+
+		await db
+			.update(characters)
+			.set({
+				alliance_id: allianceId ?? null,
+				updated_at: sql`now()`
+			})
+			.where(eq(characters.corporation_id, corporationId));
+	});
+}
+
 export async function getLeastRecentlyUpdatedCharacters(limit) {
 	// this is used to find characters that haven't been updated in 23.5h
 	// but we only care about the characters seen in the last 1 year

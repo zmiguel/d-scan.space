@@ -35,6 +35,7 @@ import {
     getCharactersByName,
     addOrUpdateCharactersDB,
     updateCharactersLastSeen,
+    updateCharactersAllianceByCorporation,
     biomassCharacter,
     getAllCharacters,
     getLeastRecentlyUpdatedCharacters
@@ -122,6 +123,47 @@ describe('database/characters', () => {
             expect(mockDb.update).toHaveBeenCalled();
             expect(mockUpdate.set).toHaveBeenCalled();
             expect(mockUpdate.where).toHaveBeenCalled();
+        });
+    });
+
+    describe('updateCharactersAllianceByCorporation', () => {
+        it('should do nothing if corporationId is missing', async () => {
+            await updateCharactersAllianceByCorporation(null, 123);
+            expect(mockDb.update).not.toHaveBeenCalled();
+        });
+
+        it('should update alliance_id for corporation characters', async () => {
+            const mockUpdate = {
+                set: vi.fn().mockReturnThis(),
+                where: vi.fn().mockResolvedValue()
+            };
+            mockDb.update.mockReturnValue(mockUpdate);
+
+            await updateCharactersAllianceByCorporation(42, 9001);
+
+            expect(mockDb.update).toHaveBeenCalled();
+            expect(mockUpdate.set).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    alliance_id: 9001
+                })
+            );
+            expect(mockUpdate.where).toHaveBeenCalled();
+        });
+
+        it('should allow null alliance id updates', async () => {
+            const mockUpdate = {
+                set: vi.fn().mockReturnThis(),
+                where: vi.fn().mockResolvedValue()
+            };
+            mockDb.update.mockReturnValue(mockUpdate);
+
+            await updateCharactersAllianceByCorporation(42, null);
+
+            expect(mockUpdate.set).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    alliance_id: null
+                })
+            );
         });
     });
 

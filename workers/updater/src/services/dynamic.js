@@ -3,10 +3,14 @@ import {
 	addOrUpdateAlliancesDB,
 	getAlliancesByID
 } from '../../../../src/lib/database/alliances.js';
-import { getLeastRecentlyUpdatedCharacters } from '../../../../src/lib/database/characters.js';
+import {
+	getLeastRecentlyUpdatedCharacters,
+	updateCharactersAllianceByCorporation
+} from '../../../../src/lib/database/characters.js';
 import {
 	addOrUpdateCorporationsDB,
-	getAllCorporations
+	getAllCorporations,
+	getCorporationsByID
 } from '../../../../src/lib/database/corporations.js';
 import { idsToAlliances } from '../../../../src/lib/server/alliances.js';
 import { idsToCorporations } from '../../../../src/lib/server/corporations.js';
@@ -171,20 +175,25 @@ async function updateCharacterData() {
 			const expiredPromise = withSpan(
 				'worker.dynamic.update_characters.expired',
 				async () => {
+					const updatedCharacters = [];
 					for (let i = 0; i < expiredCharacters.length; i += BATCH_CHARACTERS) {
 						await withSpan(
 							`worker.dynamic.update_characters.expired_batch.${i / BATCH_CHARACTERS + 1}`,
 							async (batchSpan) => {
 								const batch = expiredCharacters.slice(i, i + BATCH_CHARACTERS);
-								await updateCharactersFromESI(batch);
+								const batchResult = await updateCharactersFromESI(batch);
 								batchSpan.setAttributes({
 									'cron.task.update_characters.expired_batch_size': batch.length
 								});
 
 								charactersUpdatedCounter.add(batch.length);
+								if (Array.isArray(batchResult)) {
+									updatedCharacters.push(...batchResult);
+								}
 							}
 						);
 					}
+					return updatedCharacters;
 				},
 				{
 					'cron.task.update_characters.expired_total': expiredCharacters.length
@@ -194,27 +203,92 @@ async function updateCharacterData() {
 			const cachedPromise = withSpan(
 				'worker.dynamic.update_characters.cached',
 				async () => {
+					const updatedCharacters = [];
 					for (let i = 0; i < cachedCharacters.length; i += BATCH_CHARACTERS) {
 						await withSpan(
 							`worker.dynamic.update_characters.cached_batch.${i / BATCH_CHARACTERS + 1}`,
 							async (batchSpan) => {
 								const batch = cachedCharacters.slice(i, i + BATCH_CHARACTERS);
-								await updateAffiliationsFromESI(batch);
+								const batchResult = await updateAffiliationsFromESI(batch);
 								batchSpan.setAttributes({
 									'cron.task.update_characters.cached_batch_size': batch.length
 								});
 
 								charactersUpdatedCounter.add(batch.length);
+								if (Array.isArray(batchResult)) {
+									updatedCharacters.push(...batchResult);
+								}
 							}
 						);
 					}
+					return updatedCharacters;
 				},
 				{
 					'cron.task.update_characters.cached_total': cachedCharacters.length
 				}
 			);
 
-			await Promise.all([expiredPromise, cachedPromise]);
+			const [expiredUpdated, cachedUpdated] = await Promise.all([expiredPromise, cachedPromise]);
+			const updatedCharacters = [
+				...(Array.isArray(expiredUpdated) ? expiredUpdated : []),
+				...(Array.isArray(cachedUpdated) ? cachedUpdated : [])
+			];
+
+			if (updatedCharacters.length > 0) {
+				const updateTimestamp = new Date();
+				const corpAllianceMap = new Map();
+				const conflictedCorporations = new Set();
+
+				for (const character of updatedCharacters) {
+					const corpId = character.corporation_id;
+					if (corpId === undefined || corpId === null) continue;
+					const allianceId = character.alliance_id ?? null;
+					if (!corpAllianceMap.has(corpId)) {
+						corpAllianceMap.set(corpId, allianceId);
+						continue;
+					}
+					const existingAlliance = corpAllianceMap.get(corpId);
+					if (existingAlliance !== allianceId) {
+						conflictedCorporations.add(corpId);
+					}
+				}
+
+				const candidateCorpIds = Array.from(corpAllianceMap.keys()).filter(
+					(id) => !conflictedCorporations.has(id)
+				);
+
+				if (candidateCorpIds.length > 0) {
+					const corpRows = await getCorporationsByID(candidateCorpIds);
+					const corpById = new Map(corpRows.map((corp) => [corp.id, corp]));
+
+					await withSpan('worker.dynamic.update_characters.update_corporation_alliance', async (span) => {
+						const updates = [];
+						for (const corpId of candidateCorpIds) {
+							const corp = corpById.get(corpId);
+							if (!corp) continue;
+							const incomingAllianceId = corpAllianceMap.get(corpId) ?? null;
+							const existingAllianceId = corp.alliance_id ?? null;
+							if (existingAllianceId === incomingAllianceId) continue;
+
+							const corpUpdatedAt = new Date(corp.updated_at);
+							if (Number.isNaN(corpUpdatedAt.getTime())) continue;
+							if (corpUpdatedAt > updateTimestamp) continue;
+
+							updates.push({ corpId, allianceId: incomingAllianceId });
+						}
+
+						span.setAttributes({
+							'cron.task.update_characters.corporation_alliance_updates': updates.length,
+							'cron.task.update_characters.corporation_alliance_conflicts':
+								conflictedCorporations.size
+						});
+
+						for (const update of updates) {
+							await updateCharactersAllianceByCorporation(update.corpId, update.allianceId);
+						}
+					});
+				}
+			}
 
 			logger.info('[DynUpdater] Character data update completed.');
 			return true;
@@ -244,6 +318,10 @@ async function updateCorporationData() {
 			const corporationsToUpdate = allCorporations
 				.filter((c) => new Date(c.last_seen) > oneYearAgo)
 				.filter((c) => new Date(c.updated_at) < twentyThreeHoursAgo);
+
+			const corporationsById = new Map(
+				allCorporations.map((corporation) => [corporation.id, corporation])
+			);
 
 			span.setAttributes({
 				'cron.task.update_corporations.to_update': corporationsToUpdate.length
@@ -307,6 +385,52 @@ async function updateCorporationData() {
 								});
 
 								await addOrUpdateCorporationsDB(validCorporationsData);
+
+								const allianceChanges = validCorporationsData
+									.map((corporation) => {
+										const existing = corporationsById.get(corporation.id);
+										if (!existing) return null;
+										const existingAllianceId = existing.alliance_id ?? null;
+										const incomingAllianceId =
+											corporation.alliance_id === undefined
+												? null
+												: corporation.alliance_id ?? null;
+
+										if (existingAllianceId === incomingAllianceId) {
+											return null;
+										}
+
+										const existingUpdatedAt = new Date(existing.updated_at);
+										if (Number.isNaN(existingUpdatedAt.getTime())) {
+											return null;
+										}
+
+										if (existingUpdatedAt >= twentyThreeHoursAgo) {
+											return null;
+										}
+
+										return {
+											corporationId: corporation.id,
+											allianceId: incomingAllianceId
+										};
+									})
+									.filter(Boolean);
+
+								if (allianceChanges.length > 0) {
+									await withSpan('worker.dynamic.update_corporations.update_characters', async (span) => {
+										span.setAttributes({
+											'cron.task.update_corporations.alliance_changes': allianceChanges.length
+										});
+
+										for (const change of allianceChanges) {
+											await updateCharactersAllianceByCorporation(
+												change.corporationId,
+												change.allianceId
+											);
+										}
+									});
+								}
+
 								corporationsUpdatedCounter.add(validCorporationsData.length);
 							}
 						);

@@ -457,12 +457,13 @@ export async function addCharactersFromESI(characters, sanityCheck = false) {
 export async function updateCharactersFromESI(data) {
 	// data is a list of characters, not ids.
 	// we need to extract the ids from the characters
-	await withSpan(
+	return await withSpan(
 		'server.characters.update_from_esi',
 		async () => {
 			const ids = data.map((char) => char.id);
 			const charactersData = await idsToCharacters(ids);
 			await addOrUpdateCharacters(charactersData);
+			return charactersData;
 		},
 		{
 			'characters.update_from_esi': data.length
@@ -473,7 +474,7 @@ export async function updateCharactersFromESI(data) {
 export async function updateAffiliationsFromESI(data) {
 	// data is a list of characters, not ids.
 	// we need to extract the ids from the characters
-	await withSpan(
+	return await withSpan(
 		'server.characters.update_affiliations_from_esi',
 		async () => {
 			const ids = data.map((char) => char.id);
@@ -497,6 +498,7 @@ export async function updateAffiliationsFromESI(data) {
 			}
 
 			await addOrUpdateCharacters(updatedCharacters);
+			return updatedCharacters;
 		},
 		{
 			'characters.update_affiliations_from_esi': data.length
