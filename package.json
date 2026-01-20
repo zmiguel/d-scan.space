@@ -45,7 +45,7 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.14.0",
 		"espree": "^11.1.0",
-		"flowbite": "^3.1.2",
+		"flowbite": "^4.0.1",
 		"flowbite-svelte": "^1.31.0",
 		"flowbite-svelte-icons": "^3.1.0",
 		"import-in-the-middle": "^2.0.4",
