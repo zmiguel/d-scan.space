@@ -383,7 +383,7 @@ function extractSystemFromStructureName(name) {
 	const delimiter = ' - ';
 	const delimiterIndex = name.indexOf(delimiter);
 	const candidate = delimiterIndex === -1 ? name.trim() : name.slice(0, delimiterIndex).trim();
-	return candidate.length > 0 ? candidate : null;
+	return candidate;
 }
 
 function extractSystemFromSunName(name) {

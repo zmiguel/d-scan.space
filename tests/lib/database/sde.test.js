@@ -266,6 +266,14 @@ describe('sde', () => {
             expect(result).toBeNull();
         });
 
+        it('should return null when system is not found', async () => {
+            mockDb.limit.mockResolvedValue([]);
+
+            const result = await getSystemByName('Nowhere');
+
+            expect(result).toBeNull();
+        });
+
         it('should return system by name', async () => {
             const mockSystem = { id: 1, name: 'Jita' };
             mockDb.limit.mockResolvedValue([mockSystem]);

@@ -188,6 +188,26 @@ describe('characters', () => {
             await addCharactersFromESI(names);
             expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
         });
+
+        it('should handle null affiliations payload in namesToCharacters', async () => {
+            const names = ['Char1'];
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => null
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
+            });
+
+            await addCharactersFromESI(names);
+            expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+        });
     });
 
     describe('updateCharactersFromESI', () => {
@@ -406,12 +426,81 @@ describe('characters', () => {
             expect(result).toHaveLength(0);
         });
 
+        it('should handle null affiliations payload in idsToCharacters', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => null
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
+            });
+
+            const result = await idsToCharacters([1]);
+            expect(result).toHaveLength(0);
+        });
+
+        it('should merge affiliations into character results', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [
+                    { character_id: 1, corporation_id: 10, alliance_id: 100 },
+                    { character_id: 2, corporation_id: 20 }
+                ]
+            });
+
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char', security_status: 0 }),
+                headers: { get: () => null }
+            });
+
+            const result = await idsToCharacters([1, 2]);
+
+            expect(result).toHaveLength(2);
+            expect(result).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ id: 1, corporation_id: 10, alliance_id: 100 }),
+                    expect.objectContaining({ id: 2, corporation_id: 20, alliance_id: null })
+                ])
+            );
+        });
+
+        it('should skip characters without matching affiliations', async () => {
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char', security_status: 0 }),
+                headers: { get: () => null }
+            });
+
+            const result = await idsToCharacters([1, 2]);
+
+            expect(result).toHaveLength(1);
+            expect(result[0]).toEqual(expect.objectContaining({ id: 1, corporation_id: 10 }));
+        });
+
         it('should handle missing affiliation in updateAffiliationsFromESI', async () => {
             const data = [{ id: 1, name: 'Char1' }];
             // Affiliations return empty
             fetchPOST.mockResolvedValueOnce({
                 ok: true,
                 json: async () => []
+            });
+
+            await updateAffiliationsFromESI(data);
+            expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+        });
+
+        it('should handle null affiliations payload in updateAffiliationsFromESI', async () => {
+            const data = [{ id: 1, name: 'Char1' }];
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => null
             });
 
             await updateAffiliationsFromESI(data);
@@ -472,6 +561,37 @@ describe('characters', () => {
 
             await addCharactersFromESI(names, true);
             expect(fetchPOST).toHaveBeenCalled();
+        });
+
+        it('should handle undefined concurrency in batching', async () => {
+            vi.resetModules();
+            vi.doMock('../../../src/lib/server/constants.js', () => ({
+                CHARACTER_REQUEST_BATCH_SIZE: 250,
+                CHARACTER_BATCH_CONCURRENCY: undefined,
+                DOOMHEIM_ID: 1000001
+            }));
+
+            const { addCharactersFromESI } = await import('../../../src/lib/server/characters.js');
+            const { fetchGET, fetchPOST } = await import('../../../src/lib/server/wrappers.js');
+
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+            });
+            fetchPOST.mockResolvedValueOnce({
+                ok: true,
+                json: async () => [{ character_id: 1, corporation_id: 10 }]
+            });
+            fetchGET.mockResolvedValue({
+                ok: true,
+                json: async () => ({ name: 'Char1', security_status: 0 }),
+                headers: { get: () => null }
+            });
+
+            await addCharactersFromESI(['Char1']);
+
+            const { addOrUpdateCharactersDB } = await import('../../../src/lib/database/characters.js');
+            expect(addOrUpdateCharactersDB).toHaveBeenCalled();
         });
     });
 });

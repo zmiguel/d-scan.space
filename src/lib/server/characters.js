@@ -175,10 +175,10 @@ async function namesToCharacters(names) {
 	});
 
 	const charactersPromise = withSpan('server.characters.fetch_data', async (span) => {
-		const effectiveConcurrency = Math.min(
-			characterBatches.length || 1,
-			Math.max(1, CHARACTER_BATCH_CONCURRENCY)
-		);
+			const effectiveConcurrency = Math.min(
+				Math.max(characterBatches.length, 1),
+				Math.max(1, CHARACTER_BATCH_CONCURRENCY)
+			);
 
 		const allCharacterData = await runBatchesWithConcurrency(
 			characterBatches,
@@ -280,7 +280,7 @@ export async function idsToCharacters(ids) {
 				'server.characters.ids_to_characters.fetch_data',
 				async (span) => {
 					const effectiveConcurrency = Math.min(
-						batches.length || 1,
+						Math.max(batches.length, 1),
 						Math.max(1, CHARACTER_BATCH_CONCURRENCY)
 					);
 

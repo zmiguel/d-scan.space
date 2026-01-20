@@ -149,6 +149,30 @@ describe('DB Pool Metrics', () => {
         expect(values).toContain(0);  // Waiting
     });
 
+    it('should default pool counts to zero when undefined', async () => {
+        vi.resetModules();
+        mockPool.totalCount = undefined;
+        mockPool.idleCount = undefined;
+        mockPool.waitingCount = undefined;
+        await import('../../../src/lib/server/metrics.js');
+
+        const calls = mockMeter.addBatchObservableCallback.mock.calls;
+        const callback = calls[0][0];
+
+        const mockObservableResult = {
+            observe: vi.fn()
+        };
+
+        callback(mockObservableResult);
+
+        const values = mockObservableResult.observe.mock.calls.map(call => call[1]);
+        expect(values).toContain(0);
+
+        mockPool.totalCount = 10;
+        mockPool.idleCount = 5;
+        mockPool.waitingCount = 0;
+    });
+
     it('should handle error in pool metrics observation', async () => {
         vi.resetModules();
         await import('../../../src/lib/server/metrics.js');
@@ -202,5 +226,24 @@ describe('ESI Metrics', () => {
         const values = mockObservableResult.observe.mock.calls.map(c => c[1]);
         expect(values).toContain(50);
         expect(values).toContain(60);
+    });
+
+    it('should skip non-finite ESI rate limits', async () => {
+        vi.resetModules();
+        const { recordEsiRequest } = await import('../../../src/lib/server/metrics.js');
+
+        recordEsiRequest('GET', 200, 100, Infinity, Infinity);
+
+        const calls = mockMeter.addBatchObservableCallback.mock.calls;
+        const matchingCalls = calls.filter(c => c[1].some(g => g.name === 'esi_error_limit_remain'));
+        const callback = matchingCalls[matchingCalls.length - 1][0];
+
+        const mockObservableResult = {
+            observe: vi.fn()
+        };
+
+        callback(mockObservableResult);
+
+        expect(mockObservableResult.observe).not.toHaveBeenCalled();
     });
 });

@@ -313,6 +313,34 @@ describe('directional', () => {
             const result = await createNewDirectionalScan(rawData);
             expect(result.system).toBeUndefined();
         });
+
+        it('should handle mixed structure candidates', async () => {
+            const rawData = [
+                '1\tJita - Structure Name\tAstrahus\t10 km',
+                '2\t - \tAstrahus\t10 km'
+            ];
+            const mockMetadata = new Map([
+                [1, { typeId: 1, typeName: 'Astrahus', categoryId: 65, groupId: 1657 }],
+                [2, { typeId: 2, typeName: 'Astrahus', categoryId: 65, groupId: 1657 }]
+            ]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockResolvedValue({ name: 'Jita' });
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system.name).toBe('Jita');
+        });
+
+        it('should handle empty structure candidates', async () => {
+            const rawData = '1\t - \tAstrahus\t10 km';
+            const mockMetadata = new Map([
+                [1, { typeId: 1, typeName: 'Astrahus', categoryId: 65, groupId: 1657 }]
+            ]);
+            getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+            getSystemByName.mockResolvedValue(null);
+
+            const result = await createNewDirectionalScan(rawData);
+            expect(result.system).toBeUndefined();
+        });
     });
 
     describe('Parsing Edge Cases', () => {

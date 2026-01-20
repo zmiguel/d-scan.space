@@ -35,6 +35,7 @@ vi.mock('undici', () => ({
 import { fetchGET, fetchPOST } from '../../../src/lib/server/wrappers.js';
 import { recordEsiRequest } from '../../../src/lib/server/metrics.js';
 import { biomassCharacter } from '../../../src/lib/database/characters.js';
+import { withSpan } from '../../../src/lib/server/tracer.js';
 
 // Mock global fetch
 // global.fetch = vi.fn(); // Move to beforeEach
@@ -147,12 +148,101 @@ describe('wrappers', () => {
             }
         });
 
+        it('should include null preview when JSON body is null', async () => {
+            const errorResponse = {
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                headers: { entries: () => [], get: () => null },
+                clone: () => ({
+                    json: async () => null,
+                    text: async () => 'ignored'
+                }),
+                url: 'http://test.com'
+            };
+            global.fetch.mockResolvedValue(errorResponse);
+
+            await expect(fetchGET('http://test.com', 1)).rejects.toThrow('null');
+        });
+
         it('should handle network error (fetch throws) and decrement concurrency', async () => {
             global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
             const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
             await expect(fetchGET('http://test.com', 1)).rejects.toThrow('Network Error');
             expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
+        });
+
+        it('should add GET fetch failure event details', async () => {
+            global.fetch.mockRejectedValueOnce(new Error('Network Error'));
+
+            await expect(fetchGET('http://test.com', 1)).rejects.toThrow('Network Error');
+
+            expect(mockSpan.addEvent).toHaveBeenCalledWith(
+                'Fetch Failed',
+                expect.objectContaining({
+                    error: 'Network Error',
+                    attempt: 1
+                })
+            );
+        });
+
+        it('should handle deleted character URLs without an id', async () => {
+            const deletedResponse = {
+                ok: false,
+                status: 404,
+                statusText: 'Not Found',
+                headers: {
+                    entries: () => [],
+                    get: () => null
+                },
+                clone: () => ({
+                    json: async () => ({ error: 'Character has been deleted' }),
+                    text: async () => 'Character has been deleted'
+                }),
+                url: 'https://esi.evetech.net/v1/characters/'
+            };
+            global.fetch.mockResolvedValue(deletedResponse);
+
+            await fetchGET('https://esi.evetech.net/v1/characters/');
+
+            expect(biomassCharacter).not.toHaveBeenCalled();
+        });
+
+        it('should handle deleted resources without character ids', async () => {
+            const deletedResponse = {
+                ok: false,
+                status: 404,
+                statusText: 'Not Found',
+                headers: {
+                    entries: () => [],
+                    get: () => null
+                },
+                clone: () => ({
+                    json: async () => ({ error: 'Resource has been deleted' }),
+                    text: async () => 'Resource has been deleted'
+                }),
+                url: 'https://esi.evetech.net/v1/corporations/123'
+            };
+            global.fetch.mockResolvedValue(deletedResponse);
+
+            await fetchGET('https://esi.evetech.net/v1/corporations/123');
+
+            expect(biomassCharacter).not.toHaveBeenCalled();
+        });
+
+        it('should stringify unknown GET errors', async () => {
+            global.fetch.mockRejectedValueOnce({});
+
+            await expect(fetchGET('http://test.com', 1)).rejects.toEqual({});
+
+            expect(mockSpan.addEvent).toHaveBeenCalledWith(
+                'Fetch Failed',
+                expect.objectContaining({
+                    error: '[object Object]',
+                    attempt: 1
+                })
+            );
         });
     });
 
@@ -300,6 +390,92 @@ describe('wrappers', () => {
             expect(mockSpan.addEvent).toHaveBeenCalledWith('Fetch Failed', expect.objectContaining({
                 error: 'Network Error'
             }));
+        });
+
+        it('should include body size in POST span attributes', async () => {
+            const mockResponse = {
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                headers: {
+                    entries: () => [],
+                    get: () => null
+                },
+                clone: () => ({
+                    json: async () => ({ result: 'ok' }),
+                    text: async () => '{"result":"ok"}'
+                }),
+                redirected: false,
+                type: 'basic'
+            };
+            global.fetch.mockResolvedValue(mockResponse);
+
+            await fetchPOST('http://test.com', { a: 1 }, 1);
+
+            expect(withSpan).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(Function),
+                expect.objectContaining({
+                    'http.request.body_size': expect.any(Number)
+                })
+            );
+        });
+
+        it('should handle non-object JSON responses in POST', async () => {
+            const mockResponse = {
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                headers: {
+                    entries: () => [],
+                    get: () => null
+                },
+                clone: () => ({
+                    json: async () => 'not-object',
+                    text: async () => 'not-object'
+                }),
+                url: 'http://test.com'
+            };
+            global.fetch.mockResolvedValue(mockResponse);
+
+            await expect(fetchPOST('http://test.com', {}, 1)).rejects.toThrow();
+        });
+
+        it('should stringify unknown POST errors', async () => {
+            global.fetch.mockRejectedValueOnce({});
+
+            await expect(fetchPOST('http://test.com', {}, 1)).rejects.toEqual({});
+
+            expect(mockSpan.addEvent).toHaveBeenCalledWith(
+                'Fetch Failed',
+                expect.objectContaining({
+                    error: '[object Object]',
+                    attempt: 1
+                })
+            );
+        });
+
+        it('should handle undefined POST body size calculation', async () => {
+            const mockResponse = {
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                headers: {
+                    entries: () => [],
+                    get: () => null
+                },
+                clone: () => ({
+                    json: async () => ({ result: 'ok' }),
+                    text: async () => '{"result":"ok"}'
+                }),
+                redirected: false,
+                type: 'basic'
+            };
+            global.fetch.mockResolvedValue(mockResponse);
+
+            await fetchPOST('http://test.com', undefined, 1);
+
+            expect(global.fetch).toHaveBeenCalled();
         });
     });
 

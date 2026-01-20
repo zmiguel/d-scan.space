@@ -194,4 +194,53 @@ describe('local', () => {
         // So it should trigger updateCharactersFromESI.
         expect(updateCharactersFromESI).toHaveBeenCalled();
     });
+
+    it('should sort corporations by character count', async () => {
+        const rawData = ['Char1', 'Char2', 'Char3'];
+
+        const characters = [
+            {
+                id: 1,
+                name: 'Char1',
+                updated_at: new Date().toISOString(),
+                corporation_id: 101,
+                corporation_name: 'Corp A',
+                corporation_ticker: 'A',
+                alliance_id: 9001,
+                alliance_name: 'Alliance X',
+                alliance_ticker: 'AX'
+            },
+            {
+                id: 2,
+                name: 'Char2',
+                updated_at: new Date().toISOString(),
+                corporation_id: 101,
+                corporation_name: 'Corp A',
+                corporation_ticker: 'A',
+                alliance_id: 9001,
+                alliance_name: 'Alliance X',
+                alliance_ticker: 'AX'
+            },
+            {
+                id: 3,
+                name: 'Char3',
+                updated_at: new Date().toISOString(),
+                corporation_id: 202,
+                corporation_name: 'Corp B',
+                corporation_ticker: 'B',
+                alliance_id: 9001,
+                alliance_name: 'Alliance X',
+                alliance_ticker: 'AX'
+            }
+        ];
+
+        getCharactersByName
+            .mockResolvedValueOnce(characters)
+            .mockResolvedValueOnce(characters);
+
+        const result = await createNewLocalScan(rawData);
+
+        const corpNames = result.alliances[0].corporations.map((corp) => corp.name);
+        expect(corpNames).toEqual(['Corp A', 'Corp B']);
+    });
 });
