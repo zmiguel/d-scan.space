@@ -3,10 +3,10 @@ import { withSpan } from '$lib/server/tracer';
 
 export async function load(event) {
 	return await withSpan(
-		'page.load.public_scans',
+		'route.scans.load',
 		async (span) => {
 			const scans = await withSpan(
-				'database.get_public_scans',
+				'route.scans.fetch_public',
 				async () => {
 					return await getPublicScans();
 				},

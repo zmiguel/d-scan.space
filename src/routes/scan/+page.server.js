@@ -1,15 +1,17 @@
 import ShortUniqueId from 'short-unique-id';
 import { redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
+import { createNewDirectionalScan } from '$lib/server/directional.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
+import { scansProcessedCounter } from '$lib/server/metrics';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
 	create: async ({ request, event }) => {
 		return await withSpan(
-			'Create Scan',
+			'route.scan.create',
 			async (span) => {
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
@@ -25,11 +27,14 @@ export const actions = {
 
 				// Figure out if local or directional scan
 				//  - Directional scans start with numbers and have 3 tabs per line
-				const isDirectional = lines.every((line) => {
+				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
+				const directionalLineCount = lines.filter((line) => {
 					const parts = line.split('\t');
 					// @ts-ignore
-					return parts.length === 4 && !isNaN(parts[0]);
-				});
+					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
+				}).length;
+
+				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = uid.randomUUID(8);
@@ -46,16 +51,16 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
+					// LOCAL SCAN
 					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
-					//
-					// TBD.
+					result = await createNewDirectionalScan(lines);
 				}
 
 				try {
 					await withSpan(
-						'Create New Scan',
+						'route.scan.persist_new_scan',
 						async () => {
 							return await createNewScan({
 								scanGroupId,
@@ -80,6 +85,13 @@ export const actions = {
 				}
 
 				logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
+
+				// Record metric for scan processed
+				scansProcessedCounter.add(1, {
+					type: isDirectional ? 'directional' : 'local',
+					public: is_public.toString()
+				});
+
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
 			{},
@@ -90,7 +102,7 @@ export const actions = {
 
 	update: async ({ request, event }) => {
 		return await withSpan(
-			'Update Scan',
+			'route.scan.update',
 			async (span) => {
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
@@ -105,11 +117,14 @@ export const actions = {
 
 				// Figure out if local or directional scan
 				//  - Directional scans start with numbers and have 3 tabs per line
-				const isDirectional = lines.every((line) => {
+				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
+				const directionalLineCount = lines.filter((line) => {
 					const parts = line.split('\t');
 					// @ts-ignore
-					return parts.length === 4 && !isNaN(parts[0]);
-				});
+					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
+				}).length;
+
+				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = data.get('scan_group');
@@ -125,16 +140,16 @@ export const actions = {
 				let result;
 				// LOCAL SCAN
 				if (!isDirectional) {
+					// LOCAL SCAN
 					result = await createNewLocalScan(lines);
 				} else {
 					// DIRECTIONAL SCAN
-					//
-					// TBD.
+					result = await createNewDirectionalScan(lines);
 				}
 
 				try {
 					await withSpan(
-						'Update Scan',
+						'route.scan.persist_update_scan',
 						async () => {
 							return await updateScan({
 								scanGroupId,
@@ -157,6 +172,13 @@ export const actions = {
 				}
 
 				logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
+
+				// Record metric for scan processed (update)
+				scansProcessedCounter.add(1, {
+					type: isDirectional ? 'directional' : 'local',
+					public: 'false' // Updates are always on existing scans
+				});
+
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
 			{},

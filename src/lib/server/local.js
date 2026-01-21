@@ -2,20 +2,32 @@
  * File for all Local Scan related functions
  */
 
-import { getCharactersByName, updateCharactersLastSeen } from '$lib/database/characters.js';
-import { updateCorporationsLastSeen } from '$lib/database/corporations.js';
-import { updateAlliancesLastSeen } from '$lib/database/alliances.js';
+import { getCharactersByName, updateCharactersLastSeen } from '../database/characters.js';
+import { updateCorporationsLastSeen } from '../database/corporations.js';
+import { updateAlliancesLastSeen } from '../database/alliances.js';
 import {
 	addCharactersFromESI,
 	updateAffiliationsFromESI,
 	updateCharactersFromESI
-} from '$lib/server/characters.js';
-import logger from '$lib/logger';
+} from './characters.js';
+import logger from '../logger.js';
 import { withSpan } from './tracer';
+import {
+	cacheHitCounter,
+	cacheMissCounter,
+	scanItemsCount,
+	scanDuration,
+	scansProcessedCounter
+} from './metrics';
 
+/**
+ * Retrieves and updates character data for a local scan.
+ * @param {string[]} data - Array of character names from the scan.
+ * @returns {Promise<Object>} The structured scan result.
+ */
 async function getCharacters(data) {
 	return await withSpan(
-		'local_scan.get_characters',
+		'server.local.get_characters',
 		async (span) => {
 			span.setAttributes({
 				'characters.requested_count': data.length,
@@ -24,43 +36,47 @@ async function getCharacters(data) {
 
 			// get characters in the database
 			const charactersInDB = await getCharactersByName(data);
+			const charactersInDBNames = new Set(charactersInDB.map((c) => c.name));
 
 			const {
 				missingCharacters,
 				outdatedExpiredCharacters,
 				outdatedCachedCharacters,
 				goodCharacters
-			} = await withSpan('local_scan.filter_characters', async (span) => {
-				const missingCharacters = await data.filter(
-					(l) => !charactersInDB.some((c) => c.name === l)
-				);
-				const outdatedExpiredCharacters = await charactersInDB.filter(
-					(c) =>
-						(typeof c.updated_at === 'number'
-							? c.updated_at
-							: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
-							Math.floor(Date.now() / 1000) - 86400 &&
-						(c.esi_cache_expires == null ||
-							Math.floor(new Date(c.esi_cache_expires).getTime() / 1000) <
-								Math.floor(Date.now() / 1000))
-				);
-				const outdatedCachedCharacters = await charactersInDB.filter(
-					(c) =>
-						(typeof c.updated_at === 'number'
-							? c.updated_at
-							: Math.floor(new Date(c.updated_at).getTime() / 1000)) <
-							Math.floor(Date.now() / 1000) - 86400 &&
-						c.esi_cache_expires &&
-						Math.floor(new Date(c.esi_cache_expires).getTime() / 1000) >
-							Math.floor(Date.now() / 1000)
-				);
-				const goodCharacters = await charactersInDB.filter(
-					(c) =>
-						(typeof c.updated_at === 'number'
-							? c.updated_at
-							: Math.floor(new Date(c.updated_at).getTime() / 1000)) >=
-						Math.floor(Date.now() / 1000) - 86400
-				);
+			} = await withSpan('server.local.filter_characters', async (span) => {
+				const missingCharacters = data.filter((l) => !charactersInDBNames.has(l));
+
+				const nowSeconds = Math.floor(Date.now() / 1000);
+				const oneDaySeconds = 86400;
+
+				const outdatedExpiredCharacters = charactersInDB.filter((c) => {
+					const updatedAt = getTimestampSeconds(c.updated_at);
+					const cacheExpires = c.esi_cache_expires
+						? getTimestampSeconds(c.esi_cache_expires)
+						: null;
+
+					const isOld = updatedAt < nowSeconds - oneDaySeconds;
+					const isCacheExpired = cacheExpires == null || cacheExpires < nowSeconds;
+
+					return isOld && isCacheExpired;
+				});
+
+				const outdatedCachedCharacters = charactersInDB.filter((c) => {
+					const updatedAt = getTimestampSeconds(c.updated_at);
+					const cacheExpires = c.esi_cache_expires
+						? getTimestampSeconds(c.esi_cache_expires)
+						: null;
+
+					const isOld = updatedAt < nowSeconds - oneDaySeconds;
+					const isCacheValid = cacheExpires && cacheExpires > nowSeconds;
+
+					return isOld && isCacheValid;
+				});
+
+				const goodCharacters = charactersInDB.filter((c) => {
+					const updatedAt = getTimestampSeconds(c.updated_at);
+					return updatedAt >= nowSeconds - oneDaySeconds;
+				});
 
 				span.setAttributes({
 					'characters.missing_count': missingCharacters.length,
@@ -69,6 +85,18 @@ async function getCharacters(data) {
 					'characters.good_count': goodCharacters.length,
 					'characters.cache_hit_rate': ((goodCharacters.length / data.length) * 100).toFixed(2)
 				});
+
+				// Record cache metrics
+				// Good characters = cache hit (data is fresh)
+				cacheHitCounter.add(goodCharacters.length, { resource: 'character' });
+				// Missing + outdated = cache miss (need to fetch from ESI)
+				cacheMissCounter.add(
+					missingCharacters.length +
+						outdatedExpiredCharacters.length +
+						outdatedCachedCharacters.length,
+					{ resource: 'character' }
+				);
+
 				return {
 					missingCharacters,
 					outdatedExpiredCharacters,
@@ -128,8 +156,9 @@ async function getCharacters(data) {
 
 export async function createNewLocalScan(data) {
 	return await withSpan(
-		'local_scan.create_new',
+		'server.local.create_new',
 		async (span) => {
+			const startTime = Date.now();
 			// Remove duplicates
 			data = [...new Set(data)];
 
@@ -170,9 +199,17 @@ export async function createNewLocalScan(data) {
 			 *  ],
 			 */
 
-			/** @type {{ alliances: Array<any> }} */
+			/** @type {{
+				alliances: Array<any>;
+				total_alliances: number;
+				total_corporations: number;
+				total_pilots: number;
+			}} */
 			const formattedData = {
-				alliances: []
+				alliances: [],
+				total_alliances: 0,
+				total_corporations: 0,
+				total_pilots: 0
 			};
 
 			const alliancesMap = new Map();
@@ -231,14 +268,28 @@ export async function createNewLocalScan(data) {
 
 			formattedData.alliances.sort((a, b) => b.character_count - a.character_count);
 
+			const totalAlliances = formattedData.alliances.length;
+			const totalCorporations = formattedData.alliances.reduce(
+				(acc, alliance) => acc + alliance.corporation_count,
+				0
+			);
+			const totalPilots = allCharacters.length;
+
+			formattedData.total_alliances = totalAlliances;
+			formattedData.total_corporations = totalCorporations;
+			formattedData.total_pilots = totalPilots;
+
 			span.setAttributes({
-				'scan.processed_characters': allCharacters.length,
-				'scan.alliances_count': formattedData.alliances.length,
-				'scan.corporations_count': formattedData.alliances.reduce(
-					(acc, alliance) => acc + alliance.corporation_count,
-					0
-				)
+				'scan.processed_characters': totalPilots,
+				'scan.alliances_count': totalAlliances,
+				'scan.corporations_count': totalCorporations
 			});
+
+			// Record scan metrics
+			const duration = Date.now() - startTime;
+			scanItemsCount.record(data.length, { type: 'local' });
+			scanDuration.record(duration / 1000, { type: 'local' });
+			scansProcessedCounter.add(1, { type: 'local' });
 
 			return formattedData;
 		},
@@ -249,7 +300,7 @@ export async function createNewLocalScan(data) {
 }
 async function updateLastSeen(characters) {
 	// extract all character ids, corp ids and alliance ids to update the last seen timestamp
-	await withSpan('updateLastSeen', async (span) => {
+	await withSpan('server.local.update_last_seen', async (span) => {
 		const characterIDs = characters.map((c) => c.id);
 		const uniqueCorporationIDs = [...new Set(characters.map((c) => c.corporation_id))];
 		const uniqueAllianceIDs = [...new Set(characters.map((c) => c.alliance_id))];
@@ -264,4 +315,17 @@ async function updateLastSeen(characters) {
 		await updateCorporationsLastSeen(uniqueCorporationIDs);
 		await updateAlliancesLastSeen(uniqueAllianceIDs);
 	});
+}
+
+function getTimestampSeconds(dateOrNumber) {
+	if (typeof dateOrNumber === 'number') {
+		return dateOrNumber;
+	}
+	if (dateOrNumber instanceof Date) {
+		return Math.floor(dateOrNumber.getTime() / 1000);
+	}
+	if (typeof dateOrNumber === 'string') {
+		return Math.floor(new Date(dateOrNumber).getTime() / 1000);
+	}
+	return 0;
 }

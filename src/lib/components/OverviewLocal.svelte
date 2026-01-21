@@ -2,6 +2,7 @@
 	import { Accordion, AccordionItem, Avatar, Tooltip } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { secStatusColor } from '$lib/utils/secStatus';
+	import { asset } from '$app/paths';
 
 	let { data } = $props();
 	let truncatedElements = $state({});
@@ -28,22 +29,8 @@
 
 			if (!isVisible) return;
 
-			// Measure text width using canvas
-			const computedStyle = window.getComputedStyle(element);
-			const canvas = document.createElement('canvas');
-			const context = canvas.getContext('2d');
-			context.font = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
-
-			const textContent = element.textContent || element.innerText || '';
-			const textWidth = context.measureText(textContent).width;
-
-			// Get available space in the flex container
-			const flexParent = element.closest('.flex');
-			const parentWidth = flexParent ? flexParent.clientWidth : element.parentElement.clientWidth;
-			const avatarAndSpacing = 40; // Avatar (32px) + spacing
-			const availableTextSpace = parentWidth - avatarAndSpacing;
-
-			const isTruncated = Math.ceil(textWidth) >= Math.floor(availableTextSpace);
+			// Use scrollWidth vs clientWidth to detect truncation reliably
+			const isTruncated = Math.ceil(element.scrollWidth) > Math.floor(element.clientWidth + 1);
 
 			if (isTruncated) {
 				newTruncated[element.id] = true;
@@ -51,6 +38,10 @@
 		});
 
 		truncatedElements = newTruncated;
+	}
+
+	function stopAccordionToggle(event) {
+		event.stopPropagation();
 	}
 </script>
 
@@ -68,14 +59,31 @@
 								class="mr-2"
 							/>
 						{/if}
-						<div
-							class="min-w-0 truncate font-medium dark:text-white"
-							id="alliance-{alliance.id}"
-							data-truncate-check
-						>
+						<div class="flex min-w-0 items-center gap-1 font-medium dark:text-white">
 							{#if alliance.ticker}
 								<span class="text-pink-600 dark:text-pink-400">[{alliance.ticker}]</span>
-								{alliance.name}
+								<span
+									class="max-w-full min-w-0 truncate"
+									id="alliance-{alliance.id}"
+									data-truncate-check
+								>
+									{alliance.name}
+								</span>
+								<a
+									id="alliance-zkill-{alliance.id}"
+									href={`https://zkillboard.com/alliance/${alliance.id}/`}
+									target="_blank"
+									rel="noopener"
+									class="ms-1 inline-flex flex-shrink-0 align-middle"
+									title="zKillBoard"
+									onclick={stopAccordionToggle}
+								>
+									<img
+										src={asset('/wreck.png')}
+										alt="zKillBoard"
+										class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+									/>
+								</a>
 							{:else}
 								<span class="italic">No Alliance</span>
 							{/if}
@@ -110,17 +118,32 @@
 										size="sm"
 										class="mr-2"
 									/>
-									<div
-										class="min-w-0 truncate font-medium dark:text-white"
-										id="corp-{corp.id}"
-										data-truncate-check
-									>
-										<div class="truncate">
-											<span class="text-primary-700 dark:text-primary-400"
-												>{'<' + corp.ticker + '>'}</span
-											>
+									<div class="flex min-w-0 items-center gap-1 font-medium dark:text-white">
+										<span class="text-primary-700 dark:text-primary-400"
+											>{'<' + corp.ticker + '>'}</span
+										>
+										<span
+											class="max-w-full min-w-0 truncate"
+											id="corp-{corp.id}"
+											data-truncate-check
+										>
 											{corp.name}
-										</div>
+										</span>
+										<a
+											id="corp-zkill-{corp.id}"
+											href={`https://zkillboard.com/corporation/${corp.id}/`}
+											target="_blank"
+											rel="noopener"
+											class="ms-1 inline-flex flex-shrink-0 align-middle"
+											title="zKillBoard"
+											onclick={stopAccordionToggle}
+										>
+											<img
+												src={asset('/wreck.png')}
+												alt="zKillBoard"
+												class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+											/>
+										</a>
 									</div>
 									{#if truncatedElements[`corp-${corp.id}`]}
 										<Tooltip triggeredBy="#corp-{corp.id}" placement="top">
@@ -143,13 +166,26 @@
 										src="https://images.evetech.net/characters/{pilot.id}/portrait?size=32"
 										size="sm"
 									/>
-									<div class="font-medium dark:text-white">
+									<div class="flex items-center gap-1 font-medium dark:text-white">
 										<div>
 											{pilot.name}
 											<span style:color={secStatusColor(pilot.sec_status)}>
 												{pilot.sec_status.toFixed(3)}
 											</span>
 										</div>
+										<a
+											href={`https://zkillboard.com/character/${pilot.id}/`}
+											target="_blank"
+											rel="noopener"
+											class="inline-flex flex-shrink-0 align-middle"
+											title="zKillBoard"
+										>
+											<img
+												src={asset('/wreck.png')}
+												alt="zKillBoard"
+												class="h-4 w-4 opacity-80 transition-opacity hover:opacity-100"
+											/>
+										</a>
 									</div>
 								</div>
 							</div>

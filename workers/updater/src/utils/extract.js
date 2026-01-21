@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
-import logger from '$lib/logger';
+import logger from '../../../../src/lib/logger.js';
 
 export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
 	logger.info(`[ExtractWorker] Starting extraction from ${zipPath} to ${tempDir}`);
@@ -38,11 +38,6 @@ export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
 						extractedCount++;
 					} else {
 						failedCount++;
-					}
-
-					// Yield control every 10 files
-					if (extractedCount % 10 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
 					}
 				} catch {
 					failedCount++;
@@ -90,22 +85,13 @@ export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
 				} else {
 					throw new Error(`Failed to read file data for: ${fileName}`);
 				}
-
-				// Yield control after each file
-				await new Promise((resolve) => setImmediate(resolve));
 			} catch (error) {
 				logger.error(`[ExtractWorker] Failed to extract ${fileName}: ${error.message}`);
 				throw error;
 			}
 		}
-
-		logger.info(
-			`[ExtractWorker] Specific file extraction complete: ${extractedCount}/${files.length} files extracted`
-		);
-
 		return {
 			extractedFiles: extractedCount,
-			totalFiles: files.length,
 			requestedFiles: files.length,
 			method: 'admzip'
 		};

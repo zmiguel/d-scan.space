@@ -1,0 +1,56 @@
+services:
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    container_name: database-admin
+
+  postgres-main:
+    image: postgres:18
+    restart: always
+    shm_size: 128mb
+    container_name: postgres-db
+    hostname: db-dev
+    volumes:
+      - db_data:/var/lib/postgresql/18/docker
+    environment:
+      POSTGRES_PASSWORD: dscanspace
+      POSTGRES_USER: dscanspace
+      POSTGRES_DB: dscanspace
+
+  app:
+    image: ghcr.io/zmiguel/d-scan-space:preview
+    restart: always
+    container_name: d-scan
+    environment:
+      DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
+      AGENT: 'Non-Official'
+      ORIGIN: https://example.com
+      BODY_SIZE_LIMIT: 256M
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://trace.example.com/v1/traces'
+      OTEL_EXPORTER_OTLP_AUTHORIZATION: 'Basic example=='
+      CONTACT_EMAIL: 'your@email.com'
+      CONTACT_EVE: 'your name'
+      CONTACT_DISCORD: 'your name'
+      DB_ENV: 'dev'
+    depends_on:
+      - postgres-main
+
+  updater:
+    image: ghcr.io/zmiguel/d-scan-space-updater:preview
+    restart: always
+    environment:
+      DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://trace.example.com/v1/traces'
+      OTEL_EXPORTER_OTLP_AUTHORIZATION: 'Basic example=='
+      CONTACT_EMAIL: 'your@email.com'
+      CONTACT_EVE: 'your name'
+      CONTACT_DISCORD: 'your name'
+      DB_ENV: 'dev'
+      SKIP_MIGRATIONS: 'true'
+      #DYNAMIC_UPDATE_CRON: ""
+      #STATIC_UPDATE_CRON: ""
+    depends_on:
+      - postgres-main
+
+volumes:
+  db_data:

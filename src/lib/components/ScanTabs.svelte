@@ -1,5 +1,5 @@
 <script>
-	import { Tabs, TabItem } from 'flowbite-svelte';
+	import { Tabs, TabItem, Badge } from 'flowbite-svelte';
 	import { UsersGroupSolid, InfoCircleSolid, RocketSolid } from 'flowbite-svelte-icons';
 	import TabOverview from './TabOverview.svelte';
 	import TabLocalScan from './TabLocalScan.svelte';
@@ -39,6 +39,17 @@
 					return allPilots.sort((a, b) => a.name.localeCompare(b.name));
 				})()
 	);
+
+	const localCount = $derived(formatCountValue(data.local?.total_pilots));
+	const spaceCount = $derived(
+		formatCountValue(
+			data.directional?.on_grid?.total_objects + data.directional?.off_grid?.total_objects
+		)
+	);
+
+	function formatCountValue(value) {
+		return typeof value === 'number' && !Number.isNaN(value) ? value : '?';
+	}
 </script>
 
 <div class="min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
@@ -67,6 +78,9 @@
 				<div class="flex items-center gap-2">
 					<UsersGroupSolid size="md" />
 					Local
+					<Badge color="primary" size="xs" class="px-2 text-xs font-semibold">
+						{localCount}
+					</Badge>
 				</div>
 			{/snippet}
 			<TabLocalScan {data} {corps} {pilots} />
@@ -81,6 +95,9 @@
 				<div class="flex items-center gap-2">
 					<RocketSolid size="md" />
 					Space
+					<Badge color="primary" size="xs" class="px-2 text-xs font-semibold">
+						{spaceCount}
+					</Badge>
 				</div>
 			{/snippet}
 		</TabItem>

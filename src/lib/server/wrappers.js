@@ -1,6 +1,21 @@
-import { biomassCharacter } from '$lib/database/characters';
-import { USER_AGENT } from './constants';
+import { biomassCharacter } from '../database/characters.js';
+import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants.js';
 import { withSpan } from './tracer.js';
+import { recordEsiRequest, esiConcurrentRequests } from './metrics.js';
+import { Agent } from 'undici';
+
+const esiAgent = new Agent({
+	connections: ESI_MAX_CONNECTIONS,
+	keepAliveTimeout: 10_000,
+	keepAliveMaxTimeout: 60_000,
+	connect: {
+		timeout: 30_000
+	}
+});
+
+process.once('beforeExit', () => {
+	esiAgent.close();
+});
 
 const headers = {
 	'Content-Type': 'application/json',
@@ -12,12 +27,36 @@ const headers = {
 	'X-User-Agent': USER_AGENT
 };
 
+const RESPONSE_PREVIEW_LIMIT = 800;
+
+function createPreview(payload) {
+	if (payload == null) return 'null';
+	const stringified = typeof payload === 'string' ? payload : JSON.stringify(payload);
+	if (stringified.length <= RESPONSE_PREVIEW_LIMIT) {
+		return stringified;
+	}
+	return `${stringified.slice(0, RESPONSE_PREVIEW_LIMIT)}…`;
+}
+
+function getResourceType(url) {
+	if (url.includes('/characters/')) return 'character';
+	if (url.includes('/corporations/')) return 'corporation';
+	if (url.includes('/alliances/')) return 'alliance';
+	if (url.includes('/universe/systems/')) return 'system';
+	if (url.includes('/universe/types/')) return 'type';
+	if (url.includes('/universe/groups/')) return 'group';
+	if (url.includes('/universe/categories/')) return 'category';
+	if (url.includes('/status/')) return 'status';
+	if (url.includes('/search/')) return 'search';
+	return 'other';
+}
+
 async function handleDelete(response, span, attempt, fullResponse) {
 	// Handle the deleted edge case
 	span.addEvent('Resource marked as deleted', {
 		url: response.url,
 		attempt: attempt,
-		fullResponse: fullResponse
+		preview: createPreview(fullResponse)
 	});
 	if (response.url.includes('character')) {
 		const idStr = response.url.split('/').pop();
@@ -31,40 +70,52 @@ async function handleDelete(response, span, attempt, fullResponse) {
 
 export async function fetchGET(url, maxRetries = 3) {
 	return await withSpan(
-		`fetchGET`,
+		`server.wrappers.fetch_get`,
 		async (span) => {
 			let lastError;
+			const startTime = Date.now();
+			const resourceType = getResourceType(url);
+			console.log(`[DEBUG] fetchGET url=${url} resourceType=${resourceType}`);
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
+					esiConcurrentRequests.add(1);
 					const response = await fetch(url, {
 						method: 'GET',
-						headers: headers
+						headers: headers,
+						dispatcher: esiAgent
 					});
+					esiConcurrentRequests.add(-1);
 
 					const responseClone = response.clone();
 					let fullResponse;
 
 					try {
 						fullResponse = await responseClone.json();
-						delete fullResponse.description;
-						delete fullResponse.title;
+						if (fullResponse && typeof fullResponse === 'object') {
+							delete fullResponse.description;
+							delete fullResponse.title;
+						}
 					} catch {
 						// Fallback to text if JSON parsing fails
 						fullResponse = await response.clone().text();
 					}
 
 					span.setAttributes({
-						'http.response.status': response.status,
+						'http.response.status_code': response.status,
 						'http.response.status_text': response.statusText,
 						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
 						'http.response.body': JSON.stringify(fullResponse),
-						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						attempt: attempt
+						'http.retry.attempt': attempt,
+						'esi.resource_type': resourceType
 					});
+
+					// Extract rate limit info if available
+					const errorLimitRemain = response.headers.get('x-esi-error-limit-remain');
+					const errorLimitReset = response.headers.get('x-esi-error-limit-reset');
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
@@ -74,33 +125,50 @@ export async function fetchGET(url, maxRetries = 3) {
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
 							const error = new Error(
-								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+								`HTTP ${response.status}: ${response.statusText} | ${createPreview(fullResponse)}`
 							);
-							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
-									'http.response.status': response.status,
-									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(
-										Object.fromEntries(response.headers.entries())
-									),
-									'http.response.body': JSON.stringify(fullResponse),
-									'http.response.url': response.url,
-									'http.response.redirected': response.redirected,
-									'http.response.type': response.type,
-									'http.response.ok': response.ok,
-									attempt: attempt
+									status: response.status,
+									statusText: response.statusText,
+									url: response.url,
+									redirected: response.redirected,
+									type: response.type,
+									ok: response.ok,
+									attempt: attempt,
+									preview: createPreview(fullResponse)
 								}
 							});
 							throw error;
 						}
 					}
 
+					// Record successful ESI request metrics
+					const duration = Date.now() - startTime;
+					recordEsiRequest(
+						'GET',
+						response.status,
+						duration,
+						errorLimitRemain,
+						errorLimitReset,
+						resourceType
+					);
+
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
+					// Ensure we decrement if fetch fails (e.g. network error)
+					if (error.name !== 'Error') {
+						esiConcurrentRequests.add(-1);
+					}
+
 					lastError = error;
+
+					// Record failed request metrics
+					const duration = Date.now() - startTime;
+					const status = error.responseDetails?.status || 500;
+					recordEsiRequest('GET', status, duration, null, null, resourceType);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
@@ -140,77 +208,109 @@ export async function fetchGET(url, maxRetries = 3) {
 
 export async function fetchPOST(url, body, maxRetries = 3) {
 	return await withSpan(
-		`fetchPOST`,
+		`server.wrappers.fetch_post`,
 		async (span) => {
 			let lastError;
+			const startTime = Date.now();
+			const resourceType = getResourceType(url);
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
+					esiConcurrentRequests.add(1);
 					const response = await fetch(url, {
 						method: 'POST',
 						headers: headers,
-						body: JSON.stringify(body)
+						body: JSON.stringify(body),
+						dispatcher: esiAgent
 					});
+					esiConcurrentRequests.add(-1);
 
 					const responseClone = response.clone();
 					let fullResponse;
 
 					try {
 						fullResponse = await responseClone.json();
-						delete fullResponse.description;
-						delete fullResponse.title;
+						if (fullResponse && typeof fullResponse === 'object') {
+							delete fullResponse.description;
+							delete fullResponse.title;
+						}
 					} catch {
 						// Fallback to text if JSON parsing fails
 						fullResponse = await response.clone().text();
 					}
 
 					span.setAttributes({
-						'http.response.status': response.status,
+						'http.response.status_code': response.status,
 						'http.response.status_text': response.statusText,
 						'http.response.headers': JSON.stringify(Object.fromEntries(response.headers.entries())),
 						'http.response.body': JSON.stringify(fullResponse),
-						'http.response.url': response.url,
 						'http.response.redirected': response.redirected,
 						'http.response.type': response.type,
 						'http.response.ok': response.ok,
-						attempt: attempt
+						'http.retry.attempt': attempt,
+						'esi.resource_type': resourceType
 					});
+
+					// Extract rate limit info if available
+					const errorLimitRemain = response.headers.get('x-esi-error-limit-remain');
+					const errorLimitReset = response.headers.get('x-esi-error-limit-reset');
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
-						if (response.status === 404 && fullResponse.error.includes('deleted')) {
+						if (
+							response.status === 404 &&
+							fullResponse.error &&
+							fullResponse.error.includes('deleted')
+						) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
 							const error = new Error(
-								`HTTP ${response.status}: ${response.statusText} | ${JSON.stringify(fullResponse)}`
+								`HTTP ${response.status}: ${response.statusText} | ${createPreview(fullResponse)}`
 							);
-							// Attach response details to error for catch block using Object.assign
 							Object.assign(error, {
 								responseDetails: {
-									'http.response.status': response.status,
-									'http.response.status_text': response.statusText,
-									'http.response.headers': JSON.stringify(
-										Object.fromEntries(response.headers.entries())
-									),
-									'http.response.body': JSON.stringify(fullResponse),
-									'http.response.url': response.url,
-									'http.response.redirected': response.redirected,
-									'http.response.type': response.type,
-									'http.response.ok': response.ok,
-									attempt: attempt
+									status: response.status,
+									statusText: response.statusText,
+									url: response.url,
+									redirected: response.redirected,
+									type: response.type,
+									ok: response.ok,
+									attempt: attempt,
+									preview: createPreview(fullResponse)
 								}
 							});
 							throw error;
 						}
 					}
 
+					// Record successful ESI request metrics
+					const duration = Date.now() - startTime;
+					recordEsiRequest(
+						'POST',
+						response.status,
+						duration,
+						errorLimitRemain,
+						errorLimitReset,
+						resourceType
+					);
+
 					// Only set success status here, not error
 					span.setStatus({ code: 0 });
 					return response;
 				} catch (error) {
+					// Ensure we decrement if fetch fails (e.g. network error)
+					if (error.name !== 'Error') {
+						esiConcurrentRequests.add(-1);
+					}
+
 					lastError = error;
+
+					// Record failed request metrics
+					const duration = Date.now() - startTime;
+					const status = error.responseDetails?.status || 500;
+					recordEsiRequest('POST', status, duration, null, null, resourceType);
 
 					// Add detailed fetch failure event if response details are available
 					if (error.responseDetails) {
@@ -225,7 +325,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
-						// Exponential backoff: 1s, 2s, 4s
+						// Exponential backoff: 500ms, 1s, 2s
 						const delay = Math.pow(2, attempt - 1) * 500;
 						await new Promise((resolve) => setTimeout(resolve, delay));
 					}
@@ -244,6 +344,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 			'http.url': url,
 			'http.request.headers': JSON.stringify(headers),
 			'http.request.body': JSON.stringify(body),
+			'http.request.body_size': Buffer.byteLength(JSON.stringify(body ?? {})),
 			'max.retries': maxRetries
 		}
 	);

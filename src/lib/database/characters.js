@@ -1,16 +1,16 @@
 /**
  * All DB functions related to characters
  */
-import { db } from '$lib/database/client';
-import logger from '$lib/logger';
-import { DOOMHEIM_ID } from '$lib/server/constants';
-import { withSpan } from '$lib/server/tracer';
-import { characters, corporations, alliances } from '../database/schema';
+import { db } from './client.js';
+import logger from '../logger.js';
+import { DOOMHEIM_ID } from '../server/constants.js';
+import { withSpan } from '../server/tracer.js';
+import { characters, corporations, alliances } from './schema.js';
 import { asc, eq, inArray, sql, and, lt, gt, isNull } from 'drizzle-orm';
 
 export async function getCharactersByName(names) {
 	return await withSpan(
-		'getCharactersByName',
+		'database.characters.get_by_name',
 		async () => {
 			return db
 				.select({
@@ -43,7 +43,7 @@ export async function getAllCharacters() {
 }
 
 export async function addOrUpdateCharactersDB(data) {
-	await withSpan('addOrUpdateCharactersDB', async (span) => {
+	await withSpan('database.characters.upsert', async (span) => {
 		if (!data || data.length === 0) {
 			logger.warn('Tried to add characters from ESI but characters array was empty');
 			return;
@@ -94,10 +94,32 @@ export async function updateCharactersLastSeen(characterIDs) {
 		.where(inArray(characters.id, characterIDs));
 }
 
+export async function updateCharactersAllianceByCorporation(corporationId, allianceId) {
+	if (!corporationId && corporationId !== 0) {
+		logger.warn('Tried to update characters alliance but corporation id was empty');
+		return;
+	}
+
+	await withSpan('database.characters.update_alliance_by_corporation', async (span) => {
+		span.setAttributes({
+			'db.characters.update_alliance.corporation_id': corporationId,
+			'db.characters.update_alliance.alliance_id': allianceId ?? null
+		});
+
+		await db
+			.update(characters)
+			.set({
+				alliance_id: allianceId ?? null,
+				updated_at: sql`now()`
+			})
+			.where(eq(characters.corporation_id, corporationId));
+	});
+}
+
 export async function getLeastRecentlyUpdatedCharacters(limit) {
 	// this is used to find characters that haven't been updated in 23.5h
 	// but we only care about the characters seen in the last 1 year
-	return await withSpan('getLeastRecentlyUpdatedCharacters', async () => {
+	return await withSpan('database.characters.get_least_recently_updated', async () => {
 		return await db
 			.select()
 			.from(characters)
@@ -115,7 +137,7 @@ export async function getLeastRecentlyUpdatedCharacters(limit) {
 
 export async function biomassCharacter(id) {
 	// When a character is deleted we need to move it to the DOOMHEIM corporation
-	await withSpan('biomassCharacter', async () => {
+	await withSpan('database.characters.biomass', async () => {
 		await db
 			.update(characters)
 			.set({

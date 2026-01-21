@@ -1,10 +1,10 @@
 /**
  * All DB functions related to corporations
  */
-import { db } from '$lib/database/client';
-import logger from '$lib/logger';
-import { withSpan } from '$lib/server/tracer';
-import { corporations } from '../database/schema';
+import { db } from './client.js';
+import logger from '../logger.js';
+import { withSpan } from '../server/tracer.js';
+import { corporations } from './schema.js';
 import { inArray, sql } from 'drizzle-orm';
 
 export async function getCorporationsByID(ids) {
@@ -16,7 +16,7 @@ export async function getAllCorporations() {
 }
 
 export async function addOrUpdateCorporationsDB(data) {
-	await withSpan('addOrUpdateCorporationsDB', async (span) => {
+	await withSpan('database.corporations.upsert', async (span) => {
 		if (!data || data.length === 0) {
 			logger.warn('Tried to add corporations from ESI but corporations array was empty');
 			return;

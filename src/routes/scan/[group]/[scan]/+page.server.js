@@ -3,7 +3,7 @@ import { withSpan } from '$lib/server/tracer.js';
 
 export async function load({ params, event }) {
 	return await withSpan(
-		'page.load.scan_detail',
+		'route.scan_detail.load',
 		async (span) => {
 			const { group, scan } = params;
 
@@ -14,7 +14,7 @@ export async function load({ params, event }) {
 			});
 
 			const getScanResult = await withSpan(
-				'database.get_scan_by_id',
+				'route.scan_detail.fetch_scan',
 				async () => {
 					return await getScanByID(scan);
 				},
@@ -37,7 +37,7 @@ export async function load({ params, event }) {
 
 			const thisScan = getScanResult[0];
 			const groupScans = await withSpan(
-				'database.get_scans_by_group_id',
+				'route.scan_detail.fetch_group_scans',
 				async () => {
 					return await getScansByGroupID(group);
 				},
@@ -47,29 +47,62 @@ export async function load({ params, event }) {
 				}
 			);
 
-			let localScan;
-			let directionalScan;
-
-			if (thisScan.scan_type === 'local') {
-				localScan = thisScan;
-			} else {
-				directionalScan = thisScan;
-			}
+			const thisScanDate = new Date(thisScan.created_at);
+			let priorOppositeScan = null;
 
 			if (groupScans.length > 1) {
-				groupScans.forEach((scanItem) => {
-					if (
-						scanItem.created_at < thisScan.created_at &&
-						scanItem.scan_type !== thisScan.scan_type
-					) {
-						if (scanItem.scan_type === 'local') {
-							localScan = scanItem;
-						} else {
-							directionalScan = scanItem;
-						}
+				for (const scanItem of groupScans) {
+					if (scanItem.id === thisScan.id) {
+						continue;
 					}
-				});
+
+					if (scanItem.scan_type === thisScan.scan_type) {
+						continue;
+					}
+
+					const scanItemDate = new Date(scanItem.created_at);
+					if (scanItemDate >= thisScanDate) {
+						continue;
+					}
+
+					if (!priorOppositeScan || scanItemDate > new Date(priorOppositeScan.created_at)) {
+						priorOppositeScan = scanItem;
+					}
+				}
 			}
+
+			if (priorOppositeScan) {
+				const priorScanResult = await withSpan(
+					'route.scan_detail.fetch_prior_scan',
+					async () => {
+						return await getScanByID(priorOppositeScan.id);
+					},
+					{
+						'scan.id': priorOppositeScan.id,
+						'operation.type': 'read'
+					}
+				);
+
+				if (priorScanResult && priorScanResult[0]) {
+					priorOppositeScan = priorScanResult[0];
+				} else {
+					priorOppositeScan = null;
+				}
+			}
+
+			const localScan =
+				thisScan.scan_type === 'local'
+					? thisScan
+					: priorOppositeScan?.scan_type === 'local'
+						? priorOppositeScan
+						: null;
+
+			const directionalScan =
+				thisScan.scan_type === 'directional'
+					? thisScan
+					: priorOppositeScan?.scan_type === 'directional'
+						? priorOppositeScan
+						: null;
 
 			span.setAttributes({
 				'scan.found': true,
@@ -82,8 +115,8 @@ export async function load({ params, event }) {
 			return {
 				system: thisScan.system,
 				created_at: thisScan.created_at,
-				local: localScan ? thisScan.data : null,
-				directional: directionalScan ? thisScan.data : null,
+				local: localScan ? localScan.data : null,
+				directional: directionalScan ? directionalScan.data : null,
 				related: groupScans,
 				params: {
 					group: group,

@@ -1,123 +1,162 @@
-import { withSpan } from '$lib/server/tracer';
-import logger from '$lib/logger';
+import { withSpan } from '../../../../src/lib/server/tracer.js';
+import logger from '../../../../src/lib/logger.js';
 import {
 	getLastInstalledSDEVersion,
 	addSDEDataEntry,
-	addOrUpdateSystemsDB
-} from '$lib/database/sde';
-import { SDE_FILE, SDE_VERSION } from '$lib/server/constants';
+	addOrUpdateSystemsDB,
+	addOrUpdateCategoriesDB,
+	addOrUpdateGroupsDB,
+	addOrUpdateTypesDB
+} from '../../../../src/lib/database/sde.js';
+import { SDE_FILE, SDE_VERSION } from '../../../../src/lib/server/constants.js';
 import fs from 'fs';
 import path from 'path';
-import { extractZipNonBlocking } from '$lib/workers/extract-worker.js';
-import { addOrUpdateCorporationsDB } from '$lib/database/corporations';
-import { fetchGET } from '$lib/server/wrappers';
+import { extractZipNonBlocking } from '../utils/extract.js';
+import { addOrUpdateCorporationsDB } from '../../../../src/lib/database/corporations.js';
+import { fetchGET } from '../../../../src/lib/server/wrappers.js';
+import { recordCronJob } from '../../../../src/lib/server/metrics.js';
 
 export async function updateStaticData() {
-	logger.info('[SDEUpdater] Updating static data...');
-	await withSpan('CRON Static', async () => {
-		// Get SDE version and compare it to the last entry in DB
-		const [updated, version] = await withSpan('SDE Version Check', async (span) => {
-			let lastInstalledVersion = await getLastInstalledSDEVersion();
-			const latestOnlineVersion = await getOnlineVersion();
+	const startTime = Date.now();
 
-			// if lastInstalledVersion is an array, get the first element
-			if (Array.isArray(lastInstalledVersion)) {
-				lastInstalledVersion = lastInstalledVersion[0];
-			}
+	try {
+		logger.info('[SDEUpdater] Updating static data...');
+		await withSpan('worker.static.cron', async () => {
+			// Get SDE version and compare it to the last entry in DB
+			const [updated, version] = await withSpan('worker.static.check_version', async (span) => {
+				let lastInstalledVersion = await getLastInstalledSDEVersion();
+				const latestOnlineVersion = await getOnlineVersion();
 
-			span.setAttributes({
-				'sde.installed': JSON.stringify(lastInstalledVersion),
-				'sde.online': JSON.stringify(latestOnlineVersion)
+				// if lastInstalledVersion is an array, get the first element
+				if (Array.isArray(lastInstalledVersion)) {
+					lastInstalledVersion = lastInstalledVersion[0];
+				}
+
+				span.setAttributes({
+					'sde.installed': JSON.stringify(lastInstalledVersion),
+					'sde.online': JSON.stringify(latestOnlineVersion)
+				});
+
+				// If no previous version exists, force an update
+				if (!lastInstalledVersion) {
+					logger.info('[SDEUpdater] No previous SDE data found, update needed.');
+					return [false, latestOnlineVersion];
+				}
+
+				if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
+					logger.info('[SDEUpdater] Static data is up to date, no update needed.');
+					return [true, latestOnlineVersion];
+				}
+				logger.info('[SDEUpdater] Static data is out of date, update needed.');
+				return [false, latestOnlineVersion];
 			});
 
-			// If no previous version exists, force an update
-			if (!lastInstalledVersion) {
-				logger.info('[SDEUpdater] No previous SDE data found, update needed.');
-				return [false, latestOnlineVersion];
+			// no update needed
+			if (updated) {
+				// Record skipped CRON job (no update needed)
+				const duration = Date.now() - startTime;
+				recordCronJob('updateStaticData', duration, true);
+				return;
 			}
 
-			if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
-				logger.info('[SDEUpdater] Static data is up to date, no update needed.');
-				return [true, latestOnlineVersion];
-			}
-			logger.info('[SDEUpdater] Static data is out of date, update needed.');
-			return [false, latestOnlineVersion];
+			// update needed
+
+			// extract only the files we need to save memory and time
+			const filesToExtract = [
+				// we need this to update NPC corps
+				'npcCorporations.jsonl',
+				// and these to update the universe
+				'mapRegions.jsonl',
+				'mapConstellations.jsonl',
+				'mapSolarSystems.jsonl',
+				// stuff in space & more
+				'categories.jsonl',
+				'groups.jsonl',
+				'types.jsonl'
+			];
+
+			logger.info('[SDEUpdater] Downloading and extracting SDE files...');
+
+			await downloadAndExtractSDE(SDE_FILE, filesToExtract);
+
+			// update NPC corps
+			logger.info('[SDEUpdater] Updating NPC corporations...');
+			const npcUpdateSuccess = await updateNPCCorps();
+			logger.info(
+				'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
+			);
+
+			// update the universe
+			logger.info('[SDEUpdater] Updating universe data...');
+			const universeUpdateSuccess = await updateUniverse();
+			logger.info(
+				'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
+			);
+
+			// update items
+			logger.info('[SDEUpdater] Updating item data...');
+			const itemUpdateSuccess = await updateItems();
+			logger.info('[SDEUpdater] Item data update ' + (itemUpdateSuccess ? 'succeeded' : 'failed'));
+
+			// save the SDE data entry
+			const final_result = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
+			logger.info(
+				'[SDEUpdater] Recording new SDE version in database... ' +
+					(final_result ? 'success' : 'failure')
+			);
+			await addSDEDataEntry({
+				release_date: version.release_date,
+				release_version: version.release_version,
+				success: final_result
+			});
+
+			// Update done
+			// clean up files
+			logger.info('[SDEUpdater] Cleaning up temporary files...');
+			await cleanupTemp();
 		});
 
-		// no update needed
-		if (updated) {
-			return;
-		}
+		logger.info('[SDEUpdater] Static data update completed.');
 
-		// update needed
+		// Record successful CRON job
+		const duration = Date.now() - startTime;
+		recordCronJob('updateStaticData', duration, true);
 
-		// extract only the files we need to save memory and time
-		const filesToExtract = [
-			// we need this to update NPC corps
-			'npcCorporations.jsonl',
-			// and these to update the universe
-			'mapRegions.jsonl',
-			'mapConstellations.jsonl',
-			'mapSolarSystems.jsonl'
-			// more...
-		];
-
-		logger.info('[SDEUpdater] Downloading and extracting SDE files...');
-
-		await downloadAndExtractSDE(SDE_FILE, filesToExtract);
-
-		// update NPC corps
-		logger.info('[SDEUpdater] Updating NPC corporations...');
-		const npcUpdateSuccess = await updateNPCCorps();
-		logger.info(
-			'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
-		);
-
-		// update the universe
-		logger.info('[SDEUpdater] Updating universe data...');
-		const universeUpdateSuccess = await updateUniverse();
-		logger.info(
-			'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
-		);
-
-		// save the SDE data entry
-		const final_result = npcUpdateSuccess && universeUpdateSuccess;
-		logger.info(
-			'[SDEUpdater] Recording new SDE version in database... ' +
-				(final_result ? 'success' : 'failure')
-		);
-		await addSDEDataEntry({
-			release_date: version.release_date,
-			release_version: version.release_version,
-			success: final_result
-		});
-
-		// Update done
-		// clean up files
-		logger.info('[SDEUpdater] Cleaning up temporary files...');
-		await cleanupTemp();
-	});
-
-	logger.info('[SDEUpdater] Static data update completed.');
-	return true;
+		return true;
+	} catch (error) {
+		const duration = Date.now() - startTime;
+		recordCronJob('updateStaticData', duration, false);
+		throw error;
+	}
 }
 
 async function getOnlineVersion() {
-	return await withSpan('Get Online Version', async (span) => {
+	return await withSpan('worker.static.get_online_version', async (span) => {
 		try {
 			// fetch the version data from the SDE Links
 			const response = await fetchGET(SDE_VERSION);
 
-			if (!response.ok) {
-				throw new Error(`Failed to fetch SDE version: HTTP ${response.status}`);
+			if (!response) {
+				throw new Error(`Failed to fetch SDE version`);
 			}
 
-			// Get the JSONL content
-			const jsonlContent = await response.text();
+			const text = await response.text();
+			let sdeData;
 
-			// Parse the JSONL (assuming single line for SDE data)
-			const lines = jsonlContent.trim().split('\n');
-			const sdeData = JSON.parse(lines[0]); // Get first line
+			try {
+				// Try to parse the whole text as JSON first
+				sdeData = JSON.parse(text);
+			} catch {
+				// If that fails, assume it's JSONL and take the first line
+				const lines = text.trim().split('\n');
+				if (lines.length > 0) {
+					sdeData = JSON.parse(lines[0]);
+				}
+			}
+
+			if (!sdeData) {
+				throw new Error('Failed to parse SDE version data');
+			}
 
 			// Extract version information
 			const buildNumber = sdeData.buildNumber;
@@ -140,7 +179,7 @@ async function getOnlineVersion() {
 }
 
 async function downloadAndExtractSDE(url, files = []) {
-	await withSpan('Download and Extract SDE', async (span) => {
+	await withSpan('worker.static.download_extract', async (span) => {
 		const tempDir = './temp';
 		const zipPath = path.join(tempDir, 'sde_download.zip');
 
@@ -172,9 +211,8 @@ async function downloadAndExtractSDE(url, files = []) {
 					fileStream.write(value);
 					downloadedBytes += value.length;
 
-					// Yield control periodically during download (every ~1MB)
+					// Log progress periodically during download (every ~1MB)
 					if (downloadedBytes % (1024 * 1024) === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
 						span.addEvent('Download progress', {
 							downloadedBytes,
 							totalBytes: contentLength,
@@ -228,7 +266,7 @@ async function cleanupTemp() {
 }
 
 async function updateNPCCorps() {
-	return await withSpan('Update NPC Corps', async (span) => {
+	return await withSpan('worker.static.update_npc_corps', async (span) => {
 		try {
 			const jsonlFilePath = path.join('./temp', 'npcCorporations.jsonl');
 
@@ -317,11 +355,6 @@ async function updateNPCCorps() {
 					alliance_id: null, // NPC corps don't have alliances
 					npc: true // Mark as NPC corporation
 				});
-
-				// Yield control every 50 corporations to prevent blocking the event loop
-				if (totalCorps % 50 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
-				}
 			}
 
 			span.setAttributes({
@@ -353,7 +386,7 @@ async function updateNPCCorps() {
 }
 
 async function updateUniverse() {
-	return await withSpan('Update Universe', async (span) => {
+	return await withSpan('worker.static.update_universe', async (span) => {
 		try {
 			const tempDir = './temp';
 			const systemsData = [];
@@ -403,7 +436,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapRegions.jsonl file');
 			const regionLines = await readJSONLAsync(regionsPath);
 
-			let regionCount = 0;
 			for (const line of regionLines) {
 				if (!line.trim()) continue;
 				const regionData = JSON.parse(line);
@@ -412,12 +444,6 @@ async function updateUniverse() {
 
 				if (regionId && regionName) {
 					regionMap.set(regionId, regionName);
-					regionCount++;
-				}
-
-				// Yield control every 10 regions
-				if (regionCount % 10 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -435,7 +461,6 @@ async function updateUniverse() {
 			span.addEvent('Reading mapConstellations.jsonl file');
 			const constellationLines = await readJSONLAsync(constellationsPath);
 
-			let constellationCount = 0;
 			for (const line of constellationLines) {
 				if (!line.trim()) continue;
 				const constellationData = JSON.parse(line);
@@ -444,12 +469,6 @@ async function updateUniverse() {
 
 				if (constellationId && constellationName) {
 					constellationMap.set(constellationId, constellationName);
-					constellationCount++;
-				}
-
-				// Yield control every 20 constellations
-				if (constellationCount % 20 === 0) {
-					await new Promise((resolve) => setImmediate(resolve));
 				}
 			}
 
@@ -530,11 +549,6 @@ async function updateUniverse() {
 
 					processedSystems++;
 
-					// Yield control every 50 systems to prevent blocking the event loop
-					if (processedSystems % 50 === 0) {
-						await new Promise((resolve) => setImmediate(resolve));
-					}
-
 					// Log progress every 1000 systems
 					if (processedSystems % 1000 === 0) {
 						span.addEvent('Processing progress', {
@@ -575,6 +589,267 @@ async function updateUniverse() {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			logger.error(`Error updating Universe: ${errorMessage}`);
+			span.setStatus({ code: 2, message: errorMessage });
+			return false;
+		}
+	});
+}
+
+async function updateItems() {
+	return await withSpan('worker.static.update_items', async (span) => {
+		try {
+			const tempDir = './temp';
+
+			span.addEvent('Starting item data processing');
+
+			// Helper function to read JSONL file asynchronously without blocking
+			const readJSONLAsync = async (filePath) => {
+				return new Promise((resolve, reject) => {
+					const lines = [];
+					const stream = fs.createReadStream(filePath, {
+						encoding: 'utf8',
+						highWaterMark: 64 * 1024
+					});
+					let buffer = '';
+
+					stream.on('data', (chunk) => {
+						buffer += chunk;
+						const newlineIndex = buffer.lastIndexOf('\n');
+						if (newlineIndex !== -1) {
+							const completeLines = buffer.substring(0, newlineIndex);
+							buffer = buffer.substring(newlineIndex + 1);
+							lines.push(...completeLines.split('\n'));
+						}
+					});
+
+					stream.on('end', () => {
+						if (buffer.trim()) {
+							lines.push(buffer);
+						}
+						resolve(lines);
+					});
+
+					stream.on('error', reject);
+				});
+			};
+
+			// Process categories
+			const categoriesPath = path.join(tempDir, 'categories.jsonl');
+			const categoriesData = [];
+
+			if (!fs.existsSync(categoriesPath)) {
+				span.setStatus({ code: 2, message: 'categories.jsonl file not found' });
+				throw new Error('categories.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading categories.jsonl file');
+			const categoryLines = await readJSONLAsync(categoriesPath);
+
+			let categoryCount = 0;
+			let skippedCategories = 0;
+
+			for (const line of categoryLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const categoryData = JSON.parse(line);
+					const id = categoryData._key;
+					const name = categoryData.name?.en;
+
+					// Validate required fields
+					if (!id || !name) {
+						logger.warn(`Skipping category ${id} due to missing name`);
+						span.addEvent('Skipping category with missing data', {
+							categoryId: id,
+							hasName: !!name
+						});
+						skippedCategories++;
+						continue;
+					}
+
+					categoriesData.push({
+						id,
+						name
+					});
+
+					categoryCount++;
+				} catch (parseError) {
+					logger.warn(`Error parsing category line: ${parseError.message}`);
+					skippedCategories++;
+				}
+			}
+
+			span.setAttributes({
+				'categories.total_in_file': categoryCount,
+				'categories.skipped': skippedCategories,
+				'categories.valid': categoriesData.length
+			});
+
+			span.addEvent('Updating categories in database', {
+				categoriesCount: categoriesData.length
+			});
+
+			if (categoriesData.length > 0) {
+				await addOrUpdateCategoriesDB(categoriesData);
+				span.addEvent('Categories updated successfully', {
+					updatedCount: categoriesData.length
+				});
+			}
+
+			// Process groups
+			const groupsPath = path.join(tempDir, 'groups.jsonl');
+			const groupsData = [];
+
+			if (!fs.existsSync(groupsPath)) {
+				span.setStatus({ code: 2, message: 'groups.jsonl file not found' });
+				throw new Error('groups.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading groups.jsonl file');
+			const groupLines = await readJSONLAsync(groupsPath);
+
+			let groupCount = 0;
+			let skippedGroups = 0;
+
+			for (const line of groupLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const groupData = JSON.parse(line);
+					const id = groupData._key;
+					const name = groupData.name?.en;
+					const categoryId = groupData.categoryID;
+
+					// Validate required fields
+					if (!id || !name || categoryId === undefined || categoryId === 0) {
+						logger.warn(`Skipping group ${id} due to missing required fields`);
+						span.addEvent('Skipping group with missing data', {
+							groupId: id,
+							hasName: !!name,
+							hasCategoryId: categoryId !== undefined
+						});
+						skippedGroups++;
+						continue;
+					}
+
+					groupsData.push({
+						id,
+						name,
+						anchorable: groupData.anchorable || false,
+						anchored: groupData.anchored || false,
+						fittable_non_singleton: groupData.fittableNonSingleton || false,
+						category_id: categoryId,
+						icon_id: groupData.iconID || null
+					});
+
+					groupCount++;
+				} catch (parseError) {
+					logger.warn(`Error parsing group line: ${parseError.message}`);
+					skippedGroups++;
+				}
+			}
+
+			span.setAttributes({
+				'groups.total_in_file': groupCount,
+				'groups.skipped': skippedGroups,
+				'groups.valid': groupsData.length
+			});
+
+			span.addEvent('Updating groups in database', {
+				groupsCount: groupsData.length
+			});
+
+			if (groupsData.length > 0) {
+				await addOrUpdateGroupsDB(groupsData);
+				span.addEvent('Groups updated successfully', {
+					updatedCount: groupsData.length
+				});
+			}
+
+			// Process types
+			const typesPath = path.join(tempDir, 'types.jsonl');
+			const typesData = [];
+
+			if (!fs.existsSync(typesPath)) {
+				span.setStatus({ code: 2, message: 'types.jsonl file not found' });
+				throw new Error('types.jsonl file not found in temp directory');
+			}
+
+			span.addEvent('Reading types.jsonl file');
+			const typeLines = await readJSONLAsync(typesPath);
+
+			let typeCount = 0;
+			let skippedTypes = 0;
+
+			for (const line of typeLines) {
+				if (!line.trim()) continue;
+
+				try {
+					const typeData = JSON.parse(line);
+					const id = typeData._key;
+					const name = typeData.name?.en;
+					const groupId = typeData.groupID;
+
+					// Validate required fields
+					if (!id || !name || groupId === undefined || groupId === 0) {
+						logger.warn(`Skipping type ${id} due to missing required fields`);
+						span.addEvent('Skipping type with missing data', {
+							typeId: id,
+							hasName: !!name,
+							hasGroupId: groupId !== undefined
+						});
+						skippedTypes++;
+						continue;
+					}
+
+					typesData.push({
+						id,
+						name,
+						mass: typeData.mass || 0,
+						volume: typeData.volume || 0,
+						capacity: typeData.capacity || null,
+						faction_id: typeData.factionID || 0,
+						race_id: typeData.raceID || 0,
+						group_id: groupId,
+						market_group_id: typeData.marketGroupID || null,
+						icon_id: typeData.iconID || null
+					});
+
+					typeCount++;
+				} catch (parseError) {
+					logger.warn(`Error parsing type line: ${parseError.message}`);
+					skippedTypes++;
+				}
+			}
+
+			span.setAttributes({
+				'types.total_in_file': typeCount,
+				'types.skipped': skippedTypes,
+				'types.valid': typesData.length
+			});
+
+			span.addEvent('Updating types in database', {
+				typesCount: typesData.length
+			});
+
+			if (typesData.length > 0) {
+				await addOrUpdateTypesDB(typesData);
+				span.addEvent('Types updated successfully', {
+					updatedCount: typesData.length
+				});
+			}
+
+			span.addEvent('Item data update completed successfully', {
+				totalCategories: categoriesData.length,
+				totalGroups: groupsData.length,
+				totalTypes: typesData.length
+			});
+
+			span.setStatus({ code: 0, message: 'Item data updated successfully' });
+			return true;
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			logger.error(`Error updating item data: ${errorMessage}`);
 			span.setStatus({ code: 2, message: errorMessage });
 			return false;
 		}

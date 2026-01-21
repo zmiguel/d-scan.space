@@ -1,7 +1,7 @@
 /**
  *  Functions related to corporations
  */
-import { addOrUpdateCorporationsDB, getCorporationsByID } from '$lib/database/corporations.js';
+import { addOrUpdateCorporationsDB, getCorporationsByID } from '../database/corporations.js';
 import { withSpan } from './tracer.js';
 import { fetchGET } from './wrappers.js';
 
@@ -16,7 +16,7 @@ async function getCorporationFromESI(id) {
 }
 
 export async function idsToCorporations(ids) {
-	return await withSpan('idsToCorporations', async () => {
+	return await withSpan('server.corporations.ids_to_corporations', async () => {
 		// get all corporations from esi and return them
 		let corporationData = [];
 		const corporationPromises = ids.map(async (id) => {
@@ -31,7 +31,7 @@ export async function idsToCorporations(ids) {
 }
 
 export async function addOrUpdateCorporations(data) {
-	await withSpan('addOrUpdateCorporations', async (span) => {
+	await withSpan('server.corporations.add_or_update', async (span) => {
 		const corporationsInDB = await getCorporationsByID(data);
 
 		// find missing corporations
