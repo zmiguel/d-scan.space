@@ -47,6 +47,62 @@
 				})()
 	);
 
+	const groupStats = $derived.by(() => {
+		const shipCategoryId = 6;
+		const map = new SvelteMap();
+		const addGroupItems = (section, location) => {
+			const visit = (node, groupInfo, categoryId) => {
+				if (!node || typeof node !== 'object') return;
+				if (Array.isArray(node.objects) && node.objects.length > 0) {
+					const childHasObjects = node.objects.some((child) => Array.isArray(child?.objects));
+					const nextGroupInfo = childHasObjects
+						? groupInfo
+						: {
+								id: node.id,
+								name: node.name,
+								categoryId
+							};
+					node.objects.forEach((child) => visit(child, nextGroupInfo, categoryId));
+					return;
+				}
+
+				if (!groupInfo?.id) return;
+				const count = getNodeCount(node);
+				if (count <= 0) return;
+
+				const entry = map.get(groupInfo.id) ?? {
+					id: groupInfo.id,
+					name: groupInfo.name,
+					categoryId: groupInfo.categoryId,
+					on: 0,
+					off: 0,
+					total: 0
+				};
+
+				if (location === 'on') entry.on += count;
+				if (location === 'off') entry.off += count;
+				entry.total = entry.on + entry.off;
+				map.set(groupInfo.id, entry);
+			};
+
+			(listGroups(section) ?? []).forEach((node) => visit(node, null, Number(node?.id)));
+		};
+
+		addGroupItems(onGrid, 'on');
+		addGroupItems(offGrid, 'off');
+
+		const sorted = Array.from(map.values()).sort((a, b) => {
+			const totalDiff = b.total - a.total;
+			if (totalDiff !== 0) return totalDiff;
+			return a.name.localeCompare(b.name);
+		});
+
+		const ships = sorted.filter((group) => Number(group?.categoryId) === shipCategoryId);
+		const others = sorted.filter((group) => Number(group?.categoryId) !== shipCategoryId);
+
+		return [...ships, ...others];
+	});
+
 	onMount(() => {
 		setTimeout(checkTruncation, 100);
 		document.addEventListener('click', () => {
@@ -95,17 +151,25 @@
 	}
 
 	function sortByTotal(list) {
-		return [...list].sort((a, b) => getNodeCount(b) - getNodeCount(a));
+		return [...list].sort((a, b) => {
+			const countDiff = getNodeCount(b) - getNodeCount(a);
+			if (countDiff !== 0) return countDiff;
+			return (a?.name ?? '').localeCompare(b?.name ?? '');
+		});
 	}
 
 	function sortCategories(list) {
-		return [...list].sort((a, b) => {
-			const aIsShip = a?.name === 'Ship';
-			const bIsShip = b?.name === 'Ship';
-			if (aIsShip && !bIsShip) return -1;
-			if (!aIsShip && bIsShip) return 1;
-			return getNodeCount(b) - getNodeCount(a);
+		const shipCategoryId = 6;
+		const sorted = [...list].sort((a, b) => {
+			const countDiff = getNodeCount(b) - getNodeCount(a);
+			if (countDiff !== 0) return countDiff;
+			return (a?.name ?? '').localeCompare(b?.name ?? '');
 		});
+
+		const ships = sorted.filter((category) => Number(category?.id) === shipCategoryId);
+		const others = sorted.filter((category) => Number(category?.id) !== shipCategoryId);
+
+		return [...ships, ...others];
 	}
 
 	function collectAllLeaves(section) {
@@ -221,6 +285,32 @@
 			</div>
 		</div>
 	{/if}
+
+	<div class="border-b-2 border-gray-600 pb-3">
+		<div class="grid grid-cols-3 gap-2">
+			{#each groupStats as group (group.id)}
+				<div
+					class="grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded bg-white px-2 py-1 dark:bg-gray-800"
+				>
+					<div class="flex min-w-0 items-center gap-2">
+						<span class="min-w-0 truncate text-sm font-medium text-gray-800 dark:text-gray-100">
+							{group.name}
+						</span>
+					</div>
+					<div class="flex items-center gap-1">
+						{#if group.on > 0}
+							<Badge id="group-on-{group.id}" color="red" size="xs">{group.on}</Badge>
+							<Tooltip triggeredBy="#group-on-{group.id}" placement="top">On Grid</Tooltip>
+						{/if}
+						{#if group.off > 0}
+							<Badge id="group-off-{group.id}" color="green" size="xs">{group.off}</Badge>
+							<Tooltip triggeredBy="#group-off-{group.id}" placement="top">Off Grid</Tooltip>
+						{/if}
+					</div>
+				</div>
+			{/each}
+		</div>
+	</div>
 
 	<div class="relative grid grid-cols-2 gap-2">
 		<div class="pr-1">
