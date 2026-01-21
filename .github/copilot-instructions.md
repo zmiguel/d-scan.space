@@ -5,6 +5,7 @@
 - SvelteKit + Svelte 5 app. UI routes live in `src/routes/**/+page.svelte`; server actions/loaders live beside them in `src/routes/**/+page.server.js`.
 - Shared “business logic” sits in `src/lib/server/*` (scan parsing, ESI calls, tracing/metrics) and is reused by the Node worker in `workers/updater/`.
 - PostgreSQL via Drizzle. DB wiring/migrations: `src/lib/database/client.js`; schema: `src/lib/database/schema.js`; queries/helpers: `src/lib/database/*.js`.
+- Source of truth is `src/` and `workers/updater/src/`; the `build/` directory is generated output from `npm run build`.
 
 ## Core flows (examples)
 
@@ -18,7 +19,7 @@
 
 ## Observability is not optional here
 
-- Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes (route IDs, counts, IDs).
+- Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes (route IDs, counts, IDs). See `TRACING_GUIDE.md` for naming and examples.
 - In SvelteKit hooks/routes, pass the `event` to `withSpan(..., event)` to parent spans to SvelteKit’s request trace (see `src/hooks.server.js`).
 - App OTEL setup: `src/instrumentation.server.js` (Prometheus exporter + optional OTLP metrics + OTLP traces with retry).
 - Worker OTEL setup: `workers/updater/src/instrumentation.js`.
@@ -36,7 +37,7 @@
 
 ## Dev workflows (repo-specific)
 
-- Dev server: `npm run dev` (same as `dev-win`). Build: `npm run build`. Prod: `npm run prod` (runs `node build`).
+- Dev server: `npm run dev` (same as `dev-win`). Build: `npm run build`. Preview: `npm run preview`. Prod: `npm run prod` (runs `node build`).
 - Checks/tests: `npm run check`, `npm run lint`, `npm run format`, `npm test` (Vitest).
 - DB: set `DATABASE_URL` then `npm run db:generate|db:push|db:migrate|db:studio`.
 - Docker: root `Dockerfile` builds with `BUILD=true`; `docker-compose.yml` runs `app` + `postgres` + `updater` (worker typically sets `SKIP_MIGRATIONS=true`).

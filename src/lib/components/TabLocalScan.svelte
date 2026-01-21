@@ -242,8 +242,8 @@
 	}
 </script>
 
-<div class=" grid grid-cols-3 gap-2">
-	<div class="col-span-1 border-e-2 border-gray-600">
+<div class="relative grid grid-cols-3 gap-2">
+	<div class="col-span-1">
 		<h1 class="ms-2 text-xl font-bold">Alliances</h1>
 		<div class="col-auto mt-2">
 			{#each data.local?.alliances ?? [] as alliance (alliance.id)}
@@ -263,7 +263,7 @@
 					onmouseenter={() => setHoverAlliance(allianceTicker)}
 					onmouseleave={() => clearHoverAlliance(allianceTicker)}
 				>
-					<div class="mt-1 flex items-center space-x-2 rtl:space-x-reverse">
+					<div class="flex items-center space-x-2 rtl:space-x-reverse">
 						{#if alliance.ticker}
 							<Avatar
 								cornerStyle="rounded"
@@ -307,8 +307,12 @@
 			{/each}
 		</div>
 	</div>
-
-	<div class="col-span-1 border-e-2 border-gray-600">
+	<div
+		class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+		style="left: calc(33.333% - 0.15rem);"
+		aria-hidden="true"
+	></div>
+	<div class="col-span-1 px-1">
 		<h1 class="ms-2 text-xl font-bold">Corporations</h1>
 		<div class="col-auto mt-2">
 			{#each corps as corp (corp.id)}
@@ -328,7 +332,7 @@
 					onmouseenter={() => setHoverCorporation(corp.ticker)}
 					onmouseleave={() => clearHoverCorporation(corp.ticker)}
 				>
-					<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
+					<div class="flex items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
 							cornerStyle="rounded"
 							src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"
@@ -367,8 +371,12 @@
 			{/each}
 		</div>
 	</div>
-
-	<div class="col-span-1">
+	<div
+		class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+		style="left: calc(66.666%);"
+		aria-hidden="true"
+	></div>
+	<div class="col-span-1 pl-1">
 		<h1 class="ms-2 text-xl font-bold">Pilots</h1>
 		<div class="col-auto mt-2">
 			{#each pilots as pilot (pilot.id)}
@@ -387,7 +395,7 @@
 					onmouseenter={() => setHoverPilot(pilot.id)}
 					onmouseleave={() => clearHoverPilot(pilot.id)}
 				>
-					<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
+					<div class="flex items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
 							cornerStyle="rounded"
 							src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"
