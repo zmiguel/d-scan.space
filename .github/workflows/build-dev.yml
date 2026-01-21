@@ -235,11 +235,13 @@ jobs:
       - name: Create multi-platform manifest
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          TAG_ARGS=$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          docker buildx imagetools create ${TAG_ARGS} \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}@sha256:%s ' *)
 
-          # Get the digest of the created manifest
-          DIGEST=$(docker buildx imagetools inspect ${{ steps.meta.outputs.tags }} --raw | sha256sum | cut -d' ' -f1)
+          # Get the digest of the created manifest (use primary tag to avoid newline issues)
+          PRIMARY_TAG=$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          DIGEST=$(docker buildx imagetools inspect "$PRIMARY_TAG" --raw | sha256sum | cut -d' ' -f1)
           echo "DIGEST=sha256:$DIGEST" >> $GITHUB_OUTPUT
         id: manifest
 
