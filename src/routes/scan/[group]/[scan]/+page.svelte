@@ -45,7 +45,11 @@
 </script>
 
 <svelte:head>
-	<title>Scan {data.params.scan} | D-Scan Space!</title>
+	<title>Scan {data.params.scan} | D-Scan Space</title>
+	<meta
+		name="description"
+		content={`Public scan ${data.params.scan} in group ${data.params.group} on D-Scan Space.`}
+	/>
 </svelte:head>
 
 <div class="container mx-auto">

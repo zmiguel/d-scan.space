@@ -3,7 +3,11 @@
 </script>
 
 <svelte:head>
-	<title>CCP Copyright | D-Scan Space!</title>
+	<title>CCP Copyright | D-Scan Space</title>
+	<meta
+		name="description"
+		content="Trademark and copyright notices for EVE Online content used by D-Scan Space."
+	/>
 </svelte:head>
 
 <div class="content-center pt-4">

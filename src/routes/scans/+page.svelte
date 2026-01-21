@@ -95,7 +95,11 @@
 </script>
 
 <svelte:head>
-	<title>Public Scans | D-Scan Space!</title>
+	<title>Public Scans | D-Scan Space</title>
+	<meta
+		name="description"
+		content="Browse public directional and local scans shared on D-Scan Space."
+	/>
 </svelte:head>
 
 <div class="container mx-auto">

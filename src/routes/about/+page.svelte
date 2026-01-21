@@ -4,7 +4,11 @@
 </script>
 
 <svelte:head>
-	<title>About | D-Scan Space!</title>
+	<title>About | D-Scan Space</title>
+	<meta
+		name="description"
+		content="Learn about D-Scan Space, an EVE Online intel tool for directional scans and local chat parsing."
+	/>
 </svelte:head>
 
 <div class="content-center pt-4">

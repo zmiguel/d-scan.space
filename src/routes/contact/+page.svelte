@@ -23,7 +23,11 @@
 </script>
 
 <svelte:head>
-	<title>Contact | D-Scan Space!</title>
+	<title>Contact | D-Scan Space</title>
+	<meta
+		name="description"
+		content="Contact the D-Scan Space team for support or feedback."
+	/>
 </svelte:head>
 
 <div class="content-center pt-4">

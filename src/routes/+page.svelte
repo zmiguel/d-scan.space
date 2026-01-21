@@ -16,7 +16,11 @@
 </script>
 
 <svelte:head>
-	<title>Home | D-Scan Space!</title>
+	<title>D-Scan Space — EVE Online Directional & Local Intel Tool</title>
+	<meta
+		name="description"
+		content="Parse and visualize EVE Online directional scans and local intel. Fast, accurate, and built for capsuleers."
+	/>
 </svelte:head>
 
 <div class="content-center">

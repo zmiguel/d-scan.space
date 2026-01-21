@@ -13,7 +13,11 @@
 </script>
 
 <svelte:head>
-	<title>Stats | D-Scan Space!</title>
+	<title>Stats | D-Scan Space</title>
+	<meta
+		name="description"
+		content="Live statistics for D-Scan Space including scans, characters, corporations, and alliances."
+	/>
 </svelte:head>
 
 <div class="content-center pt-4">
