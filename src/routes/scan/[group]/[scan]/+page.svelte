@@ -99,10 +99,10 @@
 		}
 
 		if (parts.length === 0) {
-			return `Scan ${data.params.scan} in group ${data.params.group}.`;
+			return `Scan in group ${data.params.group}.`;
 		}
 
-		return `Scan ${data.params.scan}. ${parts.join(' • ')}.`;
+		return parts.map((part) => `• ${part}`).join('\n');
 	});
 </script>
 

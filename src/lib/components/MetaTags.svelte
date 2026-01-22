@@ -17,9 +17,9 @@
 	let {
 		title,
 		description = 'Parse and visualize EVE Online directional scans and local intel.',
-		image = 'https://d-scan.space/web-app-manifest-512x512.png',
-		imageAlt = 'Preview',
-		showImage = false,
+		image = 'https://d-scan.space/favicon-96x96.png',
+		imageAlt = 'D-Scan Space Logo',
+		showImage = true,
 		type = 'website',
 		color = '#101828',
 		noIndex = false
@@ -28,7 +28,7 @@
 	// --- Derived State (Runes) ---
 
 	// Append site name automatically
-	let fullTitle = $derived(`${title} | D-Scan Space`);
+	let fullTitle = $derived(`${title} | D-Scan Space!`);
 
 	// Get current absolute URL
 	let currentUrl = $derived($page.url.href);
@@ -58,18 +58,18 @@
 	<link rel="canonical" href={currentUrl} />
 
 	<!-- 3. Open Graph -->
-	<meta property="og:site_name" content="D-Scan Space" />
+	<meta property="og:site_name" content="D-Scan Space!" />
 	<meta property="og:type" content={type} />
 	<meta property="og:url" content={currentUrl} />
-	<meta property="og:title" content={title} />
+	<meta property="og:title" content={fullTitle} />
 	<meta property="og:description" content={description} />
 	{#if showImage}
 		<meta property="og:image" content={absoluteImage} />
 		<meta property="og:image:alt" content={imageAlt} />
 
 		<!-- Image Hints -->
-		<meta property="og:image:width" content="512" />
-		<meta property="og:image:height" content="512" />
+		<meta property="og:image:width" content="96" />
+		<meta property="og:image:height" content="96" />
 	{/if}
 
 	<!-- 4. Twitter Cards -->
