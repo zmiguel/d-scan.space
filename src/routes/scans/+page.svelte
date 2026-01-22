@@ -3,6 +3,7 @@
 	import { ListPlaceholder } from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	let { data } = $props();
 
@@ -10,7 +11,7 @@
 	let isTableLoading = $state(true);
 
 	// Alternative data format for better search functionality
-	const tableData = {
+	const tableData = $derived.by(() => ({
 		headings: ['Time', 'System', 'Type', 'ID', 'Group ID'],
 		data: (data?.scans || []).map((scan) => [
 			new Date(scan.created_at)
@@ -22,14 +23,14 @@
 			scan.id,
 			scan.group_id
 		])
-	};
+	}));
 
 	function open_item(scan) {
 		goto(resolve(`/scan/${scan.group_id}/${scan.id}`));
 	}
 
 	// Basic datatable options for better search functionality
-	const dataTableOptions = {
+	const dataTableOptions = $derived.by(() => ({
 		data: tableData,
 		searchable: true,
 		sortable: true,
@@ -45,7 +46,7 @@
 			tr.attributes['data-row-index'] = index;
 			return tr;
 		}
-	};
+	}));
 
 	// Handle row clicks using event delegation
 	function handleRowClick(event) {
@@ -94,13 +95,10 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Public Scans | D-Scan Space</title>
-	<meta
-		name="description"
-		content="Browse public directional and local scans shared on D-Scan Space."
-	/>
-</svelte:head>
+<MetaTags
+	title="Public Scans"
+	description="Browse public directional and local scans shared on D-Scan Space."
+/>
 
 <div class="container mx-auto">
 	<div class="min-h-[500px] rounded-sm">

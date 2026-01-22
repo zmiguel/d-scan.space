@@ -1,14 +1,12 @@
 <script>
 	import {} from 'flowbite-svelte';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 </script>
 
-<svelte:head>
-	<title>CCP Copyright | D-Scan Space</title>
-	<meta
-		name="description"
-		content="Trademark and copyright notices for EVE Online content used by D-Scan Space."
-	/>
-</svelte:head>
+<MetaTags
+	title="CCP Copyright"
+	description="Trademark and copyright notices for EVE Online content used by D-Scan Space."
+/>
 
 <div class="content-center pt-4">
 	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">CCP Copyright Notice</h1>

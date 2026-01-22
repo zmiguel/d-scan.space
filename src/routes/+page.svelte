@@ -3,6 +3,7 @@
 	import { Toggle } from 'flowbite-svelte';
 	import { Spinner } from 'flowbite-svelte';
 	import { enhance } from '$app/forms';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	let isLoading = $state(false);
 
@@ -15,13 +16,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>D-Scan Space — EVE Online Directional & Local Intel Tool</title>
-	<meta
-		name="description"
-		content="Parse and visualize EVE Online directional scans and local intel. Fast, accurate, and built for capsuleers."
-	/>
-</svelte:head>
+<MetaTags title="Home" image="/web-app-manifest-512x512.png" imageAlt="Preview" />
 
 <div class="content-center">
 	{#if isLoading}

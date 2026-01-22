@@ -1,5 +1,6 @@
 <script>
 	import {} from 'flowbite-svelte';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	export let data;
 
@@ -12,13 +13,10 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Stats | D-Scan Space</title>
-	<meta
-		name="description"
-		content="Live statistics for D-Scan Space including scans, characters, corporations, and alliances."
-	/>
-</svelte:head>
+<MetaTags
+	title="Stats"
+	description="Live statistics for D-Scan Space including scans, characters, corporations, and alliances."
+/>
 
 <div class="content-center pt-4">
 	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Stats</h1>
