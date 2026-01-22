@@ -54,7 +54,9 @@
 		{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 			<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
 				{#snippet header()}
-					<div class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2">
+					<div
+						class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 text-sm sm:text-base"
+					>
 						<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
 							{#if alliance.ticker}
 								<Avatar
@@ -115,7 +117,9 @@
 					{#each alliance.corporations as corp (corp.id)}
 						<AccordionItem classes={{ button: 'py-0', content: 'py-0 ms-4' }}>
 							{#snippet header()}
-								<div class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2">
+								<div
+									class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 text-sm sm:text-base"
+								>
 									<div class="mt-1 flex min-w-0 items-center rtl:space-x-reverse">
 										<Avatar
 											cornerStyle="rounded"
@@ -164,7 +168,9 @@
 							{/snippet}
 
 							{#each corp.characters as pilot (pilot.id)}
-								<div class="flex w-full items-center justify-between sm:flex-row sm:items-center">
+								<div
+									class="flex w-full items-center justify-between text-sm sm:flex-row sm:items-center sm:text-base"
+								>
 									<div class="mt-1 flex items-center space-x-4 rtl:space-x-reverse">
 										<Avatar
 											cornerStyle="rounded"

@@ -95,7 +95,7 @@
 		const isHighlighted =
 			(hoveredGroup && item?.group === hoveredGroup) || selectedGroups.has(item?.group);
 		return [
-			'grid w-full grid-cols-[1fr_auto_auto] items-center gap-2',
+			'grid w-full grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_auto_auto]',
 			isHighlighted ? 'rounded bg-white dark:bg-gray-800' : ''
 		]
 			.filter(Boolean)
@@ -113,13 +113,13 @@
 	}
 </script>
 
-<div class="relative grid grid-cols-3 gap-2">
+<div class="relative grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-2">
 	{#if !onGrid && !offGrid}
 		<div class="text-md col-span-3 p-6 text-center text-gray-600 dark:text-gray-300">
 			No directional data available.
 		</div>
 	{:else}
-		<div class="col-span-1 pr-1">
+		<div class="col-span-1 pr-0 sm:pr-1">
 			<div class="grid grid-cols-1 gap-2">
 				{#each groupStats as group (group.id)}
 					<div
@@ -153,11 +153,11 @@
 			</div>
 		</div>
 		<div
-			class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+			class="pointer-events-none absolute top-0 bottom-0 hidden w-0.5 bg-gray-600 sm:block"
 			style="left: calc(33.333% - 0.15rem);"
 			aria-hidden="true"
 		></div>
-		<div class="col-span-2 pl-1">
+		<div class="col-span-2 pl-0 sm:pl-1">
 			{#if interestingItems.length > 0}
 				<div class="mb-2 border-b-2 border-gray-600 pb-3">
 					<h3
@@ -165,7 +165,7 @@
 					>
 						Interesting
 					</h3>
-					<div class="grid grid-cols-2 gap-2">
+					<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
 						{#each interestingItems as item (item.id)}
 							<div
 								class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded bg-white px-2 dark:bg-gray-800"
@@ -222,8 +222,8 @@
 				</div>
 			{/if}
 
-			<div class="relative grid grid-cols-2 gap-2">
-				<div class="pr-1">
+			<div class="relative grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+				<div class="pr-0 sm:pr-1">
 					<div class="mb-1 flex items-center justify-between border-b-2 border-gray-600 pb-2">
 						<h3
 							class="text-sm font-semibold tracking-wide text-gray-600 uppercase dark:text-gray-300"
@@ -295,11 +295,11 @@
 					</Accordion>
 				</div>
 				<div
-					class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+					class="pointer-events-none absolute top-0 bottom-0 hidden w-0.5 bg-gray-600 sm:block"
 					style="left: calc(50%);"
 					aria-hidden="true"
 				></div>
-				<div class="pl-1">
+				<div class="pl-0 sm:pl-1">
 					<div class="mb-1 flex items-center justify-between border-b-2 border-gray-600 pb-2">
 						<h3
 							class="text-sm font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"

@@ -34,7 +34,7 @@
 </script>
 
 <div class="mb-3">
-	<h3 class="mb-3 border-b pb-2 text-lg font-semibold">Update Scan</h3>
+	<h3 class="mb-3 border-b pb-2 text-base font-semibold sm:text-lg">Update Scan</h3>
 	{#if isLoading}
 		<div class="flex flex-col items-center justify-center py-4">
 			<div class="text-center">
@@ -54,7 +54,7 @@
 						></path>
 					</svg>
 				</div>
-				<p class="mt-2 text-base text-gray-600 dark:text-gray-400">Processing...</p>
+				<p class="mt-2 text-sm text-gray-600 sm:text-base dark:text-gray-400">Processing...</p>
 			</div>
 		</div>
 	{:else}
@@ -68,13 +68,16 @@
 				rows={4}
 				name="scan_content"
 				required
-				class="mb-2 w-full text-sm"
+				class="mb-2 w-full text-sm sm:text-base"
 			/>
 			{#if formError}
-				<div class="mb-2 text-xs text-red-500">{formError}</div>
+				<div class="mb-2 text-xs text-red-500 sm:text-sm">{formError}</div>
 			{/if}
-			<Button class="w-full cursor-pointer text-sm" color="primary" type="submit" size="sm"
-				>Update</Button
+			<Button
+				class="w-full cursor-pointer text-sm sm:text-base"
+				color="primary"
+				type="submit"
+				size="sm">Update</Button
 			>
 		</form>
 	{/if}

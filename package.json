@@ -1,6 +1,6 @@
 {
 	"name": "d-scan-space",
-	"version": "0.5.2",
+	"version": "0.5.3",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -24,10 +24,10 @@
 		"@eslint/js": "^9.18.0",
 		"@flowbite-svelte-plugins/datatable": "^0.4.1",
 		"@opentelemetry/api": "^1.9.0",
-		"@opentelemetry/auto-instrumentations-node": "^0.68.0",
-		"@opentelemetry/exporter-trace-otlp-proto": "^0.210.0",
+		"@opentelemetry/auto-instrumentations-node": "^0.69.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.211.0",
 		"@opentelemetry/resources": "^2.0.1",
-		"@opentelemetry/sdk-node": "^0.210.0",
+		"@opentelemetry/sdk-node": "^0.211.0",
 		"@opentelemetry/sdk-trace-node": "^2.5.0",
 		"@opentelemetry/semantic-conventions": "^1.39.0",
 		"@popperjs/core": "^2.11.8",
