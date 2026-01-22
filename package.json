@@ -27,7 +27,7 @@
 		"@opentelemetry/auto-instrumentations-node": "^0.69.0",
 		"@opentelemetry/exporter-trace-otlp-proto": "^0.211.0",
 		"@opentelemetry/resources": "^2.0.1",
-		"@opentelemetry/sdk-node": "^0.210.0",
+		"@opentelemetry/sdk-node": "^0.211.0",
 		"@opentelemetry/sdk-trace-node": "^2.5.0",
 		"@opentelemetry/semantic-conventions": "^1.39.0",
 		"@popperjs/core": "^2.11.8",
