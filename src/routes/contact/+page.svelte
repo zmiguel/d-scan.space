@@ -43,11 +43,10 @@
 					aria-label={c.type + ' icon'}
 				/>
 				{#if c.href}
-					<!-- svelte-ignore svelte/no-navigation-without-resolve -->
 					<a
 						href={c.href}
 						target="_blank"
-						rel="noopener noreferrer"
+						rel="noopener noreferrer external"
 						class="text-primary-700 hover:underline dark:text-primary-400"
 					>
 						<span class="font-medium">{c.type}:</span>
