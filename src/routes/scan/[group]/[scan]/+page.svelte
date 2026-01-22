@@ -1,9 +1,14 @@
+<script module>
+	export const ssr = true;
+</script>
+
 <script>
 	import TopBar from '$lib/components/TopBar.svelte';
 	import UpdateScan from '$lib/components/UpdateScan.svelte';
 	import ScanTimeLine from '$lib/components/ScanTimeLine.svelte';
 	import ScanTabs from '$lib/components/ScanTabs.svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
+	import { buildGroupStats, SHIP_CATEGORY_ID } from '$lib/utils/directional.js';
 
 	// Define the expected structure for data
 	/**
@@ -43,12 +48,65 @@
 
 	/** @type {{ data: Data }} */
 	let { data } = $props();
+
+	const formatCount = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : null);
+
+	const scanSummary = $derived.by(() => {
+		const parts = [];
+		const systemName = data?.system;
+		if (systemName) {
+			parts.push(`System ${systemName}`);
+		}
+
+		const local = data?.local;
+		if (local) {
+			const pilots = formatCount(local.total_pilots);
+			const corps = formatCount(local.total_corporations);
+			const alliances = formatCount(local.total_alliances);
+			const localBits = [];
+			if (pilots !== null) localBits.push(`${pilots} pilots`);
+			if (corps !== null) localBits.push(`${corps} corps`);
+			if (alliances !== null) localBits.push(`${alliances} alliances`);
+			parts.push(`Local: ${localBits.length ? localBits.join(', ') : 'no pilots'}`);
+
+			const topAlliances = Array.isArray(local.alliances)
+				? [...local.alliances]
+						.filter((alliance) => alliance?.name)
+						.sort((a, b) => (b?.character_count ?? 0) - (a?.character_count ?? 0))
+						.slice(0, 3)
+						.map((alliance) => `${alliance.name} (${formatCount(alliance.character_count) ?? 0})`)
+				: [];
+
+			if (topAlliances.length) {
+				parts.push(`Top alliances: ${topAlliances.join(', ')}`);
+			}
+		}
+
+		const directional = data?.directional;
+		if (directional) {
+			const onGrid = formatCount(directional?.on_grid?.total_objects) ?? 0;
+			const offGrid = formatCount(directional?.off_grid?.total_objects) ?? 0;
+			parts.push(`Directional: ${onGrid} on-grid, ${offGrid} off-grid`);
+
+			const shipGroups = buildGroupStats(directional?.on_grid, directional?.off_grid)
+				.filter((group) => Number(group?.categoryId) === SHIP_CATEGORY_ID)
+				.slice(0, 3)
+				.map((group) => `${group.name} (${group.total})`);
+
+			if (shipGroups.length) {
+				parts.push(`Top ship groups: ${shipGroups.join(', ')}`);
+			}
+		}
+
+		if (parts.length === 0) {
+			return `Scan ${data.params.scan} in group ${data.params.group}.`;
+		}
+
+		return `Scan ${data.params.scan}. ${parts.join(' • ')}.`;
+	});
 </script>
 
-<MetaTags
-	title={`Scan ${data.params.scan}`}
-	description={`Scan ${data.params.scan} in group ${data.params.group}.`}
-/>
+<MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} />
 
 <div class="container mx-auto">
 	<div class="grid grid-cols-12 gap-4">
