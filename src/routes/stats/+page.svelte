@@ -18,7 +18,7 @@
 	description="Live statistics for D-Scan Space including scans, characters, corporations, and alliances."
 />
 
-<div class="content-center space-y-6 px-4 pt-4 sm:px-0">
+<div class="content-center space-y-6 px-0 pt-4">
 	<h1 class="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-200">Stats</h1>
 
 	<div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">

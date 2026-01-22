@@ -100,7 +100,7 @@
 	description="Browse public directional and local scans shared on D-Scan Space."
 />
 
-<div class="container mx-auto px-4 sm:px-0">
+<div class="container mx-auto px-0">
 	<div
 		class="min-h-[500px] rounded-sm border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-700"
 	>

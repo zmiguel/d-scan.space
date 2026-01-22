@@ -30,7 +30,7 @@
 			</p>
 		</div>
 	{:else}
-		<div class="container mx-auto px-4 sm:px-0">
+		<div class="container mx-auto px-0">
 			<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
 				<Label for="textarea-id" class="mb-2"
 					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or

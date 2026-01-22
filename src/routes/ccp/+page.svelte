@@ -8,7 +8,7 @@
 	description="Trademark and copyright notices for EVE Online content used by D-Scan Space."
 />
 
-<div class="content-center space-y-4 px-4 pt-4 sm:px-0">
+<div class="content-center space-y-4 px-0 pt-4">
 	<h1 class="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-200">
 		CCP Copyright Notice
 	</h1>

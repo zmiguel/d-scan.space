@@ -276,7 +276,7 @@
 									<span class="shrink-0 whitespace-nowrap text-pink-600 dark:text-pink-400">
 										[{alliance.ticker}]
 									</span>
-									<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+									<span class="inline-block max-w-[12rem] truncate align-middle sm:max-w-[16rem]">
 										{alliance.name}
 									</span>
 									{#if alliance.id}
@@ -349,7 +349,7 @@
 								<span class="shrink-0 whitespace-nowrap text-primary-700 dark:text-primary-400"
 									>{'<' + corp.ticker + '>'}</span
 								>
-								<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+								<span class="inline-block max-w-[12rem] truncate align-middle sm:max-w-[16rem]">
 									{corp.name}
 								</span>
 								<a
@@ -415,7 +415,7 @@
 						/>
 						<div class="min-w-0 flex-1 font-medium dark:text-white">
 							<div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
-								<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+								<span class="inline-block max-w-[12rem] truncate align-middle sm:max-w-[16rem]">
 									{pilot.name}
 								</span>
 								<span

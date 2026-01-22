@@ -9,7 +9,7 @@
 	description="More information about D-Scan Space, an EVE Online intel tool for directional scans and local chat parsing."
 />
 
-<div class="content-center space-y-4 px-4 pt-4 sm:px-0">
+<div class="content-center space-y-4 px-0 pt-4">
 	<h1 class="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-200">About</h1>
 	<p class="text-sm font-normal text-gray-700 sm:text-base dark:text-gray-400">
 		This website was created and is run by <strong>Oxed G</strong>. All data submitted to this

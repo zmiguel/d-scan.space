@@ -27,7 +27,7 @@
 	description="Contact the D-Scan Space team for feedback or bug reports."
 />
 
-<div class="content-center px-4 pt-4 sm:px-0">
+<div class="content-center px-0 pt-4">
 	<h1 class="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-200">Contact</h1>
 	<p class="mt-3 text-sm font-normal text-gray-700 sm:text-base dark:text-gray-400">
 		Reach out via any of the channels below.
