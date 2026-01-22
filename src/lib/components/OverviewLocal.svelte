@@ -46,7 +46,7 @@
 </script>
 
 {#if !data.local}
-	<div class="p-6 text-md text-center text-gray-600 dark:text-gray-300">
+	<div class="text-md p-6 text-center text-gray-600 dark:text-gray-300">
 		No local data available.
 	</div>
 {:else}

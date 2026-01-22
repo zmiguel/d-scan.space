@@ -3,8 +3,6 @@
 	import OverviewSpace from '$lib/components/OverviewSpace.svelte';
 
 	let { data } = $props();
-
-	const interestingIds = [30, 1972];
 </script>
 
 <div class="relative grid grid-cols-3 gap-2">
@@ -19,6 +17,6 @@
 	></div>
 	<!-- Space Overview-->
 	<div class="col-span-2 pl-1">
-		<OverviewSpace {data} {interestingIds} />
+		<OverviewSpace {data} />
 	</div>
 </div>

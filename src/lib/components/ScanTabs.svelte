@@ -3,6 +3,7 @@
 	import { UsersGroupSolid, InfoCircleSolid, RocketSolid } from 'flowbite-svelte-icons';
 	import TabOverview from './TabOverview.svelte';
 	import TabLocalScan from './TabLocalScan.svelte';
+	import TabDirectionalScan from './TabDirectionalScan.svelte';
 
 	let { data } = $props();
 
@@ -113,6 +114,7 @@
 					</Badge>
 				</div>
 			{/snippet}
+			<TabDirectionalScan {data} />
 		</TabItem>
 	</Tabs>
 </div>
