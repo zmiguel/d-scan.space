@@ -77,7 +77,11 @@
 				class="w-full cursor-pointer text-sm sm:text-base"
 				color="primary"
 				type="submit"
-				size="sm">Update</Button
+				size="sm"
+				data-rybbit-event="scan_submit"
+				data-rybbit-prop-form="update"
+				data-rybbit-prop-scan={data.params.scan}
+				data-rybbit-prop-group={data.params.group}>Update</Button
 			>
 		</form>
 	{/if}

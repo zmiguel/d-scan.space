@@ -5,15 +5,17 @@
 - SvelteKit + Svelte 5 app. UI routes live in `src/routes/**/+page.svelte`; server actions/loaders live beside them in `src/routes/**/+page.server.js`.
 - Shared “business logic” sits in `src/lib/server/*` (scan parsing, ESI calls, tracing/metrics) and is reused by the Node worker in `workers/updater/src/`.
 - PostgreSQL via Drizzle. DB wiring/migrations: `src/lib/database/client.js`; schema: `src/lib/database/schema.js`; queries/helpers: `src/lib/database/*.js`.
-- Source of truth is `src/` and `workers/updater/src/`; the `build/` directory is generated output from `npm run build`.
+- Source of truth is `src/` and `workers/updater/src/`; `build/` and `coverage/` are generated output.
 
 ## Core flows (examples)
 
-- Scan ingest: `src/routes/scan/+page.server.js` detects local vs directional (tab-separated lines; 50% threshold), then calls:
-  - Local: `createNewLocalScan` in `src/lib/server/local.js` (dedupe → cache checks → ESI refresh → update `last_seen` → alliance→corp→character tree).
-  - Directional: `createNewDirectionalScan` in `src/lib/server/directional.js` (parse lines → enrich via SDE `getTypeHierarchyMetadata` → bucket on/off grid → optional system inference).
+- Scan ingest in `src/routes/scan/+page.server.js`:
+  - Detect directional when ≥50% of lines are 4-tab columns with numeric typeId; otherwise local.
+  - IDs use `short-unique-id` (group 8 chars, scan 12 chars) then persist via `src/lib/database/scans.js`.
+- Local scan: `createNewLocalScan` in `src/lib/server/local.js` (dedupe → cache checks → ESI refresh/affiliations → update `last_seen` → alliance→corp→character tree).
+- Directional scan: `createNewDirectionalScan` in `src/lib/server/directional.js` (parse 4 columns → on-grid if km/m else off-grid for AU/"-" → enrich via `getTypeHierarchyMetadata` → bucket + optional system inference).
 - Persistence: `src/lib/database/scans.js` uses a transaction; “updates” append a new scan row and only set `scan_groups.system` if it was null.
-- Updater worker: `workers/updater/src/index.js` runs cron jobs:
+- Updater worker: `workers/updater/src/index.js` cron jobs:
   - Dynamic: `workers/updater/src/services/dynamic.js` (TQ status gate → batch refresh characters/corps/alliances using constants in `src/lib/server/constants.js`).
   - Static: `workers/updater/src/services/static.js` (SDE version compare → download/extract JSONL slices into `./temp` → bulk upsert via `src/lib/database/sde.js` helpers → cleanup).
 
@@ -23,17 +25,11 @@
 - UI uses Flowbite Svelte components and Tailwind v4 (`@import 'tailwindcss'`) with custom theme tokens in `src/app.css`.
 - Datatable styling and plugin sources are wired in `src/app.css` (`@flowbite-svelte-plugins/datatable`, `simple-datatables`).
 
-## Observability is not optional here
+## Observability + HTTP
 
-- Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes (route IDs, counts, IDs). See `TRACING_GUIDE.md` for naming and examples.
-- In SvelteKit hooks/routes, pass the `event` to `withSpan(..., event)` to parent spans to SvelteKit’s request trace (see `src/hooks.server.js`).
-- App OTEL setup: `src/instrumentation.server.js` (Prometheus exporter + optional OTLP metrics + OTLP traces with retry).
-- Worker OTEL setup: `workers/updater/src/instrumentation.js`.
-
-## ESI / HTTP conventions
-
-- Use `fetchGET` / `fetchPOST` from `src/lib/server/wrappers.js` instead of raw `fetch` for ESI: undici pooling, retries/backoff, metrics (`recordEsiRequest`), and “deleted character” handling (calls `biomassCharacter`).
-- USER_AGENT is constructed in `src/lib/server/constants.js` and expects env contact fields (`CONTACT_EMAIL`, `CONTACT_EVE`, `CONTACT_DISCORD`) plus `AGENT`/`ORIGIN`.
+- Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes. In routes/hooks, pass `event` to join request traces (see `src/hooks.server.js`).
+- Metrics counters/histograms live in `src/lib/server/metrics.js` and are used in scan flows.
+- Use `fetchGET` / `fetchPOST` from `src/lib/server/wrappers.js` instead of raw `fetch` for ESI; USER*AGENT is built in `src/lib/server/constants.js` from `CONTACT*\*`+`AGENT`/`ORIGIN`.
 
 ## DB / schema conventions
 
