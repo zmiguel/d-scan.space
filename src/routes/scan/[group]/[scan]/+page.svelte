@@ -53,7 +53,13 @@
 
 	const scanSummary = $derived.by(() => {
 		const parts = [];
-		const systemName = data?.system;
+		const systemValue = data?.system;
+		const systemName =
+			typeof systemValue === 'string'
+				? systemValue
+				: typeof systemValue?.name === 'string'
+					? systemValue.name
+					: null;
 		if (systemName) {
 			parts.push(`System ${systemName}`);
 		}
@@ -94,7 +100,7 @@
 				.map((group) => `${group.name} (${group.total})`);
 
 			if (shipGroups.length) {
-				parts.push(`Top ship groups: ${shipGroups.join(', ')}`);
+				parts.push(`Top ship: ${shipGroups.join(', ')}`);
 			}
 		}
 
