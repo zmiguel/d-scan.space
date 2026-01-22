@@ -1,3 +1,7 @@
+<script module>
+	export const ssr = true;
+</script>
+
 <script>
 	import '../app.css';
 	import { page } from '$app/state';
