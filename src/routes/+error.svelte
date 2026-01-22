@@ -3,15 +3,14 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	function handleGoHome() {
 		goto(resolve('/'));
 	}
 </script>
 
-<svelte:head>
-	<title>Ooops!! Something went wrong... | D-Scan Space!</title>
-</svelte:head>
+<MetaTags title="Oops! Something went wrong" description="An unexpected error occurred." />
 
 <div class="text-center">
 	<h1 class="text-3xl font-bold text-red-500">Oops! An error {$page.status} occurred.</h1>

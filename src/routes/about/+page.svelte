@@ -1,11 +1,13 @@
 <script>
 	import {} from 'flowbite-svelte';
 	import { resolve } from '$app/paths';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 </script>
 
-<svelte:head>
-	<title>About | D-Scan Space!</title>
-</svelte:head>
+<MetaTags
+	title="About"
+	description="More information about D-Scan Space, an EVE Online intel tool for directional scans and local chat parsing."
+/>
 
 <div class="content-center pt-4">
 	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">About</h1>

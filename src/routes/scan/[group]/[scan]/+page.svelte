@@ -3,6 +3,7 @@
 	import UpdateScan from '$lib/components/UpdateScan.svelte';
 	import ScanTimeLine from '$lib/components/ScanTimeLine.svelte';
 	import ScanTabs from '$lib/components/ScanTabs.svelte';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	// Define the expected structure for data
 	/**
@@ -44,9 +45,10 @@
 	let { data } = $props();
 </script>
 
-<svelte:head>
-	<title>Scan {data.params.scan} | D-Scan Space!</title>
-</svelte:head>
+<MetaTags
+	title={`Scan ${data.params.scan}`}
+	description={`Scan ${data.params.scan} in group ${data.params.group}.`}
+/>
 
 <div class="container mx-auto">
 	<div class="grid grid-cols-12 gap-4">

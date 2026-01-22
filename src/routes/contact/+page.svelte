@@ -1,6 +1,7 @@
 <script>
 	import { RocketSolid, GithubSolid, DiscordSolid, EnvelopeSolid } from 'flowbite-svelte-icons';
 	import { resolve } from '$app/paths';
+	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	// Contact details
 	const contacts = [
@@ -22,9 +23,10 @@
 	};
 </script>
 
-<svelte:head>
-	<title>Contact | D-Scan Space!</title>
-</svelte:head>
+<MetaTags
+	title="Contact"
+	description="Contact the D-Scan Space team for feedback or bug reports."
+/>
 
 <div class="content-center pt-4">
 	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Contact</h1>
