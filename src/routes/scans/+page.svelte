@@ -100,10 +100,12 @@
 	description="Browse public directional and local scans shared on D-Scan Space."
 />
 
-<div class="container mx-auto">
-	<div class="min-h-[500px] rounded-sm">
+<div class="container mx-auto px-4 sm:px-0">
+	<div
+		class="min-h-[500px] rounded-sm border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-700"
+	>
 		{#if !tableData.data || tableData.data.length === 0}
-			<p class="p-4">No scans available</p>
+			<p class="p-4 text-sm sm:text-base">No scans available</p>
 		{:else}
 			<!-- Loading skeleton overlay -->
 			{#if isTableLoading}
@@ -116,7 +118,7 @@
 			<div
 				class:opacity-0={isTableLoading}
 				class:invisible={isTableLoading}
-				class="transition-opacity duration-300"
+				class="-mx-4 overflow-x-auto px-4 transition-opacity duration-300 sm:mx-0 sm:px-0"
 			>
 				<Table {dataTableOptions} {onInitComplete} {onUpdate} {onPage} {onSearch} {onSort} />
 			</div>

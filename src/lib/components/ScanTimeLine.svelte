@@ -29,7 +29,7 @@
 </script>
 
 <div>
-	<h3 class="mb-3 border-b pb-2 text-lg font-semibold">Related Scans</h3>
+	<h3 class="mb-3 border-b pb-2 text-base font-semibold sm:text-lg">Related Scans</h3>
 	{#if sortedRelatedScans.length > 0}
 		<Timeline order="vertical">
 			{#each sortedRelatedScans as scan (scan.id)}
