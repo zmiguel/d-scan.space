@@ -60,8 +60,19 @@
 				: typeof systemValue?.name === 'string'
 					? systemValue.name
 					: null;
-		if (systemName) {
-			parts.push(`System ${systemName}`);
+		const constellation =
+			typeof systemValue?.constellation === 'string' ? systemValue.constellation : null;
+		const region = typeof systemValue?.region === 'string' ? systemValue.region : null;
+		const security =
+			typeof systemValue?.security === 'number' ? systemValue.security.toFixed(2) : null;
+		if (systemName || constellation || region) {
+			const securityLabel = security ?? '?';
+			const systemLabel = systemName ?? 'Unknown System';
+			const constellationLabel = constellation ?? 'Unknown Constellation';
+			const regionLabel = region ?? 'Unknown Region';
+			parts.push(
+				`Location: [${securityLabel}] ${systemLabel} > ${constellationLabel} > ${regionLabel}`
+			);
 		}
 
 		const local = data?.local;
@@ -112,7 +123,7 @@
 	});
 </script>
 
-<MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} />
+<MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} showImage={false} />
 
 <div class="container mx-auto">
 	<div class="grid grid-cols-12 gap-4">
