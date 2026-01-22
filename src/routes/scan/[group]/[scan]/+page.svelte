@@ -111,7 +111,7 @@
 				.map((group) => `${group.name} (${group.total})`);
 
 			if (shipGroups.length) {
-				parts.push(`Top ship: ${shipGroups.join(', ')}`);
+				parts.push(`Top ships: ${shipGroups.join(', ')}`);
 			}
 		}
 
