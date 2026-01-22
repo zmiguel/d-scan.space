@@ -125,10 +125,10 @@
 
 <MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} showImage={false} />
 
-<div class="container mx-auto">
+<div class="container mx-auto px-4 sm:px-0">
 	<div class="grid grid-cols-12 gap-4">
 		<!-- Main content area (80-85% width) -->
-		<div class="col-span-12 rounded-lg bg-white p-2 md:col-span-10 dark:bg-gray-800">
+		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-10 dark:bg-gray-800">
 			<div class="min-h-[600px]">
 				<!-- First row: Breadcrumbs and timestamp -->
 				<TopBar {data} />
@@ -139,7 +139,7 @@
 		</div>
 
 		<!-- Sidebar (15-20% width) -->
-		<div class="col-span-12 rounded-lg bg-white p-2 md:col-span-2 dark:bg-gray-800">
+		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-2 dark:bg-gray-800">
 			<!-- Row 1: Update current scan -->
 			<UpdateScan {data} />
 

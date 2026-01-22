@@ -18,14 +18,13 @@
 	description="Live statistics for D-Scan Space including scans, characters, corporations, and alliances."
 />
 
-<div class="content-center pt-4">
-	<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Stats</h1>
-	<br />
+<div class="content-center space-y-6 px-4 pt-4 sm:px-0">
+	<h1 class="text-xl font-bold text-gray-800 sm:text-2xl dark:text-gray-200">Stats</h1>
 
-	<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+	<div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
 		<!-- Scans Stats -->
-		<div class="rounded-lg bg-gray-200 p-6 dark:bg-gray-700">
-			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Scans</h2>
+		<div class="rounded-lg bg-gray-200 p-4 text-sm sm:p-6 sm:text-base dark:bg-gray-700">
+			<h2 class="mb-4 text-lg font-semibold text-gray-800 sm:text-xl dark:text-gray-200">Scans</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total Scans:</span>
@@ -91,8 +90,10 @@
 		</div>
 
 		<!-- Characters Stats -->
-		<div class="rounded-lg bg-gray-200 p-6 dark:bg-gray-700">
-			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Characters</h2>
+		<div class="rounded-lg bg-gray-200 p-4 text-sm sm:p-6 sm:text-base dark:bg-gray-700">
+			<h2 class="mb-4 text-lg font-semibold text-gray-800 sm:text-xl dark:text-gray-200">
+				Characters
+			</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>
@@ -188,8 +189,10 @@
 		</div>
 
 		<!-- Corporations Stats -->
-		<div class="rounded-lg bg-gray-200 p-6 dark:bg-gray-700">
-			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Corporations</h2>
+		<div class="rounded-lg bg-gray-200 p-4 text-sm sm:p-6 sm:text-base dark:bg-gray-700">
+			<h2 class="mb-4 text-lg font-semibold text-gray-800 sm:text-xl dark:text-gray-200">
+				Corporations
+			</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>
@@ -285,8 +288,10 @@
 		</div>
 
 		<!-- Alliances Stats -->
-		<div class="rounded-lg bg-gray-200 p-6 dark:bg-gray-700">
-			<h2 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-200">Alliances</h2>
+		<div class="rounded-lg bg-gray-200 p-4 text-sm sm:p-6 sm:text-base dark:bg-gray-700">
+			<h2 class="mb-4 text-lg font-semibold text-gray-800 sm:text-xl dark:text-gray-200">
+				Alliances
+			</h2>
 			<div class="space-y-3">
 				<div class="flex justify-between">
 					<span class="text-gray-600 dark:text-gray-400">Total:</span>

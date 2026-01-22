@@ -64,16 +64,16 @@
 	}
 </script>
 
-<div class="min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
+<div class="scan-tabs min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
 	<Tabs tabStyle="underline" classes={{ content: 'p-3 bg-gray-100 dark:bg-gray-700 mt-0' }}>
 		<!-- Tab 1: Overview -->
 		<TabItem
 			open={defaultTab === 'overview'}
-			activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-			inactiveClass="cursor-pointer inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+			activeClass="py-2 px-1.5 text-xs leading-tight text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active sm:py-3 sm:px-4 sm:text-sm"
+			inactiveClass="cursor-pointer inline-block text-xs font-medium leading-tight text-center disabled:cursor-not-allowed py-2 px-1.5 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400 sm:py-3 sm:px-4 sm:text-sm"
 		>
 			{#snippet titleSlot()}
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1 sm:gap-2">
 					<InfoCircleSolid size="md" />
 					Overview
 				</div>
@@ -84,14 +84,18 @@
 		<!-- Tab 2: Local Scan -->
 		<TabItem
 			open={defaultTab === 'local'}
-			activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-			inactiveClass="cursor-pointer inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+			activeClass="py-2 px-1.5 text-xs leading-tight text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active sm:py-3 sm:px-4 sm:text-sm"
+			inactiveClass="cursor-pointer inline-block text-xs font-medium leading-tight text-center disabled:cursor-not-allowed py-2 px-1.5 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400 sm:py-3 sm:px-4 sm:text-sm"
 		>
 			{#snippet titleSlot()}
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1 sm:gap-2">
 					<UsersGroupSolid size="md" />
 					Local
-					<Badge color="primary" size="xs" class="px-2 text-xs font-semibold">
+					<Badge
+						color="primary"
+						size="xs"
+						class="px-1.5 text-[11px] font-semibold sm:px-2 sm:text-xs"
+					>
 						{localCount}
 					</Badge>
 				</div>
@@ -102,14 +106,18 @@
 		<!-- Tab 3: Space Scan -->
 		<TabItem
 			open={defaultTab === 'space'}
-			activeClass="py-3 px-4 text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active"
-			inactiveClass="cursor-pointer inline-block text-sm font-medium text-center disabled:cursor-not-allowed py-3 px-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400"
+			activeClass="py-2 px-1.5 text-xs leading-tight text-primary-600 border-b-2 border-primary-600 dark:text-primary-500 dark:border-primary-500 active sm:py-3 sm:px-4 sm:text-sm"
+			inactiveClass="cursor-pointer inline-block text-xs font-medium leading-tight text-center disabled:cursor-not-allowed py-2 px-1.5 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 text-gray-500 dark:text-gray-400 sm:py-3 sm:px-4 sm:text-sm"
 		>
 			{#snippet titleSlot()}
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1 sm:gap-2">
 					<RocketSolid size="md" />
 					Space
-					<Badge color="primary" size="xs" class="px-2 text-xs font-semibold">
+					<Badge
+						color="primary"
+						size="xs"
+						class="px-1.5 text-[11px] font-semibold sm:px-2 sm:text-xs"
+					>
 						{spaceCount}
 					</Badge>
 				</div>
@@ -118,3 +126,14 @@
 		</TabItem>
 	</Tabs>
 </div>
+
+<style>
+	.scan-tabs :global([role='tablist']) {
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.scan-tabs :global([role='tablist'] > *) {
+		margin-right: 0;
+	}
+</style>

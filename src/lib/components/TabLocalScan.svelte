@@ -242,9 +242,9 @@
 	}
 </script>
 
-<div class="relative grid grid-cols-3 gap-2">
+<div class="relative grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-2">
 	<div class="col-span-1">
-		<h1 class="ms-2 text-xl font-bold">Alliances</h1>
+		<h1 class="ms-2 text-base font-bold sm:text-xl">Alliances</h1>
 		<div class="col-auto mt-2">
 			{#each data.local?.alliances ?? [] as alliance (alliance.id)}
 				{@const allianceTicker = alliance.ticker || 'none'}
@@ -252,7 +252,7 @@
 				<div
 					data-alliance-ticker={allianceTicker}
 					class={combineClasses(
-						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						'flex items-center justify-between gap-2 rounded transition-colors',
 						getHoverClass(allianceTicker),
 						allianceHighlightTicker ? getHighlightClass(allianceHighlightTicker) : ''
 					)}
@@ -263,24 +263,28 @@
 					onmouseenter={() => setHoverAlliance(allianceTicker)}
 					onmouseleave={() => clearHoverAlliance(allianceTicker)}
 				>
-					<div class="flex items-center space-x-2 rtl:space-x-reverse">
+					<div class="flex min-w-0 flex-1 items-center space-x-2 rtl:space-x-reverse">
 						{#if alliance.ticker}
 							<Avatar
 								cornerStyle="rounded"
 								src="https://images.evetech.net/alliances/{alliance.id}/logo?size=64"
 							/>
 						{/if}
-						<div class="font-medium dark:text-white">
-							<div>
+						<div class="min-w-0 flex-1 font-medium dark:text-white">
+							<div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
 								{#if alliance.ticker}
-									<span class="text-pink-600 dark:text-pink-400">[{alliance.ticker}]</span>
-									{alliance.name}
+									<span class="shrink-0 whitespace-nowrap text-pink-600 dark:text-pink-400">
+										[{alliance.ticker}]
+									</span>
+									<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+										{alliance.name}
+									</span>
 									{#if alliance.id}
 										<a
 											href={`https://zkillboard.com/alliance/${alliance.id}/`}
 											target="_blank"
 											rel="noopener"
-											class="ms-1 inline-flex flex-shrink-0 align-middle"
+											class="inline-flex shrink-0 align-middle"
 											title="zKillBoard"
 											onclick={(event) => event.stopPropagation()}
 										>
@@ -300,7 +304,7 @@
 							</div>
 						</div>
 					</div>
-					<div class="me-3 text-amber-600 dark:text-amber-400">
+					<div class="me-2 shrink-0 text-amber-600 dark:text-amber-400">
 						{alliance.character_count}
 					</div>
 				</div>
@@ -308,12 +312,15 @@
 		</div>
 	</div>
 	<div
-		class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+		class="pointer-events-none absolute top-0 bottom-0 hidden w-0.5 bg-gray-600 sm:block"
 		style="left: calc(33.333% - 0.15rem);"
 		aria-hidden="true"
 	></div>
-	<div class="col-span-1 px-1">
-		<h1 class="ms-2 text-xl font-bold">Corporations</h1>
+	<div class="col-span-1 sm:hidden">
+		<hr class="my-3 border-t-2 border-gray-500 dark:border-gray-500" />
+	</div>
+	<div class="col-span-1 px-0 sm:px-1">
+		<h1 class="ms-2 text-base font-bold sm:text-xl">Corporations</h1>
 		<div class="col-auto mt-2">
 			{#each corps as corp (corp.id)}
 				{@const corpHighlightTicker = highlightedCorps.get(corp.ticker)}
@@ -321,7 +328,7 @@
 					id="alliance-{corp.alliance_ticker || 'none'}"
 					data-corp-ticker={corp.ticker}
 					class={combineClasses(
-						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						'flex items-center justify-between gap-2 rounded transition-colors',
 						getHoverClass(corp.ticker),
 						corpHighlightTicker ? getHighlightClass(corpHighlightTicker) : ''
 					)}
@@ -332,21 +339,24 @@
 					onmouseenter={() => setHoverCorporation(corp.ticker)}
 					onmouseleave={() => clearHoverCorporation(corp.ticker)}
 				>
-					<div class="flex items-center space-x-4 rtl:space-x-reverse">
+					<div class="flex min-w-0 flex-1 items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
 							cornerStyle="rounded"
 							src="https://images.evetech.net/corporations/{corp.id}/logo?size=64"
 						/>
-						<div class="font-medium dark:text-white">
-							<div>
-								<span class="text-primary-700 dark:text-primary-400">{'<' + corp.ticker + '>'}</span
+						<div class="min-w-0 flex-1 font-medium dark:text-white">
+							<div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+								<span class="shrink-0 whitespace-nowrap text-primary-700 dark:text-primary-400"
+									>{'<' + corp.ticker + '>'}</span
 								>
-								{corp.name}
+								<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+									{corp.name}
+								</span>
 								<a
 									href={`https://zkillboard.com/corporation/${corp.id}/`}
 									target="_blank"
 									rel="noopener"
-									class="ms-1 inline-flex flex-shrink-0 align-middle"
+									class="inline-flex shrink-0 align-middle"
 									title="zKillBoard"
 									onclick={(event) => event.stopPropagation()}
 								>
@@ -364,7 +374,7 @@
 							{/if}
 						</div>
 					</div>
-					<div class="me-2 text-amber-600 dark:text-amber-400">
+					<div class="me-2 shrink-0 text-amber-600 dark:text-amber-400">
 						{corp.character_count}
 					</div>
 				</div>
@@ -372,19 +382,22 @@
 		</div>
 	</div>
 	<div
-		class="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-gray-600"
+		class="pointer-events-none absolute top-0 bottom-0 hidden w-0.5 bg-gray-600 sm:block"
 		style="left: calc(66.666%);"
 		aria-hidden="true"
 	></div>
-	<div class="col-span-1 pl-1">
-		<h1 class="ms-2 text-xl font-bold">Pilots</h1>
+	<div class="col-span-1 sm:hidden">
+		<hr class="my-3 border-t-2 border-gray-500 dark:border-gray-500" />
+	</div>
+	<div class="col-span-1 pl-0 sm:pl-1">
+		<h1 class="ms-2 text-base font-bold sm:text-xl">Pilots</h1>
 		<div class="col-auto mt-2">
 			{#each pilots as pilot (pilot.id)}
 				{@const pilotHighlightTicker = highlightedPilots.get(pilot.id)}
 				<div
 					id="alliance-{pilot.alliance_ticker || 'none'} corporation-{pilot.corporation_ticker}"
 					class={combineClasses(
-						'flex flex-col items-start justify-between rounded transition-colors sm:flex-row sm:items-center',
+						'flex items-center justify-between gap-2 rounded transition-colors',
 						getPilotHoverClass(pilot.corporation_ticker),
 						pilotHighlightTicker ? getHighlightClass(pilotHighlightTicker) : ''
 					)}
@@ -395,22 +408,27 @@
 					onmouseenter={() => setHoverPilot(pilot.id)}
 					onmouseleave={() => clearHoverPilot(pilot.id)}
 				>
-					<div class="flex items-center space-x-4 rtl:space-x-reverse">
+					<div class="flex min-w-0 flex-1 items-center space-x-4 rtl:space-x-reverse">
 						<Avatar
 							cornerStyle="rounded"
 							src="https://images.evetech.net/characters/{pilot.id}/portrait?size=64"
 						/>
-						<div class="font-medium dark:text-white">
-							<div>
-								{pilot.name}
-								<span style:color={secStatusColor(pilot.sec_status)}
-									>{pilot.sec_status.toFixed(3)}</span
+						<div class="min-w-0 flex-1 font-medium dark:text-white">
+							<div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+								<span class="inline-block max-w-[10rem] truncate align-middle sm:max-w-[14rem]">
+									{pilot.name}
+								</span>
+								<span
+									class="shrink-0 whitespace-nowrap"
+									style:color={secStatusColor(pilot.sec_status)}
 								>
+									{pilot.sec_status.toFixed(3)}
+								</span>
 								<a
 									href={`https://zkillboard.com/character/${pilot.id}/`}
 									target="_blank"
 									rel="noopener"
-									class="ms-1 inline-flex flex-shrink-0 align-middle"
+									class="inline-flex shrink-0 align-middle"
 									title="zKillBoard"
 									onclick={(event) => event.stopPropagation()}
 								>
