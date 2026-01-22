@@ -1,6 +1,5 @@
 <script>
 	import { RocketSolid, GithubSolid, DiscordSolid, EnvelopeSolid } from 'flowbite-svelte-icons';
-	import { resolve } from '$app/paths';
 	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	// Contact details
@@ -44,8 +43,9 @@
 					aria-label={c.type + ' icon'}
 				/>
 				{#if c.href}
+					<!-- svelte-ignore svelte/no-navigation-without-resolve -->
 					<a
-						href={resolve(c.href)}
+						href={c.href}
 						target="_blank"
 						rel="noopener noreferrer"
 						class="text-primary-700 hover:underline dark:text-primary-400"
