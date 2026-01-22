@@ -1,7 +1,3 @@
-<script module>
-	export const ssr = true;
-</script>
-
 <script>
 	import '../app.css';
 	import { page } from '$app/state';
@@ -21,7 +17,7 @@
 	const activeUrl = $derived(page.url.pathname);
 </script>
 
-<div class="relative px-8">
+<div class="relative px-2 sm:px-8">
 	<Navbar
 		class="fixed start-0 top-0 z-20 w-full border-b bg-gray-100 px-2 py-0 sm:px-4 dark:bg-gray-900"
 	>
@@ -54,7 +50,7 @@
 			<DarkMode class="cursor-pointer p-0" />
 		</NavUl>
 	</Navbar>
-	<div class="mt-16 mb-8 text-gray-900 dark:text-gray-300">
+	<div class="mt-12 mb-8 text-gray-900 sm:mt-16 dark:text-gray-300">
 		{@render children()}
 	</div>
 	<Footer

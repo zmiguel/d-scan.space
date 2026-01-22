@@ -1,7 +1,3 @@
-<script module>
-	export const ssr = true;
-</script>
-
 <script>
 	import TopBar from '$lib/components/TopBar.svelte';
 	import UpdateScan from '$lib/components/UpdateScan.svelte';
@@ -125,7 +121,7 @@
 
 <MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} showImage={false} />
 
-<div class="container mx-auto px-4 sm:px-0">
+<div class="container mx-auto px-0">
 	<div class="grid grid-cols-12 gap-4">
 		<!-- Main content area (80-85% width) -->
 		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-10 dark:bg-gray-800">
