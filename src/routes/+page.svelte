@@ -16,7 +16,7 @@
 	}
 </script>
 
-<MetaTags title="Home" image="/web-app-manifest-512x512.png" imageAlt="Preview" />
+<MetaTags title="Home" image="/favicon-96x96.png" imageAlt="Preview" />
 
 <div class="content-center">
 	{#if isLoading}
@@ -52,7 +52,9 @@
 				<Button
 					class="mt-4 w-full cursor-pointer text-sm sm:text-base"
 					color="primary"
-					type="submit">Process</Button
+					type="submit"
+					data-rybbit-event="scan_submit"
+					data-rybbit-prop-form="create">Process</Button
 				>
 			</form>
 		</div>
