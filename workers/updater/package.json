@@ -11,7 +11,7 @@
 		"@opentelemetry/auto-instrumentations-node": "^0.65.0",
 		"@opentelemetry/exporter-trace-otlp-proto": "^0.208.0",
 		"@opentelemetry/resources": "^2.5.0",
-		"@opentelemetry/sdk-node": "^0.208.0",
+		"@opentelemetry/sdk-node": "^0.211.0",
 		"@opentelemetry/semantic-conventions": "^1.39.0",
 		"adm-zip": "^0.5.16",
 		"croner": "^9.1.0",
