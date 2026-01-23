@@ -6,11 +6,12 @@ export const getAppName = () => {
 };
 
 const appName = getAppName();
+const db_env = process.env.DB_ENV ? `${process.env.DB_ENV}` : 'dev';
 
 export default pino({
 	level: process.env.LOG_LEVEL || 'info',
 	mixin() {
-		return { app: appName };
+		return { app: appName, env: db_env };
 	},
 	formatters: {
 		level(label, number) {

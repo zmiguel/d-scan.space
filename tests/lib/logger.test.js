@@ -36,6 +36,22 @@ describe('logger', () => {
 		expect(mixinResult).toHaveProperty('app');
 	});
 
+	it('should add db env in mixin', async () => {
+		const originalDbEnv = process.env.DB_ENV;
+		process.env.DB_ENV = 'test';
+		vi.resetModules();
+		mockPino.mockClear();
+
+		await import('../../src/lib/logger.js');
+
+		const config = mockPino.mock.calls[0][0];
+		const mixinResult = config.mixin();
+
+		expect(mixinResult).toHaveProperty('env', 'test');
+
+		process.env.DB_ENV = originalDbEnv;
+	});
+
 	it('should format level correctly', async () => {
 		await import('../../src/lib/logger.js');
 

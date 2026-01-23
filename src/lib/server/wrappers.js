@@ -3,6 +3,7 @@ import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants.js';
 import { withSpan } from './tracer.js';
 import { recordEsiRequest, esiConcurrentRequests } from './metrics.js';
 import { Agent } from 'undici';
+import logger from '../logger.js';
 
 const esiAgent = new Agent({
 	connections: ESI_MAX_CONNECTIONS,
@@ -75,7 +76,7 @@ export async function fetchGET(url, maxRetries = 3) {
 			let lastError;
 			const startTime = Date.now();
 			const resourceType = getResourceType(url);
-			console.log(`[DEBUG] fetchGET url=${url} resourceType=${resourceType}`);
+			logger.debug(`fetchGET: ${url}`, { resourceType });
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
