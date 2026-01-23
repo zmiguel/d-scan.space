@@ -44,9 +44,9 @@ const isFleetLine = (line) => {
 	if (!first) {
 		return false;
 	}
-	const groupSix = parts[5] ?? '';
-	const dashMatches = groupSix.match(/-/g);
-	return (dashMatches ? dashMatches.length : 0) >= 2;
+	const groupSix = parts[5];
+	const dashCount = groupSix.split('-').length - 1;
+	return dashCount >= 2;
 };
 
 const isProbeLine = (line) => {
@@ -57,7 +57,7 @@ const isProbeLine = (line) => {
 	if (parts.length !== 6) {
 		return false;
 	}
-	return /^[A-Z]{3}-\d{3}/.test(parts[0] ?? '');
+	return /^[A-Z]{3}-\d{3}/.test(parts[0]);
 };
 
 export function detectScanType(lines) {

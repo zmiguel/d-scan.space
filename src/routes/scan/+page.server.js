@@ -31,7 +31,18 @@ export const actions = {
 				// remove empty lines
 				lines = lines.filter((line) => line.trim().length > 0);
 
-				const scanTypeResult = detectScanType(lines);
+				const scanTypeResult = await withSpan(
+					'scan.detect_type',
+					async (childSpan) => {
+						childSpan.setAttributes({
+							'scan.content_lines': lines.length
+						});
+						return detectScanType(lines);
+					},
+					{},
+					{},
+					event
+				);
 
 				if (scanTypeResult.type === 'unknown') {
 					span.setAttributes({
@@ -142,7 +153,18 @@ export const actions = {
 				// remove empty lines
 				lines = lines.filter((line) => line.trim().length > 0);
 
-				const scanTypeResult = detectScanType(lines);
+				const scanTypeResult = await withSpan(
+					'scan.detect_type',
+					async (childSpan) => {
+						childSpan.setAttributes({
+							'scan.content_lines': lines.length
+						});
+						return detectScanType(lines);
+					},
+					{},
+					{},
+					event
+				);
 
 				if (scanTypeResult.type === 'unknown') {
 					span.setAttributes({
