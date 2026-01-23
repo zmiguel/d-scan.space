@@ -1,5 +1,6 @@
 import { getScanByID, getScansByGroupID } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer.js';
+import { error } from '@sveltejs/kit';
 
 export async function load({ params, event }) {
 	return await withSpan(
@@ -29,10 +30,7 @@ export async function load({ params, event }) {
 					'scan.found': false,
 					'response.status': 404
 				});
-				return {
-					status: 404,
-					body: 'Scan not found'
-				};
+				throw error(404, 'Scan not found');
 			}
 
 			const thisScan = getScanResult[0];

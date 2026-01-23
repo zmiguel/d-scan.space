@@ -1,11 +1,12 @@
 import ShortUniqueId from 'short-unique-id';
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
 import { createNewDirectionalScan } from '$lib/server/directional.js';
 import { createNewScan, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 import { scansProcessedCounter } from '$lib/server/metrics';
+import { detectScanType } from '$lib/utils/scan_type.js';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
@@ -18,23 +19,40 @@ export const actions = {
 				const is_public = data.has('is_public');
 
 				if (!content) {
-					return { status: 400, body: 'No scan content provided' };
+					span.setAttributes({
+						'scan.error': 'missing_content',
+						'response.status': 400
+					});
+					logger.warn('Scan create rejected: no scan content provided');
+					throw error(400, 'No scan content provided');
 				}
 
 				let lines = content.split('\n');
 				// remove empty lines
 				lines = lines.filter((line) => line.trim().length > 0);
 
-				// Figure out if local or directional scan
-				//  - Directional scans start with numbers and have 3 tabs per line
-				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
-				const directionalLineCount = lines.filter((line) => {
-					const parts = line.split('\t');
-					// @ts-ignore
-					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
-				}).length;
+				const scanTypeResult = detectScanType(lines);
 
-				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
+				if (scanTypeResult.type === 'unknown') {
+					span.setAttributes({
+						'scan.error': 'unknown_format',
+						'response.status': 400
+					});
+					logger.warn('Scan create rejected: unrecognized scan format');
+					throw error(400, 'Unrecognized scan format');
+				}
+
+				if (!scanTypeResult.supported) {
+					span.setAttributes({
+						'scan.error': 'unsupported_type',
+						'scan.type': scanTypeResult.type,
+						'response.status': 422
+					});
+					logger.warn(`Scan create rejected: unsupported scan type ${scanTypeResult.type}`);
+					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
+				}
+
+				const isDirectional = scanTypeResult.type === 'directional';
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = uid.randomUUID(8);
@@ -43,7 +61,7 @@ export const actions = {
 				span.setAttributes({
 					'scan.content_lines': lines.length,
 					'scan.is_public': is_public,
-					'scan.is_directional': isDirectional,
+					'scan.type': scanTypeResult.type,
 					'scan.group_id': scanGroupId,
 					'scan.id': scanId
 				});
@@ -66,7 +84,7 @@ export const actions = {
 								scanGroupId,
 								scanId,
 								is_public,
-								type: isDirectional ? 'directional' : 'local',
+								type: scanTypeResult.type,
 								data: result,
 								raw_data: content
 							});
@@ -74,21 +92,25 @@ export const actions = {
 						{
 							'scan.group_id': scanGroupId,
 							'scan.id': scanId,
-							'scan.type': isDirectional ? 'directional' : 'local',
+							'scan.type': scanTypeResult.type,
 							'scan.data_lines': lines.length,
 							'scan.is_public': is_public
 						}
 					);
 				} catch (e) {
+					span.setAttributes({
+						'scan.error': 'persist_failed',
+						'response.status': 500
+					});
 					logger.error('Failed to store scan data', e);
-					return { status: 500, body: 'Failed to store scan data' };
+					throw error(500, 'Failed to store scan data');
 				}
 
 				logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
 
 				// Record metric for scan processed
 				scansProcessedCounter.add(1, {
-					type: isDirectional ? 'directional' : 'local',
+					type: scanTypeResult.type,
 					public: is_public.toString()
 				});
 
@@ -108,23 +130,40 @@ export const actions = {
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
 
 				if (!content) {
-					return { status: 400, body: 'No scan content provided' };
+					span.setAttributes({
+						'scan.error': 'missing_content',
+						'response.status': 400
+					});
+					logger.warn('Scan update rejected: no scan content provided');
+					throw error(400, 'No scan content provided');
 				}
 
 				let lines = content.split('\n');
 				// remove empty lines
 				lines = lines.filter((line) => line.trim().length > 0);
 
-				// Figure out if local or directional scan
-				//  - Directional scans start with numbers and have 3 tabs per line
-				//  - We use a threshold of 50% to allow for some bad lines (e.g. copy paste errors)
-				const directionalLineCount = lines.filter((line) => {
-					const parts = line.split('\t');
-					// @ts-ignore
-					return parts.length === 4 && !isNaN(parseFloat(parts[0])) && isFinite(parts[0]);
-				}).length;
+				const scanTypeResult = detectScanType(lines);
 
-				const isDirectional = lines.length > 0 && directionalLineCount / lines.length >= 0.5;
+				if (scanTypeResult.type === 'unknown') {
+					span.setAttributes({
+						'scan.error': 'unknown_format',
+						'response.status': 400
+					});
+					logger.warn('Scan update rejected: unrecognized scan format');
+					throw error(400, 'Unrecognized scan format');
+				}
+
+				if (!scanTypeResult.supported) {
+					span.setAttributes({
+						'scan.error': 'unsupported_type',
+						'scan.type': scanTypeResult.type,
+						'response.status': 422
+					});
+					logger.warn(`Scan update rejected: unsupported scan type ${scanTypeResult.type}`);
+					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
+				}
+
+				const isDirectional = scanTypeResult.type === 'directional';
 
 				const uid = new ShortUniqueId();
 				const scanGroupId = data.get('scan_group');
@@ -132,7 +171,7 @@ export const actions = {
 
 				span.setAttributes({
 					'scan.content_lines': lines.length,
-					'scan.type': isDirectional ? 'directional' : 'local',
+					'scan.type': scanTypeResult.type,
 					'scan.group_id': scanGroupId,
 					'scan.id': scanId
 				});
@@ -154,7 +193,7 @@ export const actions = {
 							return await updateScan({
 								scanGroupId,
 								scanId,
-								type: isDirectional ? 'directional' : 'local',
+								type: scanTypeResult.type,
 								data: result,
 								raw_data: content
 							});
@@ -162,20 +201,24 @@ export const actions = {
 						{
 							'scan.group_id': scanGroupId,
 							'scan.id': scanId,
-							'scan.type': isDirectional ? 'directional' : 'local',
+							'scan.type': scanTypeResult.type,
 							'scan.data_lines': lines.length
 						}
 					);
 				} catch (e) {
+					span.setAttributes({
+						'scan.error': 'persist_failed',
+						'response.status': 500
+					});
 					logger.error('Failed to store scan data', e);
-					return { status: 500, body: 'Failed to store scan data' };
+					throw error(500, 'Failed to store scan data');
 				}
 
 				logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
 
 				// Record metric for scan processed (update)
 				scansProcessedCounter.add(1, {
-					type: isDirectional ? 'directional' : 'local',
+					type: scanTypeResult.type,
 					public: 'false' // Updates are always on existing scans
 				});
 
