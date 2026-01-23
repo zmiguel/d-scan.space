@@ -124,6 +124,61 @@ describe('tracer', () => {
 			expect(mockSpan.end).toHaveBeenCalled();
 		});
 
+		it('should treat 4xx HttpErrors as handled client errors', async () => {
+			const httpError = { status: 404, message: 'Not found' };
+			const fn = vi.fn().mockRejectedValue(httpError);
+
+			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+
+			expect(mockSpan.setAttributes).toHaveBeenCalledWith(
+				expect.objectContaining({
+					'http.response.status_code': 404,
+					'sveltekit.error': true,
+					'error.level': 'info'
+				})
+			);
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'client_error',
+				expect.objectContaining({ status: 404, message: 'Not found' })
+			);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
+			expect(mockSpan.recordException).not.toHaveBeenCalled();
+		});
+
+		it('should tag 422 HttpErrors as warnings', async () => {
+			const httpError = { status: 422, message: 'Validation failed' };
+			const fn = vi.fn().mockRejectedValue(httpError);
+
+			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+
+			expect(mockSpan.setAttributes).toHaveBeenCalledWith(
+				expect.objectContaining({
+					'http.response.status_code': 422,
+					'sveltekit.error': true,
+					'error.level': 'warning'
+				})
+			);
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'warning',
+				expect.objectContaining({ status: 422, message: 'Validation failed' })
+			);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
+			expect(mockSpan.recordException).not.toHaveBeenCalled();
+		});
+
+		it('should fallback to string message for HttpErrors without message', async () => {
+			const httpError = { status: 400 };
+			const fn = vi.fn().mockRejectedValue(httpError);
+
+			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'client_error',
+				expect.objectContaining({ status: 400, message: '[object Object]' })
+			);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
+		});
+
 		it('should use SvelteKit event for parent context and attributes', async () => {
 			const mockEvent = {
 				tracing: { current: mockSpan },

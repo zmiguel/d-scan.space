@@ -22,6 +22,15 @@ function isRedirect(error) {
 }
 
 /**
+ * Check if this is a SvelteKit HttpError
+ * @param {any} error - The error/object to check
+ * @returns {boolean} - True if it's an HttpError with status
+ */
+function isHttpError(error) {
+	return error && typeof error === 'object' && typeof error.status === 'number';
+}
+
+/**
  * Get SvelteKit's current span from request event if available
  * @param {import('$app/server').RequestEvent | undefined} event - SvelteKit request event
  * @returns {import('@opentelemetry/api').Span | undefined} - The current span
@@ -101,6 +110,23 @@ export async function withSpan(name, fn, attributes = {}, options = {}, event = 
 			span.setStatus({ code: SpanStatusCode.OK });
 
 			// Re-throw the redirect to maintain SvelteKit's flow
+			throw error;
+		}
+
+		// Treat SvelteKit 4xx HttpErrors as handled client errors
+		if (isHttpError(error) && error.status >= 400 && error.status < 500) {
+			const errorMessage = error?.message ?? String(error);
+			const isWarning = error.status === 422;
+			span.setAttributes({
+				'http.response.status_code': error.status,
+				'sveltekit.error': true,
+				'error.level': isWarning ? 'warning' : 'info'
+			});
+			span.addEvent(isWarning ? 'warning' : 'client_error', {
+				status: error.status,
+				message: errorMessage
+			});
+			span.setStatus({ code: SpanStatusCode.OK });
 			throw error;
 		}
 
