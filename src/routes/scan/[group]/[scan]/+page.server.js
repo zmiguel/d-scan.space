@@ -24,7 +24,7 @@ export async function load({ params, event }) {
 				}
 			);
 
-			if (!getScanResult) {
+			if (!getScanResult || getScanResult.length === 0) {
 				span.setAttributes({
 					'scan.found': false,
 					'response.status': 404
