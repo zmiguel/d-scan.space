@@ -105,21 +105,24 @@ export async function withSpan(name, fn, attributes = {}, options = {}, event = 
 		}
 
 		// Handle actual errors
-		logger.error('Error occurred in span: ' + error.message);
+		const errorMessage = error?.message ?? String(error);
+		const errorStack = error?.stack;
+		const errorCode = error?.code || 'UNKNOWN_ERROR';
+		logger.error('Error occurred in span: ' + errorMessage);
 		span.recordException(error);
 		span.setStatus({
 			code: SpanStatusCode.ERROR,
-			message: error.message
+			message: errorMessage
 		});
 		span.addEvent('error', {
-			message: error.message,
-			stack: error.stack,
-			code: error.code || 'UNKNOWN_ERROR'
+			message: errorMessage,
+			stack: errorStack,
+			code: errorCode
 		});
 		span.setAttributes({
-			'error.message': error.message,
-			'error.stack': error.stack,
-			'error.code': error.code || 'UNKNOWN_ERROR'
+			'error.message': errorMessage,
+			'error.stack': errorStack,
+			'error.code': errorCode
 		});
 		throw error;
 	} finally {

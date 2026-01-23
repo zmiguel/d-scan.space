@@ -89,6 +89,21 @@ describe('tracer', () => {
 			expect(mockSpan.end).toHaveBeenCalled();
 		});
 
+		it('should handle non-Error throws', async () => {
+			const fn = vi.fn().mockRejectedValue('boom');
+
+			await expect(withSpan('test-span', fn)).rejects.toBe('boom');
+
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 2, message: 'boom' }); // ERROR
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'error',
+				expect.objectContaining({
+					message: 'boom',
+					code: 'UNKNOWN_ERROR'
+				})
+			);
+		});
+
 		it('should handle SvelteKit redirects', async () => {
 			const redirectError = {
 				status: 302,
