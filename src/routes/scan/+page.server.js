@@ -63,8 +63,6 @@ export const actions = {
 					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
 				}
 
-				const isDirectional = scanTypeResult.type === 'directional';
-
 				const uid = new ShortUniqueId();
 				const scanGroupId = uid.randomUUID(8);
 				const scanId = uid.randomUUID(12);
@@ -78,13 +76,53 @@ export const actions = {
 				});
 
 				let result;
-				// LOCAL SCAN
-				if (!isDirectional) {
-					// LOCAL SCAN
-					result = await createNewLocalScan(lines);
-				} else {
-					// DIRECTIONAL SCAN
-					result = await createNewDirectionalScan(lines);
+				switch (scanTypeResult.type) {
+					case 'local':
+						result = await createNewLocalScan(lines);
+						break;
+					case 'directional':
+						result = await createNewDirectionalScan(lines);
+						break;
+					default:
+						span.setAttributes({
+							'scan.error': 'unsupported_type',
+							'scan.type': scanTypeResult.type,
+							'response.status': 422
+						});
+						logger.warn(`Scan create rejected: unsupported scan type ${scanTypeResult.type}`);
+						throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
+				}
+
+				switch (scanTypeResult.type) {
+					case 'local': {
+						const totalPilots = result?.total_pilots ?? 0;
+						if (totalPilots === 0) {
+							span.setAttributes({
+								'scan.error': 'no_valid_characters',
+								'scan.type': scanTypeResult.type,
+								'response.status': 418
+							});
+							logger.warn('Scan create rejected: no valid characters found');
+							throw error(418, 'No valid characters found in scan');
+						}
+						break;
+					}
+					case 'directional': {
+						const onGrid = result?.on_grid?.total_objects ?? 0;
+						const offGrid = result?.off_grid?.total_objects ?? 0;
+						if (onGrid + offGrid === 0) {
+							span.setAttributes({
+								'scan.error': 'no_valid_objects',
+								'scan.type': scanTypeResult.type,
+								'response.status': 418
+							});
+							logger.warn('Scan create rejected: no valid objects found');
+							throw error(418, 'No valid objects found in scan');
+						}
+						break;
+					}
+					default:
+						break;
 				}
 
 				try {
@@ -185,8 +223,6 @@ export const actions = {
 					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
 				}
 
-				const isDirectional = scanTypeResult.type === 'directional';
-
 				const uid = new ShortUniqueId();
 				const scanGroupId = data.get('scan_group');
 				const scanId = uid.randomUUID(12);
@@ -199,13 +235,53 @@ export const actions = {
 				});
 
 				let result;
-				// LOCAL SCAN
-				if (!isDirectional) {
-					// LOCAL SCAN
-					result = await createNewLocalScan(lines);
-				} else {
-					// DIRECTIONAL SCAN
-					result = await createNewDirectionalScan(lines);
+				switch (scanTypeResult.type) {
+					case 'local':
+						result = await createNewLocalScan(lines);
+						break;
+					case 'directional':
+						result = await createNewDirectionalScan(lines);
+						break;
+					default:
+						span.setAttributes({
+							'scan.error': 'unsupported_type',
+							'scan.type': scanTypeResult.type,
+							'response.status': 422
+						});
+						logger.warn(`Scan update rejected: unsupported scan type ${scanTypeResult.type}`);
+						throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
+				}
+
+				switch (scanTypeResult.type) {
+					case 'local': {
+						const totalPilots = result?.total_pilots ?? 0;
+						if (totalPilots === 0) {
+							span.setAttributes({
+								'scan.error': 'no_valid_characters',
+								'scan.type': scanTypeResult.type,
+								'response.status': 418
+							});
+							logger.warn('Scan update rejected: no valid characters found');
+							throw error(418, 'No valid characters found in scan');
+						}
+						break;
+					}
+					case 'directional': {
+						const onGrid = result?.on_grid?.total_objects ?? 0;
+						const offGrid = result?.off_grid?.total_objects ?? 0;
+						if (onGrid + offGrid === 0) {
+							span.setAttributes({
+								'scan.error': 'no_valid_objects',
+								'scan.type': scanTypeResult.type,
+								'response.status': 418
+							});
+							logger.warn('Scan update rejected: no valid objects found');
+							throw error(418, 'No valid objects found in scan');
+						}
+						break;
+					}
+					default:
+						break;
 				}
 
 				try {

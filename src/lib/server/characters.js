@@ -124,7 +124,7 @@ async function namesToCharacters(names) {
 	});
 
 	if (!allCharacters || allCharacters.length === 0) {
-		logger.error('Tried to add characters from ESI but charactersIds array was empty');
+		logger.warn('Tried to add characters from ESI but charactersIds array was empty');
 		return [];
 	}
 
@@ -441,7 +441,7 @@ export async function addCharactersFromESI(characters, sanityCheck = false) {
 
 			// check if charactersIds is empty or if characters is empty
 			if (!charactersData || charactersData.length === 0) {
-				logger.error('Tried to add characters from ESI but charactersIds array was empty');
+				logger.warn('Tried to add characters from ESI but charactersIds array was empty');
 				return;
 			}
 

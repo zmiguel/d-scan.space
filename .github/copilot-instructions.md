@@ -5,7 +5,7 @@
 - SvelteKit + Svelte 5 app. UI routes live in `src/routes/**/+page.svelte`; server actions/loaders live beside them in `src/routes/**/+page.server.js`.
 - Shared “business logic” sits in `src/lib/server/*` (scan parsing, ESI calls, tracing/metrics) and is reused by the Node worker in `workers/updater/src/`.
 - PostgreSQL via Drizzle. DB wiring/migrations: `src/lib/database/client.js`; schema: `src/lib/database/schema.js`; queries/helpers: `src/lib/database/*.js`.
-- Source of truth is `src/` and `workers/updater/src/`; `build/` and `coverage/` are generated output.
+- Source of truth is `src/` and `workers/updater/src/`; `build/` and `coverage/` are generated output (adapter-node build).
 
 ## Core flows (examples)
 
@@ -27,9 +27,10 @@
 
 ## Observability + HTTP
 
+- Tracing is wired in `src/instrumentation.server.js` and `workers/updater/src/instrumentation.js`; see `TRACING_GUIDE.md` for local setup.
 - Wrap I/O and multi-step work in `withSpan` from `src/lib/server/tracer.js` and add high-value attributes. In routes/hooks, pass `event` to join request traces (see `src/hooks.server.js`).
 - Metrics counters/histograms live in `src/lib/server/metrics.js` and are used in scan flows.
-- Use `fetchGET` / `fetchPOST` from `src/lib/server/wrappers.js` instead of raw `fetch` for ESI; USER*AGENT is built in `src/lib/server/constants.js` from `CONTACT*\*`+`AGENT`/`ORIGIN`.
+- Use `fetchGET` / `fetchPOST` from `src/lib/server/wrappers.js` instead of raw `fetch` for ESI; USER\*AGENT is built in `src/lib/server/constants.js` from `CONTACT**`+`AGENT`/`ORIGIN`.
 
 ## DB / schema conventions
 
@@ -40,7 +41,7 @@
 ## Dev workflows (repo-specific)
 
 - Dev server: `npm run dev` (same as `dev-win`). Build: `npm run build`. Preview: `npm run preview`. Prod: `npm run prod` (runs `node build`).
-- Checks/tests: `npm run check`, `npm run lint`, `npm run format`, `npm test` (Vitest).
+- Checks/tests: `npm run check` or `npm run check:watch`, `npm run lint`, `npm run format`, `npm test` (Vitest + writes `coverage/`).
 - DB: set `DATABASE_URL` then `npm run db:generate|db:push|db:migrate|db:studio`.
-- Worker runs from `workers/updater/` via `npm run start` in that folder.
+- Worker runs from `workers/updater/` via `npm run start` in that folder (entry: `workers/updater/src/index.js`).
 - Docker: root `Dockerfile` builds with `BUILD=true`; `docker-compose.yml` runs `app` + `postgres` + `updater` (worker typically sets `SKIP_MIGRATIONS=true`).

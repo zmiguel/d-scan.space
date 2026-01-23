@@ -10,3 +10,8 @@ updates:
     schedule:
       interval: 'daily'
     target-branch: 'preview'
+  - package-ecosystem: 'npm' # See documentation for possible values
+    directory: '/workers/updater' # Location of package manifests
+    schedule:
+      interval: 'daily'
+    target-branch: 'preview'
