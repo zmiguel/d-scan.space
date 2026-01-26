@@ -1,6 +1,6 @@
 {
 	"name": "d-scan-space-updater",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
 	"main": "src/index.js",
 	"scripts": {
@@ -19,6 +19,6 @@
 		"import-in-the-middle": "^2.0.5",
 		"pg": "^8.17.2",
 		"pino": "^10.3.0",
-		"undici": "^7.19.0"
+		"undici": "^7.19.1"
 	}
 }

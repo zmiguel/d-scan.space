@@ -3,52 +3,99 @@ services:
     image: adminer
     restart: unless-stopped
     container_name: database-admin
+    ports:
+      - '${ADMINER_PORT:-8080}:8080'
+    environment:
+      ADMINER_DEFAULT_SERVER: ${ADMINER_DEFAULT_SERVER:-postgres-main}
 
   postgres-main:
     image: postgres:18
     restart: always
     shm_size: 128mb
     container_name: postgres-db
-    hostname: db-dev
+    hostname: ${POSTGRES_HOSTNAME:-postgres-db}
     volumes:
-      - db_data:/var/lib/postgresql/18/docker
+      - db_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: dscanspace
-      POSTGRES_USER: dscanspace
-      POSTGRES_DB: dscanspace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dscanspace}
+      POSTGRES_USER: ${POSTGRES_USER:-dscanspace}
+      POSTGRES_DB: ${POSTGRES_DB:-dscanspace}
 
   app:
-    image: ghcr.io/zmiguel/d-scan-space:preview
+    image: ghcr.io/zmiguel/d-scan-space:main
+    build:
+      context: .
     restart: always
     container_name: d-scan
     environment:
-      DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
-      AGENT: 'Non-Official'
-      ORIGIN: https://example.com
-      BODY_SIZE_LIMIT: 256M
-      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://trace.example.com/v1/traces'
-      OTEL_EXPORTER_OTLP_AUTHORIZATION: 'Basic example=='
-      CONTACT_EMAIL: 'your@email.com'
-      CONTACT_EVE: 'your name'
-      CONTACT_DISCORD: 'your name'
-      DB_ENV: 'dev'
+      # Core
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dscanspace:dscanspace@postgres-main:5432/dscanspace}
+      DB_ENV: ${DB_ENV:-dev}
+
+      # Runtime
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-3000}
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-256M}
+
+      # Logging / identity
+      NODE_ENV: ${NODE_ENV:-production}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AGENT: ${AGENT:-Self-Hosted}
+
+      # ESI contact info (mandatory per CCP policy)
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-you@example.com}
+      CONTACT_EVE: ${CONTACT_EVE:-YourCharacterName}
+      CONTACT_DISCORD: ${CONTACT_DISCORD:-YourDiscord}
+
+      # OpenTelemetry (optional)
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318/v1/traces}
+      OTEL_EXPORTER_OTLP_AUTHORIZATION: ${OTEL_EXPORTER_OTLP_AUTHORIZATION:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-d-scan.space}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9464}
     depends_on:
       - postgres-main
+    ports:
+      - '${PORT:-3000}:${PORT:-3000}'
 
   updater:
-    image: ghcr.io/zmiguel/d-scan-space-updater:preview
+    image: ghcr.io/zmiguel/d-scan-space-updater:main
+    build:
+      context: .
+      dockerfile: workers/updater/Dockerfile
     restart: always
     environment:
-      DATABASE_URL: postgres://dscanspace:dscanspace@postgres-db:5432/dscanspace
-      OTEL_EXPORTER_OTLP_ENDPOINT: 'https://trace.example.com/v1/traces'
-      OTEL_EXPORTER_OTLP_AUTHORIZATION: 'Basic example=='
-      CONTACT_EMAIL: 'your@email.com'
-      CONTACT_EVE: 'your name'
-      CONTACT_DISCORD: 'your name'
-      DB_ENV: 'dev'
+      # Core
+      DATABASE_URL: ${DATABASE_URL:-postgresql://dscanspace:dscanspace@postgres-main:5432/dscanspace}
+      DB_ENV: ${DB_ENV:-dev}
+
+      # Logging / identity
+      NODE_ENV: ${NODE_ENV:-production}
+      #LOG_LEVEL: ${LOG_LEVEL:-info}
+      AGENT: ${AGENT:-Self-Hosted}
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+
+      # ESI contact info (mandatory per CCP policy)
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-you@example.com}
+      CONTACT_EVE: ${CONTACT_EVE:-YourCharacterName}
+      CONTACT_DISCORD: ${CONTACT_DISCORD:-YourDiscord}
+
+      # Worker schedules
+      # If you happen to need to change these, uncomment them below.
+      # you might need to STATIC_UPDATE_CRON for a few minutes from the first time you start
+      # so that the static data is populated.
+      #DYNAMIC_UPDATE_CRON: ${DYNAMIC_UPDATE_CRON:-* * * * *}
+      #STATIC_UPDATE_CRON: ${STATIC_UPDATE_CRON:-30 11,12 * * *}
+
+      # Worker should not run migrations (let the app handle them)
       SKIP_MIGRATIONS: 'true'
-      #DYNAMIC_UPDATE_CRON: ""
-      #STATIC_UPDATE_CRON: ""
+
+      # OpenTelemetry (optional)
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318/v1/traces}
+      OTEL_EXPORTER_OTLP_AUTHORIZATION: ${OTEL_EXPORTER_OTLP_AUTHORIZATION:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-d-scan.space}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9464}
     depends_on:
       - postgres-main
 
