@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	buildInterestingItems
-} from '../../../src/lib/utils/interesting_items.js';
+import { buildInterestingItems } from '../../../src/lib/utils/interesting_items.js';
 
 const buildDirectional = () => ({
 	objects: [
