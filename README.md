@@ -51,7 +51,7 @@ Prereqs: Docker + Docker Compose.
 cp .env.example .env
 ```
 
-1. (Mandatory) set at least:
+2. (Mandatory) set at least:
 
 - `ORIGIN` (public URL you’ll use)
 - `CONTACT_EMAIL` / `CONTACT_EVE` / `CONTACT_DISCORD` (used for the ESI User-Agent)
@@ -60,13 +60,13 @@ cp .env.example .env
 > For the first run: uncomment `STATIC_UPDATE_CRON` in the docker-compose file and set it to 1 or 2 minutes after the current time, this will populate the static data.
 > Remember to comment it back or set it to the default value, and restart the updater container.
 
-2. Start everything:
+3. Start everything:
 
 ```bash
 docker compose up -d
 ```
 
-3. Open the app:
+4. Open the app:
 
 - App: <http://localhost:3000>
 - Adminer (DB UI): <http://localhost:8080>
