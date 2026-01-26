@@ -6,7 +6,6 @@ import {
 	sortByTotal,
 	sortCategories,
 	collectAllLeaves,
-	collectInteresting,
 	buildGroupStats
 } from '../../../src/lib/utils/directional.js';
 
@@ -139,45 +138,6 @@ describe('directional utils', () => {
 			objects: [{ id: 2, name: 'Zero', count: 0 }]
 		};
 		const items = collectAllLeaves(section);
-		expect(items).toEqual([]);
-	});
-
-	it('collectInteresting returns matched items and preserves group', () => {
-		const section = buildDirectional();
-		const set = new Set([27]);
-		const items = collectInteresting(section, 'on', set);
-
-		expect(items.map((item) => item.name)).toEqual(['Raven', 'Typhoon']);
-		items.forEach((item) => {
-			expect(item.group).toBe('Battleship');
-			expect(item.location).toBe('on');
-		});
-	});
-
-	it('collectInteresting matches leaf ids directly', () => {
-		const section = { objects: [{ id: 30, name: 'Titan', count: 1 }] };
-		const set = new Set([30]);
-		const items = collectInteresting(section, 'on', set);
-		expect(items).toEqual([{ id: 30, name: 'Titan', group: null, count: 1, location: 'on' }]);
-	});
-
-	it('collectInteresting skips invalid nodes', () => {
-		const section = { objects: [null, { id: 30, name: 'Titan', count: 1 }] };
-		const set = new Set([30]);
-		const items = collectInteresting(section, 'on', set);
-		expect(items).toHaveLength(1);
-	});
-
-	it('collectInteresting ignores unmatched ids', () => {
-		const section = { objects: [{ id: 30, name: 'Titan', count: 1 }] };
-		const set = new Set([999]);
-		const items = collectInteresting(section, 'on', set);
-		expect(items).toEqual([]);
-	});
-
-	it('collectInteresting returns empty when no interesting set', () => {
-		const section = buildDirectional();
-		const items = collectInteresting(section, 'on');
 		expect(items).toEqual([]);
 	});
 

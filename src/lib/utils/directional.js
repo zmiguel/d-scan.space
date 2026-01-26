@@ -64,29 +64,6 @@ export function collectAllLeaves(section) {
 	return items;
 }
 
-export function collectInteresting(section, location, interestingSet) {
-	const items = [];
-	const visit = (node, includeAll, groupName) => {
-		if (!node || typeof node !== 'object') return;
-		const matched = includeAll || (interestingSet?.has(node.id) ?? false);
-
-		if (Array.isArray(node.objects) && node.objects.length > 0) {
-			const childHasObjects = node.objects.some((child) => Array.isArray(child?.objects));
-			const nextGroup = childHasObjects ? groupName : node.name;
-			node.objects.forEach((child) => visit(child, matched, nextGroup));
-			return;
-		}
-
-		const count = getNodeCount(node);
-		if (matched && count > 0) {
-			items.push({ id: node.id, name: node.name, group: groupName, count, location });
-		}
-	};
-
-	listGroups(section).forEach((node) => visit(node, false, null));
-	return items;
-}
-
 export function buildGroupStats(onGrid, offGrid) {
 	const map = new SvelteMap();
 	const addGroupItems = (section, location) => {
