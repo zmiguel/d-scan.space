@@ -105,9 +105,6 @@ export const INTERESTING_RULES = [
 	{ id: 2078, min_count: 1, min_percent: null } //	AT			Zephyr
 ];
 
-// Back-compat: older callers/tests may still import this.
-export const INTERESTING_IDS = INTERESTING_RULES.map((rule) => rule.id);
-
 function toNumber(value) {
 	if (value === null || value === undefined) return null;
 	const n = Number(value);

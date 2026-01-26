@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	buildInterestingItems,
-	INTERESTING_IDS,
-	INTERESTING_RULES
+	buildInterestingItems
 } from '../../../src/lib/utils/interesting_items.js';
 
 const buildDirectional = () => ({
@@ -47,7 +45,6 @@ describe('interesting items', () => {
 		const result = buildInterestingItems(buildDirectional(), null);
 		const ids = result.map((item) => item.id).sort();
 		expect(ids).toEqual([30, 45534].sort());
-		expect(INTERESTING_RULES.map((r) => r.id)).toEqual(INTERESTING_IDS);
 	});
 
 	it('aggregates on/off counts and sorts by total desc', () => {
