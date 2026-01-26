@@ -7,13 +7,12 @@ The Ultimate EVE Online Local/Direction Scan Tool
 
 ## Index
 
-- [Example scan](#example-scan-urls)
+- [Example scan](#example-scan)
 - [Tech stack](#tech-stack)
 - [Screenshots](#screenshots)
 - [Quick start (Docker Compose)](#quick-start-docker-compose)
 - [Configuration (environment variables)](#configuration-environment-variables)
 - [Observability](#observability)
-- [Troubleshooting](#troubleshooting)
 
 ## Example scan
 
@@ -58,13 +57,13 @@ cp .env.example .env
 - `CONTACT_EMAIL` / `CONTACT_EVE` / `CONTACT_DISCORD` (used for the ESI User-Agent)
 
 > [!NOTE]
-> For the first run: uncomment `STATIC_UPDATE_CRON` on the docker-compose file and set it to 1 or 2 minutes after the current time, this will populate the static data.
+> For the first run: uncomment `STATIC_UPDATE_CRON` in the docker-compose file and set it to 1 or 2 minutes after the current time, this will populate the static data.
 > Remember to comment it back or set it to the default value, and restart the updater container.
 
 2. Start everything:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 3. Open the app:
@@ -168,7 +167,3 @@ If you change Postgres credentials, make sure `DATABASE_URL` matches.
 ## Observability
 
 - Metrics: Prometheus exporter is enabled and exposes `/metrics` on `PROMETHEUS_PORT` for both the app and the updater.
-
-## Troubleshooting
-
-- Database migrations run automatically on app boot unless `SKIP_MIGRATIONS=true`.
