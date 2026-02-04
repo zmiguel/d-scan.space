@@ -70,24 +70,25 @@ async function handleDelete(response, span, attempt, fullResponse) {
 }
 
 export async function fetchGET(url, maxRetries = 3) {
+	const resourceType = getResourceType(url);
+	const requestHeaders =
+		ESI_TEST_FLAGS && ['character', 'corporation', 'alliance'].includes(resourceType)
+			? { ...headers, 'X-Compatibility-Date': '2099-01-01' }
+			: headers;
+
 	return await withSpan(
 		`server.wrappers.fetch_get`,
 		async (span) => {
 			let lastError;
 			const startTime = Date.now();
-			const resourceType = getResourceType(url);
 			logger.debug(`fetchGET: ${url}`, { resourceType });
-
-			if (ESI_TEST_FLAGS) {
-				headers['X-Compatibility-Date'] = '2099-01-01';
-			}
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
 					esiConcurrentRequests.add(1);
 					const response = await fetch(url, {
 						method: 'GET',
-						headers: headers,
+						headers: requestHeaders,
 						dispatcher: esiAgent
 					});
 					esiConcurrentRequests.add(-1);
@@ -205,7 +206,7 @@ export async function fetchGET(url, maxRetries = 3) {
 		{
 			'http.method': 'GET',
 			'http.url': url,
-			'http.request.headers': JSON.stringify(headers),
+			'http.request.headers': JSON.stringify(requestHeaders),
 			'max.retries': maxRetries
 		}
 	);
