@@ -1,6 +1,6 @@
 {
 	"name": "d-scan-space-updater",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"type": "module",
 	"main": "src/index.js",
 	"scripts": {
@@ -17,8 +17,8 @@
 		"croner": "^9.1.0",
 		"drizzle-orm": "^0.45.1",
 		"import-in-the-middle": "^2.0.6",
-		"pg": "^8.17.2",
+		"pg": "^8.18.0",
 		"pino": "^10.3.0",
-		"undici": "^7.19.2"
+		"undici": "^7.20.0"
 	}
 }

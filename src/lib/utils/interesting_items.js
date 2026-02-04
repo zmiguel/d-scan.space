@@ -44,65 +44,64 @@ export const INTERESTING_RULES = [
 	{ id: 4594, min_count: 1, min_percent: null }, //	T2			Lancer Dreadnought
 	{ id: 4902, min_count: 1, min_percent: null }, //	T1			Expedition Command Ship
 	// Individual Ship Types
-	{ id: 2836, min_count: 1, min_percent: null }, //	AT			Adrestia
-	{ id: 32848, min_count: 1, min_percent: null }, //	Special		Aliastra Catalyst
-	{ id: 11936, min_count: 1, min_percent: null }, //	Special		Apocalypse Imperial Issue
-	{ id: 11938, min_count: 1, min_percent: null }, //	Special		Armageddon Imperial Issue
-	{ id: 74316, min_count: 1, min_percent: null }, //	AT			Bestla
-	{ id: 64034, min_count: 1, min_percent: null }, //	Special		Boobook
-	{ id: 42246, min_count: 1, min_percent: null }, //	AT			Caedes
-	{ id: 32788, min_count: 1, min_percent: null }, //	AT			Cambion
-	{ id: 33675, min_count: 1, min_percent: null }, //	AT			Chameleon
-	{ id: 33397, min_count: 1, min_percent: null }, //	AT			Chremoas
-	{ id: 34496, min_count: 1, min_percent: null }, //	Special		Council Diplomatic Shuttle
-	{ id: 3532, min_count: 1, min_percent: null }, //	Special		Echelon
-	{ id: 617, min_count: 1, min_percent: null }, //	Special		Echo
-	{ id: 32790, min_count: 1, min_percent: null }, //	AT			Etana
-	{ id: 35781, min_count: 1, min_percent: null }, //	AT			Fiend
-	{ id: 32207, min_count: 1, min_percent: null }, //	AT 			Freki
-	{ id: 74141, min_count: 1, min_percent: null }, //	AT			Geri
-	{ id: 11940, min_count: 1, min_percent: null }, //	Special		Gold Magnate
-	{ id: 21097, min_count: 1, min_percent: null }, //	Special		Goru's Shuttle
-	{ id: 11011, min_count: 1, min_percent: null }, //	Special		Guardian-Vexor
-	{ id: 21628, min_count: 1, min_percent: null }, //	Special		Guristas Shuttle
-	{ id: 33079, min_count: 1, min_percent: null }, //	Special		Hematos
 	{ id: 615, min_count: 1, min_percent: null }, //	Special		Immolator
-	{ id: 35779, min_count: 1, min_percent: null }, //	AT			Imp
-	{ id: 32844, min_count: 1, min_percent: null }, //	Special		Inner Zone Shipping Catalyst
-	{ id: 32985, min_count: 1, min_percent: null }, //	Special		Inner Zone Shipping Imicus
-	{ id: 32842, min_count: 1, min_percent: null }, //	Special		Intaki Syndicate Catalyst
-	{ id: 32840, min_count: 1, min_percent: null }, //	Special		InterBus Catalyst
-	{ id: 30842, min_count: 1, min_percent: null }, //	Special		InterBus Shuttle
-	{ id: 60764, min_count: 1, min_percent: null }, //	AT			Laelaps
-	{ id: 33513, min_count: 1, min_percent: null }, //	Special		Leopard
+	{ id: 617, min_count: 1, min_percent: null }, //	Special		Echo
+	{ id: 635, min_count: 1, min_percent: null }, //	Special		Opux Luxury Yacht
+	{ id: 2078, min_count: 1, min_percent: null }, //	Special		Zephyr
+	{ id: 2834, min_count: 1, min_percent: null }, //	AT			Utu
+	{ id: 2836, min_count: 1, min_percent: null }, //	AT			Adrestia
 	{ id: 3516, min_count: 1, min_percent: null }, //	AT			Malice
-	{ id: 13202, min_count: 1, min_percent: null }, //	Special		Megathron Federate Issue
-	{ id: 32811, min_count: 1, min_percent: null }, //	Special		Miasmos Amastris Edition
+	{ id: 3518, min_count: 1, min_percent: null }, //	AT			Vangel
+	{ id: 3532, min_count: 1, min_percent: null }, //	Special		Echelon
+	{ id: 4005, min_count: 1, min_percent: null }, //	Special		Scorpion Ishukone Watch
 	{ id: 4363, min_count: 1, min_percent: null }, //	Special		Miasmos Quafe Ultra Edition
 	{ id: 4388, min_count: 1, min_percent: null }, //	Special		Miasmos Quafe Ultramarine Edition
-	{ id: 32209, min_count: 1, min_percent: null }, //	AT			Mimir
-	{ id: 33395, min_count: 1, min_percent: null }, //	AT			Moracha
-	{ id: 33099, min_count: 1, min_percent: null }, //	Special		Nefantar Thrasher
-	{ id: 635, min_count: 1, min_percent: null }, //	Special		Opux Luxury Yacht
-	{ id: 32846, min_count: 1, min_percent: null }, //	Special		Quafe Catalyst
-	{ id: 42245, min_count: 1, min_percent: null }, //	AT			Rabisu
-	{ id: 60765, min_count: 1, min_percent: null }, //	Special		Raiju
-	{ id: 26840, min_count: 1, min_percent: null }, //	Special		Raven State Issue
-	{ id: 32987, min_count: 1, min_percent: null }, //	Special		Sarum Magnate
-	{ id: 4005, min_count: 1, min_percent: null }, //	Special		Scorpion Ishukone Watch
+	{ id: 11011, min_count: 1, min_percent: null }, //	Special		Guardian-Vexor
+	{ id: 11936, min_count: 1, min_percent: null }, //	Special		Apocalypse Imperial Issue
+	{ id: 11938, min_count: 1, min_percent: null }, //	Special		Armageddon Imperial Issue
+	{ id: 11940, min_count: 1, min_percent: null }, //	Special		Gold Magnate
 	{ id: 11942, min_count: 1, min_percent: null }, //	Special		Silver Magnate
-	{ id: 33553, min_count: 1, min_percent: null }, //	Special		Stratios Emergency Responder
-	{ id: 32983, min_count: 1, min_percent: null }, //	Special		Sukuuvestaa Heron
-	{ id: 33081, min_count: 1, min_percent: null }, //	Special		Taipan
-	{ id: 33190, min_count: 1, min_percent: null }, //	Special		Tash-Murkon Magnate
+	{ id: 13202, min_count: 1, min_percent: null }, //	Special		Megathron Federate Issue
+	{ id: 21097, min_count: 1, min_percent: null }, //	Special		Goru's Shuttle
+	{ id: 21628, min_count: 1, min_percent: null }, //	Special		Guristas Shuttle
+	{ id: 26840, min_count: 1, min_percent: null }, //	Special		Raven State Issue
 	{ id: 26842, min_count: 1, min_percent: null }, //	AT			Tempest Tribal Issue
-	{ id: 2834, min_count: 1, min_percent: null }, //	AT			Utu
-	{ id: 3518, min_count: 1, min_percent: null }, //	AT			Vangel
+	{ id: 30842, min_count: 1, min_percent: null }, //	Special		InterBus Shuttle
+	{ id: 32207, min_count: 1, min_percent: null }, //	AT 			Freki
+	{ id: 32209, min_count: 1, min_percent: null }, //	AT			Mimir
+	{ id: 32788, min_count: 1, min_percent: null }, //	AT			Cambion
+	{ id: 32790, min_count: 1, min_percent: null }, //	AT			Etana
+	{ id: 32811, min_count: 1, min_percent: null }, //	Special		Miasmos Amastris Edition
+	{ id: 32840, min_count: 1, min_percent: null }, //	Special		InterBus Catalyst
+	{ id: 32842, min_count: 1, min_percent: null }, //	Special		Intaki Syndicate Catalyst
+	{ id: 32844, min_count: 1, min_percent: null }, //	Special		Inner Zone Shipping Catalyst
+	{ id: 32846, min_count: 1, min_percent: null }, //	Special		Quafe Catalyst
+	{ id: 32848, min_count: 1, min_percent: null }, //	Special		Aliastra Catalyst
+	{ id: 32983, min_count: 1, min_percent: null }, //	Special		Sukuuvestaa Heron
+	{ id: 32985, min_count: 1, min_percent: null }, //	Special		Inner Zone Shipping Imicus
+	{ id: 32987, min_count: 1, min_percent: null }, //	Special		Sarum Magnate
 	{ id: 32989, min_count: 1, min_percent: null }, //	Special		Vherokior Probe
-	{ id: 34590, min_count: 1, min_percent: null }, //	Special		Victorieux Luxury Yacht
+	{ id: 33079, min_count: 1, min_percent: null }, //	Special		Hematos
+	{ id: 33081, min_count: 1, min_percent: null }, //	Special		Taipan
 	{ id: 33083, min_count: 1, min_percent: null }, //	Special		Violator
+	{ id: 33099, min_count: 1, min_percent: null }, //	Special		Nefantar Thrasher
+	{ id: 33395, min_count: 1, min_percent: null }, //	AT			Moracha
+	{ id: 33397, min_count: 1, min_percent: null }, //	AT			Chremoas
+	{ id: 33513, min_count: 1, min_percent: null }, //	Special		Leopard
+	{ id: 33553, min_count: 1, min_percent: null }, //	Special		Stratios Emergency Responder
 	{ id: 33673, min_count: 1, min_percent: null }, //	AT			Whiptail
-	{ id: 2078, min_count: 1, min_percent: null } //	AT			Zephyr
+	{ id: 33675, min_count: 1, min_percent: null }, //	AT			Chameleon
+	{ id: 34496, min_count: 1, min_percent: null }, //	Special		Council Diplomatic Shuttle
+	{ id: 34590, min_count: 1, min_percent: null }, //	Special		Victorieux Luxury Yacht
+	{ id: 35779, min_count: 1, min_percent: null }, //	AT			Imp
+	{ id: 35781, min_count: 1, min_percent: null }, //	AT			Fiend
+	{ id: 42245, min_count: 1, min_percent: null }, //	AT			Rabisu
+	{ id: 42246, min_count: 1, min_percent: null }, //	AT			Caedes
+	{ id: 60764, min_count: 1, min_percent: null }, //	AT			Laelaps
+	{ id: 60765, min_count: 1, min_percent: null }, //	AT			Raiju
+	{ id: 64034, min_count: 1, min_percent: null }, //	Special		Boobook
+	{ id: 74141, min_count: 1, min_percent: null }, //	AT			Geri
+	{ id: 74316, min_count: 1, min_percent: null } //	AT			Bestla
 ];
 
 function toNumber(value) {

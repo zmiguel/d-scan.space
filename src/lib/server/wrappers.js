@@ -1,5 +1,5 @@
 import { biomassCharacter } from '../database/characters.js';
-import { USER_AGENT, ESI_MAX_CONNECTIONS } from './constants.js';
+import { USER_AGENT, ESI_MAX_CONNECTIONS, ESI_TEST_FLAGS } from './constants.js';
 import { withSpan } from './tracer.js';
 import { recordEsiRequest, esiConcurrentRequests } from './metrics.js';
 import { Agent } from 'undici';
@@ -77,6 +77,10 @@ export async function fetchGET(url, maxRetries = 3) {
 			const startTime = Date.now();
 			const resourceType = getResourceType(url);
 			logger.debug(`fetchGET: ${url}`, { resourceType });
+
+			if (ESI_TEST_FLAGS) {
+				headers['X-Compatibility-Date'] = '2099-01-01';
+			}
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
