@@ -82,16 +82,19 @@ export async function fetchGET(url, maxRetries = 3) {
 			let lastError;
 			const startTime = Date.now();
 			logger.debug(`fetchGET: ${url}`, { resourceType });
+			let didIncrement = false;
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
 					esiConcurrentRequests.add(1);
+					didIncrement = true;
 					const response = await fetch(url, {
 						method: 'GET',
 						headers: requestHeaders,
 						dispatcher: esiAgent
 					});
 					esiConcurrentRequests.add(-1);
+					didIncrement = false;
 
 					const responseClone = response.clone();
 					let fullResponse;
@@ -126,7 +129,7 @@ export async function fetchGET(url, maxRetries = 3) {
 					// Check if response is not ok and throw error
 					if (!response.ok) {
 						// deleted edge case
-						if (response.status === 404 && fullResponse.error.includes('deleted')) {
+						if (response.status === 404 && ['character'].includes(resourceType)) {
 							// Handle the deleted edge case
 							await handleDelete(response, span, attempt, fullResponse);
 						} else {
@@ -165,8 +168,9 @@ export async function fetchGET(url, maxRetries = 3) {
 					return response;
 				} catch (error) {
 					// Ensure we decrement if fetch fails (e.g. network error)
-					if (error.name !== 'Error') {
+					if (didIncrement) {
 						esiConcurrentRequests.add(-1);
+						didIncrement = false;
 					}
 
 					lastError = error;
@@ -187,6 +191,16 @@ export async function fetchGET(url, maxRetries = 3) {
 						});
 					}
 
+					logger.error(
+						{
+							url,
+							attempt,
+							resourceType,
+							error: error.message || String(error)
+						},
+						'fetchGET failed'
+					);
+
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
 						// Exponential backoff: 500ms, 1s, 2s
@@ -201,7 +215,15 @@ export async function fetchGET(url, maxRetries = 3) {
 				code: 1,
 				message: `Failed after ${maxRetries} attempts: ${lastError.message}`
 			});
-			throw lastError;
+			logger.error(
+				{
+					url,
+					resourceType,
+					error: lastError?.message || String(lastError)
+				},
+				'fetchGET exhausted retries'
+			);
+			return null;
 		},
 		{
 			'http.method': 'GET',
@@ -219,10 +241,12 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 			let lastError;
 			const startTime = Date.now();
 			const resourceType = getResourceType(url);
+			let didIncrement = false;
 
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
 					esiConcurrentRequests.add(1);
+					didIncrement = true;
 					const response = await fetch(url, {
 						method: 'POST',
 						headers: headers,
@@ -230,6 +254,7 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 						dispatcher: esiAgent
 					});
 					esiConcurrentRequests.add(-1);
+					didIncrement = false;
 
 					const responseClone = response.clone();
 					let fullResponse;
@@ -307,8 +332,9 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 					return response;
 				} catch (error) {
 					// Ensure we decrement if fetch fails (e.g. network error)
-					if (error.name !== 'Error') {
+					if (didIncrement) {
 						esiConcurrentRequests.add(-1);
+						didIncrement = false;
 					}
 
 					lastError = error;
@@ -329,6 +355,16 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 						});
 					}
 
+					logger.error(
+						{
+							url,
+							attempt,
+							resourceType,
+							error: error.message || String(error)
+						},
+						'fetchPOST failed'
+					);
+
 					// Don't wait after the last attempt
 					if (attempt < maxRetries) {
 						// Exponential backoff: 500ms, 1s, 2s
@@ -343,7 +379,15 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 				code: 1,
 				message: `Failed after ${maxRetries} attempts: ${lastError.message}`
 			});
-			throw lastError;
+			logger.error(
+				{
+					url,
+					resourceType,
+					error: lastError?.message || String(lastError)
+				},
+				'fetchPOST exhausted retries'
+			);
+			return null;
 		},
 		{
 			'http.method': 'POST',

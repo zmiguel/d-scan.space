@@ -6,6 +6,7 @@
 - Shared scan/ESI/tracing logic is in `src/lib/server/*` and reused by the updater worker in `workers/updater/src/`.
 - PostgreSQL via Drizzle. DB wiring/migrations: `src/lib/database/client.js`; schema: `src/lib/database/schema.js`; helpers in `src/lib/database/*.js`.
 - Source of truth is `src/` and `workers/updater/src/`; `build/` and `coverage/` are generated output.
+- Runtime config is env-driven; canonical defaults live in `.env.example` (see ORIGIN + CONTACT\_\* for ESI User-Agent).
 
 ## Core flows (examples)
 
@@ -45,3 +46,4 @@
 - DB: set `DATABASE_URL` then `npm run db:generate|db:push|db:migrate|db:studio`.
 - Worker runs from `workers/updater/` via `npm run start` (entry: `workers/updater/src/index.js`).
 - Docker: root `Dockerfile` builds with `BUILD=true`; `docker-compose.yml` runs `app` + `postgres` + `updater` (worker typically sets `SKIP_MIGRATIONS=true`).
+- Compose note: first run may require enabling `STATIC_UPDATE_CRON` briefly to populate SDE (see README).

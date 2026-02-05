@@ -20,6 +20,12 @@ vi.mock('../../../src/lib/database/corporations.js', () => ({
 	addOrUpdateCorporationsDB: vi.fn()
 }));
 
+vi.mock('../../../src/lib/logger.js', () => ({
+	default: {
+		error: vi.fn()
+	}
+}));
+
 import {
 	idsToCorporations,
 	addOrUpdateCorporations
@@ -47,6 +53,28 @@ describe('corporations', () => {
 
 			expect(fetchGET).toHaveBeenCalledWith('https://esi.evetech.net/corporations/1');
 			expect(result).toEqual([{ id: 1, name: 'Corp1', ticker: 'CORP1' }]);
+		});
+
+		it('should handle null response', async () => {
+			const ids = [1];
+			fetchGET.mockResolvedValue(null);
+
+			const result = await idsToCorporations(ids);
+
+			expect(result).toEqual([]);
+		});
+
+		it('should handle non-ok response', async () => {
+			const ids = [1];
+			fetchGET.mockResolvedValue({
+				ok: false,
+				status: 500,
+				statusText: 'Server Error'
+			});
+
+			const result = await idsToCorporations(ids);
+
+			expect(result).toEqual([]);
 		});
 	});
 

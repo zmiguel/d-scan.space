@@ -49,6 +49,15 @@ describe('alliances', () => {
 			expect(result).toEqual([{ id: 1, name: 'Alliance1', ticker: 'ALL1' }]);
 		});
 
+		it('should handle null response', async () => {
+			const ids = [1];
+			fetchGET.mockResolvedValue(null);
+
+			const result = await idsToAlliances(ids);
+
+			expect(result).toEqual([]);
+		});
+
 		it('should handle failed fetch', async () => {
 			const ids = [1];
 			fetchGET.mockResolvedValue({
@@ -58,7 +67,7 @@ describe('alliances', () => {
 
 			const result = await idsToAlliances(ids);
 
-			expect(result).toEqual([null]); // getAllianceFromESI returns null on failure
+			expect(result).toEqual([]); // failed fetches are skipped
 		});
 	});
 

@@ -21,6 +21,11 @@ import {
 async function getCharacterFromESI(id) {
 	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);
 
+	if (!characterData) {
+		logger.error(`Failed to fetch character ${id}: no response`);
+		return null;
+	}
+
 	if (!characterData.ok) {
 		logger.error(
 			`Failed to fetch character ${id}: ${characterData.status} ${characterData.statusText}`
@@ -96,6 +101,13 @@ async function namesToCharacters(names) {
 		const batchPromises = idsBatches.map(async (batch) => {
 			const response = await fetchPOST('https://esi.evetech.net/universe/ids', batch);
 
+			if (!response) {
+				logger.error(
+					`Failed to get character ids from ESI - no response, batch size: ${batch.length}`
+				);
+				return [];
+			}
+
 			if (!response.ok) {
 				const errorText = await response.text();
 				logger.error(
@@ -150,6 +162,13 @@ async function namesToCharacters(names) {
 				'https://esi.evetech.net/characters/affiliation',
 				batch.map((c) => c.id)
 			);
+
+			if (!response) {
+				logger.error(
+					`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
+				);
+				return [];
+			}
 
 			if (!response.ok) {
 				const errorText = await response.text();
@@ -244,6 +263,13 @@ export async function idsToCharacters(ids) {
 							'https://esi.evetech.net/characters/affiliation',
 							batch
 						);
+
+						if (!response) {
+							logger.error(
+								`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
+							);
+							return [];
+						}
 
 						if (!response.ok) {
 							const errorText = await response.text();
@@ -365,6 +391,13 @@ async function idsToAffiliations(ids) {
 	return await withSpan('server.characters.ids_to_affiliations', async (span) => {
 		const batchPromises = affiliationBatches.map(async (batch) => {
 			const response = await fetchPOST('https://esi.evetech.net/characters/affiliation', batch);
+
+			if (!response) {
+				logger.error(
+					`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
+				);
+				return [];
+			}
 
 			if (!response.ok) {
 				const errorText = await response.text();
