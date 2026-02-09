@@ -41,7 +41,7 @@
 		"@vitest/coverage-v8": "^4.0.18",
 		"drizzle-kit": "^0.31.8",
 		"drizzle-orm": "^0.45.1",
-		"eslint": "^9.39.2",
+		"eslint": "^10.0.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.14.0",
 		"espree": "^11.1.0",
