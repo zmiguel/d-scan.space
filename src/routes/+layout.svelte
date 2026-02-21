@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { asset } from '$app/paths';
+	import { syncRybbitIdentity } from '$lib/utils/rybbit.js';
 	import {
 		Navbar,
 		NavBrand,
@@ -19,6 +20,14 @@
 	import { DarkMode } from 'flowbite-svelte';
 	let { children, data } = $props();
 	const activeUrl = $derived(page.url.pathname);
+
+	$effect(() => {
+		if (typeof window === 'undefined') {
+			return;
+		}
+
+		syncRybbitIdentity(window.rybbit, data?.session);
+	});
 
 	function submitLogout() {
 		document.getElementById('logout-form')?.requestSubmit();
@@ -95,7 +104,7 @@
 					</div>
 					<Dropdown triggeredBy="#eve-user-trigger" class="z-30 w-56">
 						<DropdownGroup>
-							<DropdownItem href="/scans">My Scans</DropdownItem>
+							<DropdownItem href="/my-scans">My Scans</DropdownItem>
 						</DropdownGroup>
 						<DropdownGroup>
 							<DropdownItem onclick={submitAddCharacter} class="cursor-pointer"

@@ -10,10 +10,14 @@ import { detectScanType } from '$lib/utils/scan_type.js';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
-	create: async ({ request, event }) => {
+	create: async ({ request, event, locals }) => {
 		return await withSpan(
 			'route.scan.create',
 			async (span) => {
+				const session = await locals.auth();
+				const createdBy = session?.user?.id ?? null;
+				const primaryCharacterName = session?.eve?.characterName ?? session?.user?.name ?? null;
+
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
 				const is_public = data.has('is_public');
@@ -72,7 +76,9 @@ export const actions = {
 					'scan.is_public': is_public,
 					'scan.type': scanTypeResult.type,
 					'scan.group_id': scanGroupId,
-					'scan.id': scanId
+					'scan.id': scanId,
+					'user.id': createdBy ?? 'anonymous',
+					'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 				});
 
 				let result;
@@ -135,7 +141,9 @@ export const actions = {
 								is_public,
 								type: scanTypeResult.type,
 								data: result,
-								raw_data: content
+								raw_data: content,
+								created_by: createdBy,
+								primary_character_name: primaryCharacterName
 							});
 						},
 						{
@@ -143,7 +151,9 @@ export const actions = {
 							'scan.id': scanId,
 							'scan.type': scanTypeResult.type,
 							'scan.data_lines': lines.length,
-							'scan.is_public': is_public
+							'scan.is_public': is_public,
+							'user.id': createdBy ?? 'anonymous',
+							'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 						}
 					);
 				} catch (e) {
@@ -171,10 +181,14 @@ export const actions = {
 		);
 	},
 
-	update: async ({ request, event }) => {
+	update: async ({ request, event, locals }) => {
 		return await withSpan(
 			'route.scan.update',
 			async (span) => {
+				const session = await locals.auth();
+				const createdBy = session?.user?.id ?? null;
+				const primaryCharacterName = session?.eve?.characterName ?? session?.user?.name ?? null;
+
 				const data = await request.formData();
 				const content = /** @type {(string | null)} */ (data.get('scan_content'));
 
@@ -231,7 +245,9 @@ export const actions = {
 					'scan.content_lines': lines.length,
 					'scan.type': scanTypeResult.type,
 					'scan.group_id': scanGroupId,
-					'scan.id': scanId
+					'scan.id': scanId,
+					'user.id': createdBy ?? 'anonymous',
+					'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 				});
 
 				let result;
@@ -293,14 +309,18 @@ export const actions = {
 								scanId,
 								type: scanTypeResult.type,
 								data: result,
-								raw_data: content
+								raw_data: content,
+								created_by: createdBy,
+								primary_character_name: primaryCharacterName
 							});
 						},
 						{
 							'scan.group_id': scanGroupId,
 							'scan.id': scanId,
 							'scan.type': scanTypeResult.type,
-							'scan.data_lines': lines.length
+							'scan.data_lines': lines.length,
+							'user.id': createdBy ?? 'anonymous',
+							'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 						}
 					);
 				} catch (e) {

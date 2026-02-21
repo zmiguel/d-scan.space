@@ -46,7 +46,10 @@ import {
 	createNewScan,
 	updateScan,
 	getScansByGroupID,
-	getPublicScans
+	getPublicScans,
+	getScansByUser,
+	getScanGroupByID,
+	setScanGroupSystemIfOwnerAndUnset
 } from '../../../src/lib/database/scans.js';
 
 describe('scans', () => {
@@ -296,5 +299,109 @@ describe('getPublicScans', () => {
 		expect(mockSelect.where).toHaveBeenCalled();
 		expect(mockSelect.orderBy).toHaveBeenCalled();
 		expect(result).toHaveLength(1);
+	});
+});
+
+describe('getScansByUser', () => {
+	it('should fetch scans by user id', async () => {
+		const mockSelect = {
+			from: vi.fn().mockReturnThis(),
+			leftJoin: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			orderBy: vi.fn().mockResolvedValue([{ id: 'scan1', public: true }])
+		};
+		mockDb.select.mockReturnValue(mockSelect);
+
+		const result = await getScansByUser('user-123');
+
+		expect(mockDb.select).toHaveBeenCalled();
+		expect(mockSelect.from).toHaveBeenCalled();
+		expect(mockSelect.leftJoin).toHaveBeenCalled();
+		expect(mockSelect.where).toHaveBeenCalled();
+		expect(mockSelect.orderBy).toHaveBeenCalled();
+		expect(result).toEqual([{ id: 'scan1', public: true }]);
+	});
+});
+
+describe('getScanGroupByID', () => {
+	it('should fetch scan group by id', async () => {
+		const mockSelect = {
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([{ id: 'group-1', system: null, created_by: 'user-1' }])
+		};
+		mockDb.select.mockReturnValue(mockSelect);
+
+		const result = await getScanGroupByID('group-1');
+
+		expect(result).toEqual({ id: 'group-1', system: null, created_by: 'user-1' });
+	});
+
+	it('returns null when scan group is missing', async () => {
+		const mockSelect = {
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([])
+		};
+		mockDb.select.mockReturnValue(mockSelect);
+
+		const result = await getScanGroupByID('missing-group');
+
+		expect(result).toBeNull();
+	});
+});
+
+describe('setScanGroupSystemIfOwnerAndUnset', () => {
+	it('returns true when one-time system set succeeds', async () => {
+		const mockUpdate = {
+			set: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			returning: vi.fn().mockResolvedValue([{ id: 'group-1' }])
+		};
+		mockDb.update = vi.fn().mockReturnValue(mockUpdate);
+
+		const result = await setScanGroupSystemIfOwnerAndUnset({
+			groupId: 'group-1',
+			userId: 'user-1',
+			system: { name: 'Jita' },
+			primaryCharacterName: 'Pilot'
+		});
+
+		expect(result).toBe(true);
+	});
+
+	it('returns false when no row is updated', async () => {
+		const mockUpdate = {
+			set: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			returning: vi.fn().mockResolvedValue([])
+		};
+		mockDb.update = vi.fn().mockReturnValue(mockUpdate);
+
+		const result = await setScanGroupSystemIfOwnerAndUnset({
+			groupId: 'group-1',
+			userId: 'user-1',
+			system: { name: 'Jita' },
+			primaryCharacterName: 'Pilot'
+		});
+
+		expect(result).toBe(false);
+	});
+
+	it('uses unknown fallback when primary character name is missing', async () => {
+		const mockUpdate = {
+			set: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			returning: vi.fn().mockResolvedValue([{ id: 'group-1' }])
+		};
+		mockDb.update = vi.fn().mockReturnValue(mockUpdate);
+
+		const result = await setScanGroupSystemIfOwnerAndUnset({
+			groupId: 'group-1',
+			userId: 'user-1',
+			system: { name: 'Jita' }
+		});
+
+		expect(result).toBe(true);
 	});
 });
