@@ -2,14 +2,45 @@
 	import { Textarea, Label, Button } from 'flowbite-svelte';
 	import { Toggle } from 'flowbite-svelte';
 	import { Spinner } from 'flowbite-svelte';
+	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	let isLoading = $state(false);
+	const copiedFlagKey = 'scan-link-copied';
+
+	async function copyRedirectUrl(location) {
+		if (!browser || !location) {
+			return;
+		}
+
+		const absoluteUrl = new URL(location, window.location.origin).toString();
+		try {
+			await navigator.clipboard.writeText(absoluteUrl);
+		} catch {
+			// Ignore clipboard write failures (e.g., permission denied)
+		}
+	}
+
+	function markCopiedFlag() {
+		if (!browser) {
+			return;
+		}
+
+		sessionStorage.setItem(copiedFlagKey, '1');
+	}
 
 	function handleSubmit() {
 		isLoading = true;
-		return async ({ update }) => {
+		return async ({ result, update }) => {
+			if (result?.type === 'redirect') {
+				await copyRedirectUrl(result.location);
+				markCopiedFlag();
+				window.location.assign(result.location);
+				isLoading = false;
+				return;
+			}
+
 			await update();
 			isLoading = false;
 		};

@@ -6,6 +6,7 @@ const {
 	mockCreateNewLocalScan,
 	mockCreateNewDirectionalScan,
 	mockCreateNewScan,
+	mockGetScanGroupByID,
 	mockUpdateScan,
 	mockDetectScanType,
 	mockMetricsAdd,
@@ -27,6 +28,7 @@ const {
 			off_grid: { total_objects: 0 }
 		})),
 		mockCreateNewScan: vi.fn(async () => undefined),
+		mockGetScanGroupByID: vi.fn(async () => ({ id: 'group-1', system: null })),
 		mockUpdateScan: vi.fn(async () => undefined),
 		mockDetectScanType: vi.fn(() => ({ type: 'local', supported: true })),
 		mockMetricsAdd: vi.fn(),
@@ -68,6 +70,7 @@ vi.mock('../../src/lib/server/directional.js', () => ({
 
 vi.mock('../../src/lib/database/scans.js', () => ({
 	createNewScan: mockCreateNewScan,
+	getScanGroupByID: mockGetScanGroupByID,
 	updateScan: mockUpdateScan
 }));
 
@@ -118,6 +121,7 @@ describe('routes/scan/+page.server.js tracing', () => {
 			on_grid: { total_objects: 1 },
 			off_grid: { total_objects: 0 }
 		});
+		mockGetScanGroupByID.mockResolvedValue({ id: 'group-1', system: null });
 		mockCreateNewScan.mockResolvedValue(undefined);
 		mockUpdateScan.mockResolvedValue(undefined);
 	});
@@ -531,6 +535,147 @@ describe('routes/scan/+page.server.js tracing', () => {
 			expect.objectContaining({
 				type: 'directional',
 				public: 'false'
+			})
+		);
+	});
+
+	it('update creates a new scan group when directional system mismatches existing group system', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockDetectScanType.mockReturnValue({ type: 'directional', supported: true });
+		mockGetScanGroupByID.mockResolvedValue({
+			id: 'group-1',
+			system: { id: 30000142, name: 'Jita' }
+		});
+		mockCreateNewDirectionalScan.mockResolvedValue({
+			on_grid: { total_objects: 1 },
+			off_grid: { total_objects: 0 },
+			system: { id: 30002187, name: 'Amarr' }
+		});
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: { auth: vi.fn().mockResolvedValue(null) }
+		});
+
+		expect(mockUpdateScan).not.toHaveBeenCalled();
+		expect(mockCreateNewScan).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scanGroupId: 'id-2',
+				scanId: 'id-1',
+				is_public: false,
+				type: 'directional'
+			})
+		);
+		expect(result).toEqual(
+			expect.objectContaining({
+				status: 303,
+				location: '/scan/id-2/id-1'
+			})
+		);
+	});
+
+	it('update keeps existing group when directional system matches existing group system', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockDetectScanType.mockReturnValue({ type: 'directional', supported: true });
+		mockGetScanGroupByID.mockResolvedValue({
+			id: 'group-1',
+			system: { id: 30000142, name: 'Jita' }
+		});
+		mockCreateNewDirectionalScan.mockResolvedValue({
+			on_grid: { total_objects: 1 },
+			off_grid: { total_objects: 0 },
+			system: { id: 30000142, name: 'Jita' }
+		});
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: { auth: vi.fn().mockResolvedValue(null) }
+		});
+
+		expect(mockCreateNewScan).not.toHaveBeenCalled();
+		expect(mockUpdateScan).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scanGroupId: 'group-1',
+				scanId: 'id-1',
+				type: 'directional'
+			})
+		);
+		expect(result).toEqual(
+			expect.objectContaining({
+				status: 303,
+				location: '/scan/group-1/id-1'
+			})
+		);
+	});
+
+	it('update keeps existing group when directional systems match by normalized name', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockDetectScanType.mockReturnValue({ type: 'directional', supported: true });
+		mockGetScanGroupByID.mockResolvedValue({
+			id: 'group-1',
+			system: { id: null, name: '  Jita  ' }
+		});
+		mockCreateNewDirectionalScan.mockResolvedValue({
+			on_grid: { total_objects: 1 },
+			off_grid: { total_objects: 0 },
+			system: { id: undefined, name: 'jita' }
+		});
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: { auth: vi.fn().mockResolvedValue(null) }
+		});
+
+		expect(mockCreateNewScan).not.toHaveBeenCalled();
+		expect(mockUpdateScan).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scanGroupId: 'group-1',
+				scanId: 'id-1',
+				type: 'directional'
+			})
+		);
+		expect(result).toEqual(
+			expect.objectContaining({
+				status: 303,
+				location: '/scan/group-1/id-1'
+			})
+		);
+	});
+
+	it('update creates a new group when directional systems have no comparable ids or names', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockDetectScanType.mockReturnValue({ type: 'directional', supported: true });
+		mockGetScanGroupByID.mockResolvedValue({
+			id: 'group-1',
+			system: {}
+		});
+		mockCreateNewDirectionalScan.mockResolvedValue({
+			on_grid: { total_objects: 1 },
+			off_grid: { total_objects: 0 },
+			system: {}
+		});
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: { auth: vi.fn().mockResolvedValue(null) }
+		});
+
+		expect(mockUpdateScan).not.toHaveBeenCalled();
+		expect(mockCreateNewScan).toHaveBeenCalledWith(
+			expect.objectContaining({
+				scanGroupId: 'id-2',
+				scanId: 'id-1',
+				type: 'directional'
+			})
+		);
+		expect(result).toEqual(
+			expect.objectContaining({
+				status: 303,
+				location: '/scan/id-2/id-1'
 			})
 		);
 	});

@@ -1,5 +1,6 @@
 <script>
 	import { Textarea, Button } from 'flowbite-svelte';
+	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import { onDestroy } from 'svelte';
 
@@ -8,11 +9,41 @@
 	// For the sidebar form
 	let isLoading = $state(false);
 	let formError = $state('');
+	const copiedFlagKey = 'scan-link-copied';
+
+	async function copyRedirectUrl(location) {
+		if (!browser || !location) {
+			return;
+		}
+
+		const absoluteUrl = new URL(location, window.location.origin).toString();
+		try {
+			await navigator.clipboard.writeText(absoluteUrl);
+		} catch {
+			// Ignore clipboard write failures (e.g., permission denied)
+		}
+	}
+
+	function markCopiedFlag() {
+		if (!browser) {
+			return;
+		}
+
+		sessionStorage.setItem(copiedFlagKey, '1');
+	}
 
 	function handleSubmit() {
 		isLoading = true;
 		formError = '';
-		return async ({ update }) => {
+		return async ({ result, update }) => {
+			if (result?.type === 'redirect') {
+				await copyRedirectUrl(result.location);
+				markCopiedFlag();
+				window.location.assign(result.location);
+				isLoading = false;
+				return;
+			}
+
 			await update();
 			isLoading = false;
 		};

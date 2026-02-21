@@ -2,7 +2,7 @@ import ShortUniqueId from 'short-unique-id';
 import { error, redirect } from '@sveltejs/kit';
 import { createNewLocalScan } from '$lib/server/local.js';
 import { createNewDirectionalScan } from '$lib/server/directional.js';
-import { createNewScan, updateScan } from '$lib/database/scans.js';
+import { createNewScan, getScanGroupByID, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 import { scansProcessedCounter } from '$lib/server/metrics';
@@ -238,13 +238,14 @@ export const actions = {
 				}
 
 				const uid = new ShortUniqueId();
-				const scanGroupId = data.get('scan_group');
+				const originalScanGroupId = data.get('scan_group');
+				let targetScanGroupId = originalScanGroupId;
 				const scanId = uid.randomUUID(12);
 
 				span.setAttributes({
 					'scan.content_lines': lines.length,
 					'scan.type': scanTypeResult.type,
-					'scan.group_id': scanGroupId,
+					'scan.group_id': originalScanGroupId,
 					'scan.id': scanId,
 					'user.id': createdBy ?? 'anonymous',
 					'user.primary_character_name': primaryCharacterName ?? 'anonymous'
@@ -300,29 +301,78 @@ export const actions = {
 						break;
 				}
 
+				let createAsNewGroup = false;
+				if (scanTypeResult.type === 'directional' && originalScanGroupId) {
+					const existingGroup = await getScanGroupByID(originalScanGroupId);
+					const existingSystem = existingGroup?.system ?? null;
+					const directionalSystem = result?.system ?? null;
+
+					if (
+						existingSystem &&
+						directionalSystem &&
+						!systemsMatch(existingSystem, directionalSystem)
+					) {
+						createAsNewGroup = true;
+						targetScanGroupId = uid.randomUUID(8);
+						span.setAttributes({
+							'scan.group_id.original': originalScanGroupId,
+							'scan.group_id.target': targetScanGroupId,
+							'scan.system.mismatch': true,
+							'scan.system.existing': existingSystem?.name ?? 'unknown',
+							'scan.system.inferred': directionalSystem?.name ?? 'unknown'
+						});
+					}
+				}
+
 				try {
-					await withSpan(
-						'route.scan.persist_update_scan',
-						async () => {
-							return await updateScan({
-								scanGroupId,
-								scanId,
-								type: scanTypeResult.type,
-								data: result,
-								raw_data: content,
-								created_by: createdBy,
-								primary_character_name: primaryCharacterName
-							});
-						},
-						{
-							'scan.group_id': scanGroupId,
-							'scan.id': scanId,
-							'scan.type': scanTypeResult.type,
-							'scan.data_lines': lines.length,
-							'user.id': createdBy ?? 'anonymous',
-							'user.primary_character_name': primaryCharacterName ?? 'anonymous'
-						}
-					);
+					if (createAsNewGroup) {
+						await withSpan(
+							'route.scan.persist_new_from_update_scan',
+							async () => {
+								return await createNewScan({
+									scanGroupId: targetScanGroupId,
+									scanId,
+									is_public: false,
+									type: scanTypeResult.type,
+									data: result,
+									raw_data: content,
+									created_by: createdBy,
+									primary_character_name: primaryCharacterName
+								});
+							},
+							{
+								'scan.group_id': targetScanGroupId,
+								'scan.id': scanId,
+								'scan.type': scanTypeResult.type,
+								'scan.data_lines': lines.length,
+								'user.id': createdBy ?? 'anonymous',
+								'user.primary_character_name': primaryCharacterName ?? 'anonymous'
+							}
+						);
+					} else {
+						await withSpan(
+							'route.scan.persist_update_scan',
+							async () => {
+								return await updateScan({
+									scanGroupId: targetScanGroupId,
+									scanId,
+									type: scanTypeResult.type,
+									data: result,
+									raw_data: content,
+									created_by: createdBy,
+									primary_character_name: primaryCharacterName
+								});
+							},
+							{
+								'scan.group_id': targetScanGroupId,
+								'scan.id': scanId,
+								'scan.type': scanTypeResult.type,
+								'scan.data_lines': lines.length,
+								'user.id': createdBy ?? 'anonymous',
+								'user.primary_character_name': primaryCharacterName ?? 'anonymous'
+							}
+						);
+					}
 				} catch (e) {
 					span.setAttributes({
 						'scan.error': 'persist_failed',
@@ -332,7 +382,7 @@ export const actions = {
 					throw error(500, 'Failed to store scan data');
 				}
 
-				logger.info(`Updated scan with ID: ${scanId} in group: ${scanGroupId}`);
+				logger.info(`Updated scan with ID: ${scanId} in group: ${targetScanGroupId}`);
 
 				// Record metric for scan processed (update)
 				scansProcessedCounter.add(1, {
@@ -340,7 +390,7 @@ export const actions = {
 					public: 'false' // Updates are always on existing scans
 				});
 
-				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
+				return redirect(303, `/scan/${targetScanGroupId}/${scanId}`);
 			},
 			{},
 			{},
@@ -348,3 +398,25 @@ export const actions = {
 		);
 	}
 };
+
+function systemsMatch(existingSystem, inferredSystem) {
+	const existingId = Number(existingSystem?.id);
+	const inferredId = Number(inferredSystem?.id);
+
+	if (Number.isFinite(existingId) && Number.isFinite(inferredId)) {
+		return existingId === inferredId;
+	}
+
+	const existingName = String(existingSystem?.name ?? '')
+		.trim()
+		.toLowerCase();
+	const inferredName = String(inferredSystem?.name ?? '')
+		.trim()
+		.toLowerCase();
+
+	if (!existingName || !inferredName) {
+		return false;
+	}
+
+	return existingName === inferredName;
+}
