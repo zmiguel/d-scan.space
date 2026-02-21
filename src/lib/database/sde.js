@@ -390,3 +390,37 @@ export async function getSystemByName(name) {
 		return rows[0] ?? null;
 	});
 }
+
+/**
+ * Searches solar systems by name prefix for autocomplete use cases.
+ * @param {string} query
+ * @param {number} limit
+ * @returns {Promise<Array<{id:number,name:string,constellation:string,region:string,secStatus:number}>>}
+ */
+export async function searchSystemsByName(query, limit = 10) {
+	return await withSpan('database.sde.search_systems_by_name', async (span) => {
+		const trimmed = query?.trim();
+		if (!trimmed) {
+			return [];
+		}
+
+		const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(25, Number(limit))) : 10;
+		span.setAttributes({
+			'system.search_query': trimmed,
+			'system.search_limit': boundedLimit
+		});
+
+		return await db
+			.select({
+				id: systems.id,
+				name: systems.name,
+				constellation: systems.constellation,
+				region: systems.region,
+				secStatus: systems.sec_status
+			})
+			.from(systems)
+			.where(sql`${systems.name} ILIKE ${`${trimmed}%`}`)
+			.orderBy(systems.name)
+			.limit(boundedLimit);
+	});
+}

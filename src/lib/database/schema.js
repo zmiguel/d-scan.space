@@ -16,6 +16,7 @@ import {
 const dbEnvSchema =
 	(typeof process !== 'undefined' && process.env?.DB_ENV?.trim())?.toLowerCase() || 'dev';
 const scanSchema = pgSchema(dbEnvSchema);
+const authSchema = pgSchema('auth');
 
 // SCANS
 
@@ -32,11 +33,20 @@ export const scans = scanSchema.table(
 		data: json().notNull(),
 		raw_data: text().notNull(),
 
-		created_at: timestamp().defaultNow().notNull()
+		created_at: timestamp().defaultNow().notNull(),
+		created_by: text().references(() => authUsers.id)
 	},
 	(table) => ({
 		groupIdIdx: index('scans_group_id_idx').on(table.group_id),
-		createdAtIdx: index('scans_created_at_idx').on(table.created_at)
+		scansCreatedAtIdx: index('scans_created_at_idx').on(table.created_at),
+		scanTypeIdx: index('scans_scan_type_idx').on(table.scan_type),
+		createdByIdx: index('scans_created_by_idx').on(table.created_by),
+		scanTypeCreatedIdx: index('scans_scan_type_created_idx').on(table.scan_type, table.created_by),
+		groupIdScanTypeCreatedIdx: index('scans_group_id_scan_type_created_idx').on(
+			table.group_id,
+			table.scan_type,
+			table.created_by
+		)
 	})
 );
 
@@ -47,10 +57,17 @@ export const scanGroups = scanSchema.table(
 		public: boolean().notNull().default(false),
 		system: json(),
 
-		created_at: timestamp().defaultNow().notNull()
+		created_at: timestamp().defaultNow().notNull(),
+		created_by: text().references(() => authUsers.id)
 	},
 	(table) => ({
-		publicCreatedIdx: index('scan_groups_public_created_idx').on(table.public, table.created_at)
+		publicCreatedIdx: index('scan_groups_public_created_idx').on(table.public, table.created_at),
+		createdByIdx: index('scan_groups_created_by_idx').on(table.created_by),
+		publicIdx: index('scan_groups_public_idx').on(table.public),
+		createdByPublicIdx: index('scan_groups_created_by_public_idx').on(
+			table.created_by,
+			table.public
+		)
 	})
 );
 
@@ -171,3 +188,94 @@ export const invTypes = pgTable('inv_types', {
 	created_at: timestamp().defaultNow().notNull(),
 	updated_at: timestamp().defaultNow().notNull()
 });
+
+// AUTH.JS (DRIZZLE ADAPTER)
+
+export const authUsers = authSchema.table(
+	'user',
+	{
+		id: text().primaryKey(),
+		name: text(),
+		email: text().unique(),
+		emailVerified: timestamp({ mode: 'date' }),
+		primary_character_id: bigint({ mode: 'number' }),
+		image: text()
+	},
+	(table) => ({
+		primaryCharacterIdx: index('user_primary_character_idx').on(table.primary_character_id),
+		nameIdx: index('user_name_idx').on(table.name)
+	})
+);
+
+export const authAccounts = authSchema.table(
+	'account',
+	{
+		userId: text()
+			.notNull()
+			.references(() => authUsers.id, { onDelete: 'cascade' }),
+		type: text().notNull(),
+		provider: text().notNull(),
+		providerAccountId: text().notNull(),
+		refresh_token: text(),
+		access_token: text(),
+		expires_at: integer(),
+		token_type: text(),
+		scope: text(),
+		id_token: text(),
+		session_state: text(),
+		character_name: text(),
+		character_image: text()
+	},
+	(table) => ({
+		providerAccountUnique: uniqueIndex('account_provider_provider_account_idx').on(
+			table.provider,
+			table.providerAccountId
+		),
+		character_nameIdx: index('account_character_name_idx').on(table.character_name)
+	})
+);
+
+export const authSessions = authSchema.table('session', {
+	sessionToken: text().primaryKey(),
+	userId: text()
+		.notNull()
+		.references(() => authUsers.id, { onDelete: 'cascade' }),
+	expires: timestamp({ mode: 'date' }).notNull()
+});
+
+export const authVerificationTokens = authSchema.table(
+	'verificationToken',
+	{
+		identifier: text().notNull(),
+		token: text().notNull(),
+		expires: timestamp({ mode: 'date' }).notNull()
+	},
+	(table) => ({
+		identifierTokenUnique: uniqueIndex('verification_token_identifier_token_idx').on(
+			table.identifier,
+			table.token
+		)
+	})
+);
+
+export const authAuthenticators = authSchema.table(
+	'authenticator',
+	{
+		credentialID: text().notNull().unique(),
+		userId: text()
+			.notNull()
+			.references(() => authUsers.id, { onDelete: 'cascade' }),
+		providerAccountId: text().notNull(),
+		credentialPublicKey: text().notNull(),
+		counter: integer().notNull(),
+		credentialDeviceType: text().notNull(),
+		credentialBackedUp: boolean().notNull(),
+		transports: text()
+	},
+	(table) => ({
+		userCredentialUnique: uniqueIndex('authenticator_user_credential_idx').on(
+			table.userId,
+			table.credentialID
+		)
+	})
+);

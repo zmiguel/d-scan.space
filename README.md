@@ -55,6 +55,11 @@ cp .env.example .env
 
 - `ORIGIN` (public URL you’ll use)
 - `CONTACT_EMAIL` / `CONTACT_EVE` / `CONTACT_DISCORD` (used for the ESI User-Agent)
+- `AUTH_SECRET` / `AUTH_EVEONLINE_ID` / `AUTH_EVEONLINE_SECRET` (for EVE SSO login)
+
+For EVE SSO app setup in CCP Developer Portal, use callback URL:
+
+- `<ORIGIN>/auth/callback/eveonline`
 
 > [!NOTE]
 > For the first run: uncomment `STATIC_UPDATE_CRON` in the docker-compose file and set it to 1 or 2 minutes after the current time, this will populate the static data.
@@ -97,6 +102,17 @@ All runtime configuration is via environment variables. The canonical list (with
 | `PORT`            | `3000`                  | Bind port for the HTTP server.                                      |
 | `ORIGIN`          | `http://localhost:3000` | Public origin (also included in the ESI User-Agent).                |
 | `BODY_SIZE_LIMIT` | `256M`                  | Max request body size (supports values like `512K`, `10M`, `256M`). |
+
+### Auth.js / EVE SSO
+
+| Name                    | Default | Description                                                                  |
+| ----------------------- | ------- | ---------------------------------------------------------------------------- |
+| `AUTH_SECRET`           | ``      | Secret used by Auth.js to sign/encrypt session data.                         |
+| `AUTH_EVEONLINE_ID`     | ``      | EVE SSO OAuth client ID from CCP Developer Portal.                           |
+| `AUTH_EVEONLINE_SECRET` | ``      | EVE SSO OAuth client secret from CCP Developer Portal.                       |
+| `AUTH_TRUST_HOST`       | `true`  | Trust `X-Forwarded-*` host/proto headers (recommended behind proxy/ingress). |
+
+EVE SSO callback URL must be set to `<ORIGIN>/auth/callback/eveonline`.
 
 ### Migrations / runtime flags
 

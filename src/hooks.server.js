@@ -3,19 +3,16 @@ import logger from '$lib/logger';
 import { recordHttpRequest } from '$lib/server/metrics';
 import { withSpan } from '$lib/server/tracer';
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { sequence } from '@sveltejs/kit/hooks';
+import { authHandle } from '$auth';
 
 /** @type {import('@sveltejs/kit').ServerInit} */
 export async function init() {
 	logger.info('Current User-Agent: ' + USER_AGENT);
 }
 
-/**
- * SvelteKit handle hook that processes all HTTP requests.
- * Records metrics for request method, route, status code, and duration.
- *
- * @type {import('@sveltejs/kit').Handle}
- */
-export async function handle({ event, resolve }) {
+/** @type {import('@sveltejs/kit').Handle} */
+const metricsHandle = async ({ event, resolve }) => {
 	return await withSpan(
 		'server.hooks.handle_request',
 		async (span) => {
@@ -55,4 +52,6 @@ export async function handle({ event, resolve }) {
 		{ kind: SpanKind.SERVER },
 		event
 	);
-}
+};
+
+export const handle = sequence(metricsHandle, authHandle);

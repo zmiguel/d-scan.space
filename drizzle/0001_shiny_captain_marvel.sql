@@ -82,6 +82,38 @@ CREATE TABLE "dev"."scans" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "preview"."scan_groups" (
+	"id" text PRIMARY KEY NOT NULL,
+	"public" boolean DEFAULT false NOT NULL,
+	"system" json,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "preview"."scans" (
+	"id" text PRIMARY KEY NOT NULL,
+	"group_id" text NOT NULL,
+	"scan_type" "scanTypes" NOT NULL,
+	"data" json NOT NULL,
+	"raw_data" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "prod"."scan_groups" (
+	"id" text PRIMARY KEY NOT NULL,
+	"public" boolean DEFAULT false NOT NULL,
+	"system" json,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "prod"."scans" (
+	"id" text PRIMARY KEY NOT NULL,
+	"group_id" text NOT NULL,
+	"scan_type" "scanTypes" NOT NULL,
+	"data" json NOT NULL,
+	"raw_data" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "sde" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "sde_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"release_date" timestamp DEFAULT now() NOT NULL,
@@ -106,6 +138,8 @@ ALTER TABLE "corporations" ADD CONSTRAINT "corporations_alliance_id_alliances_id
 ALTER TABLE "inv_groups" ADD CONSTRAINT "inv_groups_category_id_inv_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."inv_categories"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "inv_types" ADD CONSTRAINT "inv_types_group_id_inv_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."inv_groups"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dev"."scans" ADD CONSTRAINT "scans_group_id_scan_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "dev"."scan_groups"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "preview"."scans" ADD CONSTRAINT "scans_group_id_scan_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "preview"."scan_groups"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "prod"."scans" ADD CONSTRAINT "scans_group_id_scan_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "prod"."scan_groups"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "alliances_refresh_idx" ON "alliances" USING btree ("last_seen","updated_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "characters_name_idx" ON "characters" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "characters_refresh_idx" ON "characters" USING btree ("deleted_at","updated_at","last_seen");--> statement-breakpoint

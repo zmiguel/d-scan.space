@@ -101,7 +101,8 @@ import {
 	addOrUpdateTypesDB,
 	getTypeHierarchyMetadata,
 	getSystemByName,
-	updateSystemsLastSeen
+	updateSystemsLastSeen,
+	searchSystemsByName
 } from '../../../src/lib/database/sde.js';
 
 describe('sde', () => {
@@ -205,6 +206,44 @@ describe('sde', () => {
 				})
 			);
 			expect(mockDb.where).toHaveBeenCalled();
+		});
+	});
+
+	describe('searchSystemsByName', () => {
+		it('returns empty list for empty query', async () => {
+			const result = await searchSystemsByName('   ');
+			expect(result).toEqual([]);
+			expect(mockDb.select).not.toHaveBeenCalled();
+		});
+
+		it('searches systems by name prefix with bounded limit', async () => {
+			const rows = [{ id: 30000142, name: 'Jita' }];
+			mockDb.limit.mockResolvedValue(rows);
+
+			const result = await searchSystemsByName('Ji', 10);
+
+			expect(mockDb.select).toHaveBeenCalled();
+			expect(mockDb.from).toHaveBeenCalled();
+			expect(mockDb.where).toHaveBeenCalled();
+			expect(mockDb.orderBy).toHaveBeenCalled();
+			expect(mockDb.limit).toHaveBeenCalledWith(10);
+			expect(result).toEqual(rows);
+		});
+
+		it('clamps limit to max 25', async () => {
+			mockDb.limit.mockResolvedValue([]);
+
+			await searchSystemsByName('J', 100);
+
+			expect(mockDb.limit).toHaveBeenCalledWith(25);
+		});
+
+		it('falls back to default limit when limit is non-finite', async () => {
+			mockDb.limit.mockResolvedValue([]);
+
+			await searchSystemsByName('J', Number.NaN);
+
+			expect(mockDb.limit).toHaveBeenCalledWith(10);
 		});
 	});
 
