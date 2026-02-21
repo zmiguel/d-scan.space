@@ -15,6 +15,20 @@
       "when": 1763479346081,
       "tag": "0001_shiny_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771637669777,
+      "tag": "0002_gorgeous_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771641021675,
+      "tag": "0003_nebulous_mockingbird",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,27 @@
+35834	C-N4OD - Fountain of Life	Keepstar	0 m
+655	Epitalos	Epithal	7,481 m
+16238	1.b	Cormorant	10 km
+670	Capsule - Djanga Unchained	Capsule	12 km
+45534	!! BAD FIT !!	Monitor	33 km
+11965	Bringer of woodchips	Pilgrim	33 km
+11957	Falcon - Shield Cyno	Falcon	37 km
+605	{♆} пошук	Heron	40 km
+54732	INIT. Pika	Stormbringer	46 km
+11129	.	Gallente Shuttle	49 km
+11957	Falcon - vance leon	Falcon	64 km
+22456	03	Sabre	68 km
+34317	112	Confessor	126 km
+670	Capsule - zenoxii Boirelle	Capsule	126 km
+11129	Fast	Gallente Shuttle	320 km
+3874	KVN-36	Stargate (Gallente Constellation)	1,124 km
+11400	DJ	Jaguar	1,133 km
+28665	Havlock XX	Vargur	1,135 km
+35836	C-N4OD - Khazad-dum Refinery	Tatara	2,134 km
+35841	C-N4OD » J5A-IX - Der Geile Springen	Ansiblex Jump Bridge	2,748 km
+35827	C-N4OD - Kuat Drive Yards	Sotiyo	3,321 km
+35826	C-N4OD - Daystrom Institute	Azbel	4,624 km
+35825	C-N4OD - Asgard Invention	Raitaru	5,797 km
+670	Capsule - Revan Goldstein	Capsule	5,907 km
+81046	BTR4Y DELUGE	Deluge	5,910 km
+35834	C-N4OD - Merc Den Detention Centre	Keepstar	6,891 km
+671	Erebus - Severini	Erebus	7,017 km

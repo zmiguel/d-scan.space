@@ -4,6 +4,8 @@
 	import ScanTimeLine from '$lib/components/ScanTimeLine.svelte';
 	import ScanTabs from '$lib/components/ScanTabs.svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
+	import { Toast } from 'flowbite-svelte';
+	import { browser } from '$app/environment';
 	import { buildGroupStats, SHIP_CATEGORY_ID } from '$lib/utils/directional.js';
 
 	// Define the expected structure for data
@@ -44,6 +46,9 @@
 
 	/** @type {{ data: Data }} */
 	let { data } = $props();
+	let showCopiedToast = $state(false);
+	let hideCopiedToastTimeout;
+	const copiedFlagKey = 'scan-link-copied';
 
 	const formatCount = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : null);
 
@@ -117,11 +122,46 @@
 
 		return parts.map((part) => `• ${part}`).join('\n');
 	});
+
+	$effect(() => {
+		if (!browser) {
+			return;
+		}
+
+		const copied = sessionStorage.getItem(copiedFlagKey);
+		if (copied !== '1') {
+			return;
+		}
+
+		sessionStorage.removeItem(copiedFlagKey);
+
+		showCopiedToast = true;
+		clearTimeout(hideCopiedToastTimeout);
+		hideCopiedToastTimeout = setTimeout(() => {
+			showCopiedToast = false;
+		}, 3000);
+
+		return () => {
+			clearTimeout(hideCopiedToastTimeout);
+		};
+	});
 </script>
 
 <MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} showImage={false} />
 
 <div class="container mx-auto px-0">
+	{#if showCopiedToast}
+		<Toast
+			color="green"
+			dismissable={false}
+			position="top-right"
+			class="z-50 !border-green-700 !bg-green-600 text-sm font-medium !text-white shadow-lg"
+			classes={{ content: '!text-white', close: '!text-white' }}
+		>
+			Scan link copied to clipboard.
+		</Toast>
+	{/if}
+
 	<div class="grid grid-cols-12 gap-4">
 		<!-- Main content area (80-85% width) -->
 		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-10 dark:bg-gray-800">

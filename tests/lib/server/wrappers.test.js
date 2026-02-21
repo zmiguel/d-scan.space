@@ -99,7 +99,8 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			await expect(fetchGET('http://test.com', 2)).rejects.toThrow();
+			const result = await fetchGET('http://test.com', 2);
+			expect(result).toBeNull();
 
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 		});
@@ -127,6 +128,68 @@ describe('wrappers', () => {
 			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 0 });
 		});
 
+		it('should mark deleted character with span event', async () => {
+			const deletedResponse = {
+				ok: false,
+				status: 404,
+				statusText: 'Not Found',
+				headers: {
+					entries: () => [],
+					get: () => null
+				},
+				clone: () => ({
+					json: async () => ({ error: 'Character has been deleted' }),
+					text: async () => 'Character has been deleted'
+				}),
+				url: 'https://esi.evetech.net/v1/characters/456'
+			};
+			global.fetch.mockResolvedValue(deletedResponse);
+
+			await fetchGET('https://esi.evetech.net/v1/characters/456');
+
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Resource marked as deleted',
+				expect.objectContaining({ url: 'https://esi.evetech.net/v1/characters/456' })
+			);
+		});
+
+		it('should apply compatibility date when ESI_TEST_FLAGS is enabled', async () => {
+			vi.resetModules();
+			vi.doMock('../../../src/lib/server/constants.js', () => ({
+				USER_AGENT: 'TestAgent',
+				ESI_MAX_CONNECTIONS: 1,
+				ESI_TEST_FLAGS: true
+			}));
+
+			const { fetchGET: fetchGETWithFlags } = await import('../../../src/lib/server/wrappers.js');
+
+			const mockResponse = {
+				ok: true,
+				status: 200,
+				statusText: 'OK',
+				headers: {
+					entries: () => [],
+					get: () => null
+				},
+				clone: () => ({
+					json: async () => ({ data: 'test' }),
+					text: async () => '{"data": "test"}'
+				}),
+				redirected: false,
+				type: 'basic'
+			};
+			global.fetch.mockResolvedValue(mockResponse);
+
+			await fetchGETWithFlags('https://esi.evetech.net/v1/characters/1/');
+
+			expect(global.fetch).toHaveBeenCalledWith(
+				'https://esi.evetech.net/v1/characters/1/',
+				expect.objectContaining({
+					headers: expect.objectContaining({ 'X-Compatibility-Date': '2099-01-01' })
+				})
+			);
+		});
+
 		it('should handle JSON parse error by falling back to text', async () => {
 			const errorResponse = {
 				ok: false,
@@ -143,11 +206,12 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			try {
-				await fetchGET('http://test.com');
-			} catch (e) {
-				expect(e.message).toContain('Raw Text Error');
-			}
+			const result = await fetchGET('http://test.com');
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Fetch Failed',
+				expect.objectContaining({ preview: 'Raw Text Error' })
+			);
 		});
 
 		it('should include null preview when JSON body is null', async () => {
@@ -164,21 +228,28 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			await expect(fetchGET('http://test.com', 1)).rejects.toThrow('null');
+			const result = await fetchGET('http://test.com', 1);
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Fetch Failed',
+				expect.objectContaining({ preview: 'null' })
+			);
 		});
 
 		it('should handle network error (fetch throws) and decrement concurrency', async () => {
 			global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
 			const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
-			await expect(fetchGET('http://test.com', 1)).rejects.toThrow('Network Error');
+			const result = await fetchGET('http://test.com', 1);
+			expect(result).toBeNull();
 			expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
 		});
 
 		it('should add GET fetch failure event details', async () => {
 			global.fetch.mockRejectedValueOnce(new Error('Network Error'));
 
-			await expect(fetchGET('http://test.com', 1)).rejects.toThrow('Network Error');
+			const result = await fetchGET('http://test.com', 1);
+			expect(result).toBeNull();
 
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
 				'Fetch Failed',
@@ -236,7 +307,8 @@ describe('wrappers', () => {
 		it('should stringify unknown GET errors', async () => {
 			global.fetch.mockRejectedValueOnce({});
 
-			await expect(fetchGET('http://test.com', 1)).rejects.toEqual({});
+			const result = await fetchGET('http://test.com', 1);
+			expect(result).toBeNull();
 
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
 				'Fetch Failed',
@@ -305,7 +377,8 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			await expect(fetchPOST('http://test.com', {}, 2)).rejects.toThrow();
+			const result = await fetchPOST('http://test.com', {}, 2);
+			expect(result).toBeNull();
 
 			expect(global.fetch).toHaveBeenCalledTimes(2);
 		});
@@ -333,6 +406,28 @@ describe('wrappers', () => {
 			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 0 });
 		});
 
+		it('should handle deleted non-character resource without biomass', async () => {
+			const deletedResponse = {
+				ok: false,
+				status: 404,
+				statusText: 'Not Found',
+				headers: {
+					entries: () => [],
+					get: () => null
+				},
+				clone: () => ({
+					json: async () => ({ error: 'Resource has been deleted' }),
+					text: async () => 'Resource has been deleted'
+				}),
+				url: 'https://esi.evetech.net/v1/corporations/123'
+			};
+			global.fetch.mockResolvedValue(deletedResponse);
+
+			await fetchPOST('https://esi.evetech.net/v1/corporations/123', {});
+
+			expect(biomassCharacter).not.toHaveBeenCalled();
+		});
+
 		it('should truncate large error response previews', async () => {
 			const largeError = 'x'.repeat(1000);
 			const errorResponse = {
@@ -348,7 +443,12 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			await expect(fetchPOST('http://test.com', {})).rejects.toThrow();
+			const result = await fetchPOST('http://test.com', {});
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Fetch Failed',
+				expect.objectContaining({ preview: expect.stringContaining('…') })
+			);
 		});
 
 		it('should handle JSON parse error by falling back to text', async () => {
@@ -367,18 +467,20 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(errorResponse);
 
-			try {
-				await fetchPOST('http://test.com', {});
-			} catch (e) {
-				expect(e.message).toContain('Raw Text Error');
-			}
+			const result = await fetchPOST('http://test.com', {});
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Fetch Failed',
+				expect.objectContaining({ preview: 'Raw Text Error' })
+			);
 		});
 
 		it('should handle network error (fetch throws) and decrement concurrency', async () => {
 			global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
 			const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
-			await expect(fetchPOST('http://test.com', {}, 1)).rejects.toThrow('Network Error');
+			const result = await fetchPOST('http://test.com', {}, 1);
+			expect(result).toBeNull();
 			expect(esiConcurrentRequests.add).toHaveBeenCalledWith(-1);
 		});
 
@@ -388,9 +490,8 @@ describe('wrappers', () => {
 			global.fetch.mockRejectedValueOnce(error);
 			global.fetch.mockRejectedValueOnce(error);
 
-			await expect(fetchPOST('https://esi.evetech.net/v1/post', {})).rejects.toThrow(
-				'Network Error'
-			);
+			const result = await fetchPOST('https://esi.evetech.net/v1/post', {});
+			expect(result).toBeNull();
 
 			// Verify span.addEvent fallback
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
@@ -447,13 +548,15 @@ describe('wrappers', () => {
 			};
 			global.fetch.mockResolvedValue(mockResponse);
 
-			await expect(fetchPOST('http://test.com', {}, 1)).rejects.toThrow();
+			const result = await fetchPOST('http://test.com', {}, 1);
+			expect(result).toBeNull();
 		});
 
 		it('should stringify unknown POST errors', async () => {
 			global.fetch.mockRejectedValueOnce({});
 
-			await expect(fetchPOST('http://test.com', {}, 1)).rejects.toEqual({});
+			const result = await fetchPOST('http://test.com', {}, 1);
+			expect(result).toBeNull();
 
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
 				'Fetch Failed',
@@ -511,13 +614,12 @@ describe('wrappers', () => {
 				url: 'https://esi.evetech.net/v1/test'
 			});
 
-			try {
-				await fetchGET('https://esi.evetech.net/v1/test');
-			} catch (e) {
-				const msg = e.message;
-				const hasNullOrUndefined = msg.includes('null') || msg.includes('undefined');
-				expect(hasNullOrUndefined).toBe(true);
-			}
+			const result = await fetchGET('https://esi.evetech.net/v1/test');
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith(
+				'Fetch Failed',
+				expect.objectContaining({ preview: 'null' })
+			);
 		});
 	});
 

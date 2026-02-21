@@ -10,6 +10,11 @@ async function getAllianceFromESI(id) {
 	// fetchGET has tracing built-in
 	const allianceData = await fetchGET(`https://esi.evetech.net/alliances/${id}`);
 
+	if (!allianceData) {
+		logger.error(`Failed to fetch alliance ${id}: no response`);
+		return null;
+	}
+
 	if (!allianceData.ok) {
 		logger.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);
 		return null;
@@ -27,7 +32,9 @@ export async function idsToAlliances(ids) {
 		let allianceData = [];
 		const alliancePromises = ids.map(async (id) => {
 			const allianceInfo = await getAllianceFromESI(id);
-			allianceData.push(allianceInfo);
+			if (allianceInfo) {
+				allianceData.push(allianceInfo);
+			}
 		});
 
 		await Promise.all(alliancePromises);
@@ -56,13 +63,14 @@ export async function addOrUpdateAlliances(data) {
 		}
 
 		const alliancesData = await idsToAlliances(alliancesToFetch);
+		const filteredAlliancesData = alliancesData.filter(Boolean);
 
 		span.setAttributes({
 			'scan.alliances.missing': missingAlliances.length,
 			'scan.alliances.outdated': outdatedAlliances.length,
-			'scan.alliances.fetched': alliancesData.length
+			'scan.alliances.fetched': filteredAlliancesData.length
 		});
 
-		await addOrUpdateAlliancesDB(alliancesData);
+		await addOrUpdateAlliancesDB(filteredAlliancesData);
 	});
 }

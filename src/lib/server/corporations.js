@@ -3,11 +3,24 @@
  */
 import { addOrUpdateCorporationsDB, getCorporationsByID } from '../database/corporations.js';
 import { withSpan } from './tracer.js';
+import logger from '../logger.js';
 import { fetchGET } from './wrappers.js';
 
 async function getCorporationFromESI(id) {
 	// fetchGET has tracing built-in
 	const corporationData = await fetchGET(`https://esi.evetech.net/corporations/${id}`);
+
+	if (!corporationData) {
+		logger.error(`Failed to fetch corporation ${id}: no response`);
+		return null;
+	}
+
+	if (!corporationData.ok) {
+		logger.error(
+			`Failed to fetch corporation ${id}: ${corporationData.status} ${corporationData.statusText}`
+		);
+		return null;
+	}
 
 	const corporationInfo = await corporationData.json();
 	corporationInfo.id = id;
@@ -21,7 +34,9 @@ export async function idsToCorporations(ids) {
 		let corporationData = [];
 		const corporationPromises = ids.map(async (id) => {
 			const corporationInfo = await getCorporationFromESI(id);
-			corporationData.push(corporationInfo);
+			if (corporationInfo) {
+				corporationData.push(corporationInfo);
+			}
 		});
 
 		await Promise.all(corporationPromises);
@@ -50,13 +65,14 @@ export async function addOrUpdateCorporations(data) {
 		}
 
 		const corporationData = await idsToCorporations(corporationsToFetch);
+		const filteredCorporationData = corporationData.filter(Boolean);
 
 		span.setAttributes({
 			'scan.corporations.missing': missingCorporations.length,
 			'scan.corporations.outdated': outdatedCorporations.length,
-			'scan.corporations.fetched': corporationData.length
+			'scan.corporations.fetched': filteredCorporationData.length
 		});
 
-		await addOrUpdateCorporationsDB(corporationData);
+		await addOrUpdateCorporationsDB(filteredCorporationData);
 	});
 }

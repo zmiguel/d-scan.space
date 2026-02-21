@@ -126,6 +126,14 @@ describe('characters', () => {
 			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
 		});
 
+		it('should handle null response in names to ids', async () => {
+			fetchPOST.mockResolvedValueOnce(null);
+
+			await addCharactersFromESI(['Char1']);
+
+			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+		});
+
 		it('should handle getCharacterFromESI failure', async () => {
 			const names = ['Char1'];
 			fetchPOST.mockResolvedValueOnce({
@@ -141,6 +149,23 @@ describe('characters', () => {
 				status: 404,
 				statusText: 'Not Found'
 			});
+
+			await addCharactersFromESI(names);
+
+			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+		});
+
+		it('should handle getCharacterFromESI null response', async () => {
+			const names = ['Char1'];
+			fetchPOST.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+			});
+			fetchPOST.mockResolvedValueOnce({
+				ok: true,
+				json: async () => [{ character_id: 1, corporation_id: 10 }]
+			});
+			fetchGET.mockResolvedValue(null);
 
 			await addCharactersFromESI(names);
 
@@ -169,6 +194,23 @@ describe('characters', () => {
 
 			await addCharactersFromESI(names);
 			// Should return empty affiliations, so no characters added
+			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+		});
+
+		it('should handle null response in namesToCharacters affiliations', async () => {
+			const names = ['Char1'];
+			fetchPOST.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+			});
+			fetchPOST.mockResolvedValueOnce(null);
+			fetchGET.mockResolvedValue({
+				ok: true,
+				json: async () => ({ name: 'Char1', security_status: 0 }),
+				headers: { get: () => null }
+			});
+
+			await addCharactersFromESI(names);
 			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
 		});
 
@@ -357,6 +399,18 @@ describe('characters', () => {
 			expect(result).toHaveLength(0);
 		});
 
+		it('should handle null response in idsToCharacters affiliations', async () => {
+			fetchPOST.mockResolvedValueOnce(null);
+			fetchGET.mockResolvedValue({
+				ok: true,
+				json: async () => ({ name: 'Char1', security_status: 0 }),
+				headers: { get: () => null }
+			});
+
+			const result = await idsToCharacters([1]);
+			expect(result).toHaveLength(0);
+		});
+
 		it('should handle invalid expires header in getCharacterFromESI', async () => {
 			fetchPOST.mockResolvedValueOnce({
 				ok: true,
@@ -504,6 +558,14 @@ describe('characters', () => {
 				ok: true,
 				json: async () => null
 			});
+
+			await updateAffiliationsFromESI(data);
+			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+		});
+
+		it('should handle null response in updateAffiliationsFromESI', async () => {
+			const data = [{ id: 1, name: 'Char1' }];
+			fetchPOST.mockResolvedValueOnce(null);
 
 			await updateAffiliationsFromESI(data);
 			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
