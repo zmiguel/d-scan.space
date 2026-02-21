@@ -11,5 +11,5 @@ export default defineConfig({
 	dbCredentials: { url: process.env.DATABASE_URL },
 	verbose: true,
 	strict: true,
-	schemaFilter: Array.from(new Set(['public', dbSchema]))
+	schemaFilter: Array.from(new Set(['public', dbSchema, 'auth']))
 });
