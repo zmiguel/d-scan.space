@@ -12,6 +12,10 @@ const GRID_BUCKETS = {
 };
 
 const UNKNOWN_LABEL = 'Unknown';
+const HIDDEN_CONTROL_PATTERN =
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g; // eslint-disable-line no-control-regex
+
+const sanitizeDirectionalLine = (line) => line.replace(HIDDEN_CONTROL_PATTERN, '');
 
 /**
  * Parses raw directional scan data and aggregates it into a structured result.
@@ -152,7 +156,10 @@ function parseDirectionalLines(rawData) {
 			continue;
 		}
 
-		const [typeIdRaw, nameRaw, typeNameRaw, distanceRaw] = parts;
+		const typeIdRaw = parts[0];
+		const distanceRaw = parts[parts.length - 1];
+		const typeNameRaw = parts[parts.length - 2];
+		const nameRaw = parts.slice(1, -2).join(' ');
 		const typeId = Number(typeIdRaw);
 		if (!Number.isFinite(typeId) || typeId <= 0) {
 			invalidLines++;
@@ -187,14 +194,17 @@ function parseDirectionalLines(rawData) {
 function normalizeLines(rawData) {
 	if (Array.isArray(rawData)) {
 		return rawData.map((line) => {
-			if (typeof line === 'string') return line;
+			if (typeof line === 'string') return sanitizeDirectionalLine(line);
 			if (line == null) return '';
-			return String(line);
+			return sanitizeDirectionalLine(String(line));
 		});
 	}
 
 	if (typeof rawData === 'string') {
-		return rawData.replace(/\r/g, '').split('\n');
+		return rawData
+			.replace(/\r/g, '')
+			.split('\n')
+			.map((line) => sanitizeDirectionalLine(line));
 	}
 
 	return [];

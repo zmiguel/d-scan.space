@@ -133,6 +133,60 @@ describe('directional', () => {
 		expect(result.system.name).toBe('Jita');
 	});
 
+	it('should parse directional lines with embedded tabs in object names', async () => {
+		const rawData = '22474\therק\tto the derק\tDamnation\t33 km';
+
+		const mockMetadata = new Map([
+			[
+				22474,
+				{
+					typeId: 22474,
+					typeName: 'Damnation',
+					categoryId: 6,
+					categoryName: 'Ship',
+					groupId: 419,
+					groupName: 'Command Ship',
+					mass: 13000000
+				}
+			]
+		]);
+
+		getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+		getSystemByName.mockResolvedValue(null);
+
+		const result = await createNewDirectionalScan(rawData);
+
+		expect(result.on_grid.total_objects).toBe(1);
+		expect(result.on_grid.objects[0].objects[0].objects[0].name).toBe('Damnation');
+	});
+
+	it('should normalize hidden control characters without breaking tab parsing', async () => {
+		const rawData = '22474\ther\u0007\tto the der\u200B\tDamnation\t33 km';
+
+		const mockMetadata = new Map([
+			[
+				22474,
+				{
+					typeId: 22474,
+					typeName: 'Damnation',
+					categoryId: 6,
+					categoryName: 'Ship',
+					groupId: 419,
+					groupName: 'Command Ship',
+					mass: 13000000
+				}
+			]
+		]);
+
+		getTypeHierarchyMetadata.mockResolvedValue(mockMetadata);
+		getSystemByName.mockResolvedValue(null);
+
+		const result = await createNewDirectionalScan(rawData);
+
+		expect(result.on_grid.total_objects).toBe(1);
+		expect(result.on_grid.objects[0].objects[0].objects[0].name).toBe('Damnation');
+	});
+
 	describe('system name extraction', () => {
 		it('should extract from Ansiblex Jump Bridge', async () => {
 			const rawData = '123\tJita » Ansiblex\tAnsiblex Jump Gate\t10 km';

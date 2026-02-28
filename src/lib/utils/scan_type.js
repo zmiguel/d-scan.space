@@ -2,7 +2,13 @@
  * Scan type detection for pasted scan content.
  */
 
+import logger from '$lib/logger';
+
 const DISTANCE_PATTERN = /\b\d+(?:\.\d+)?\s*(?:m|km|AU)\b/i;
+const HIDDEN_CONTROL_PATTERN =
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g; // eslint-disable-line no-control-regex
+
+const sanitizeScanLine = (line) => line.replace(HIDDEN_CONTROL_PATTERN, '');
 
 const hasExactTabs = (line, count) => {
 	const matches = line.match(/\t/g);
@@ -18,14 +24,16 @@ const isLocalLine = (line) => {
 };
 
 const isDirectionalLine = (line) => {
-	if (!hasExactTabs(line, 3)) {
+	const tabMatches = line.match(/\t/g);
+	if ((tabMatches ? tabMatches.length : 0) < 3) {
 		return false;
 	}
 	const parts = line.split('\t');
-	if (parts.length !== 4) {
+	if (parts.length < 4) {
 		return false;
 	}
-	const [first, , , last] = parts;
+	const first = parts[0];
+	const last = parts[parts.length - 1];
 	if (first === '' || Number.isNaN(Number.parseFloat(first))) {
 		return false;
 	}
@@ -60,27 +68,81 @@ const isProbeLine = (line) => {
 	return /^[A-Z]{3}-\d{3}/.test(parts[0]);
 };
 
+const SCAN_TYPES = [
+	{ type: 'local', supported: true, predicate: isLocalLine },
+	{ type: 'directional', supported: true, predicate: isDirectionalLine },
+	{ type: 'fleet', supported: false, predicate: isFleetLine },
+	{ type: 'probe', supported: false, predicate: isProbeLine }
+];
+
+const getMatchResult = (lines, scanType) => {
+	let matched = 0;
+	const failedLines = [];
+
+	for (const [index, line] of lines.entries()) {
+		if (scanType.predicate(line)) {
+			matched += 1;
+			continue;
+		}
+
+		failedLines.push({
+			line_number: index + 1,
+			line
+		});
+	}
+
+	const total = lines.length;
+	const matchPercent = total > 0 ? (matched / total) * 100 : 0;
+
+	return {
+		type: scanType.type,
+		supported: scanType.supported,
+		matched,
+		total,
+		match_percent: Number(matchPercent.toFixed(2)),
+		failed_lines: failedLines
+	};
+};
+
 export function detectScanType(lines) {
 	if (!Array.isArray(lines) || lines.length === 0) {
 		return { type: 'unknown' };
 	}
 
-	const allMatch = (predicate) => lines.every((line) => predicate(line));
+	const sanitizedLines = lines.map((line) =>
+		typeof line === 'string' ? sanitizeScanLine(line) : String(line ?? '')
+	);
 
-	if (allMatch(isLocalLine)) {
-		return { type: 'local', supported: true };
+	const matchResults = SCAN_TYPES.map((scanType) => getMatchResult(sanitizedLines, scanType));
+
+	for (const result of matchResults) {
+		if (result.matched === result.total) {
+			return { type: result.type, supported: result.supported };
+		}
 	}
 
-	if (allMatch(isDirectionalLine)) {
-		return { type: 'directional', supported: true };
-	}
+	const [closest] = matchResults.reduce(
+		(best, current) => {
+			if (!best[0] || current.matched > best[0].matched) {
+				return [current];
+			}
 
-	if (allMatch(isFleetLine)) {
-		return { type: 'fleet', supported: false };
-	}
+			return best;
+		},
+		[null]
+	);
 
-	if (allMatch(isProbeLine)) {
-		return { type: 'probe', supported: false };
+	if (closest) {
+		logger.warn(
+			{
+				closest_type: closest.type,
+				match_percent: closest.match_percent,
+				matched_lines: closest.matched,
+				total_lines: closest.total,
+				failed_lines: closest.failed_lines
+			},
+			'Scan type detection failed; closest scan type did not fully match'
+		);
 	}
 
 	return { type: 'unknown' };
