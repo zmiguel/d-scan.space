@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { detectScanType } from '../../../src/lib/utils/scan_type.js';
+import logger from '../../../src/lib/logger.js';
 
 describe('scan_type detection', () => {
 	it('returns unknown for empty or invalid input', () => {
@@ -27,6 +28,16 @@ describe('scan_type detection', () => {
 
 	it('detects directional scans with dash distance', () => {
 		const lines = ['5\tSome\tThing\t-'];
+		expect(detectScanType(lines)).toEqual({ type: 'directional', supported: true });
+	});
+
+	it('detects directional scans when name contains embedded tab characters', () => {
+		const lines = ['22474\therק\tto the derק\tDamnation\t33 km'];
+		expect(detectScanType(lines)).toEqual({ type: 'directional', supported: true });
+	});
+
+	it('detects directional scans with hidden control characters while preserving tabs', () => {
+		const lines = ['22474\ther\u0007\tto the der\u200B\tDamnation\t33 km'];
 		expect(detectScanType(lines)).toEqual({ type: 'directional', supported: true });
 	});
 
@@ -133,5 +144,22 @@ describe('scan_type detection', () => {
 	it('returns unknown when lines are mixed types', () => {
 		const lines = ['Pilot One', '5\tSome\tThing\t-'];
 		expect(detectScanType(lines)).toEqual({ type: 'unknown' });
+	});
+
+	it('logs closest matching type and failing lines for unknown scans', () => {
+		const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+		const lines = ['Pilot One', 'Pilot Two Three Four'];
+
+		expect(detectScanType(lines)).toEqual({ type: 'unknown' });
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				closest_type: 'local',
+				match_percent: 50,
+				matched_lines: 1,
+				total_lines: 2,
+				failed_lines: [{ line_number: 2, line: 'Pilot Two Three Four' }]
+			}),
+			'Scan type detection failed; closest scan type did not fully match'
+		);
 	});
 });
