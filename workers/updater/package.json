@@ -12,7 +12,7 @@
 		"@opentelemetry/exporter-trace-otlp-proto": "^0.211.0",
 		"@opentelemetry/resources": "^2.5.1",
 		"@opentelemetry/sdk-node": "^0.212.0",
-		"@opentelemetry/semantic-conventions": "^1.39.0",
+		"@opentelemetry/semantic-conventions": "^1.40.0",
 		"adm-zip": "^0.5.16",
 		"croner": "^10.0.1",
 		"drizzle-orm": "^0.45.1",
