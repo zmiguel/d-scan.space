@@ -133,8 +133,8 @@ jobs:
       - name: Fail if fixable vulnerabilities exist
         run: |
           output=$(npm audit fix --dry-run 2>&1)
-          if echo "$output" | grep -q "fixed"; then
-            echo "Fixable vulnerabilities found — run 'npm audit fix' to apply them."
+          if echo "$output" | grep -Eq "fixed [1-9][0-9]* of [0-9]+ vulnerabilities"; then
+            echo "Fixable vulnerabilities found that do not require --force. Run 'npm audit fix' to apply them."
             echo "$output"
             exit 1
           fi
