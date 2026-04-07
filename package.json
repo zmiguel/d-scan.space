@@ -28,7 +28,7 @@
 		"@flowbite-svelte-plugins/datatable": "^0.4.1",
 		"@opentelemetry/api": "^1.9.1",
 		"@opentelemetry/auto-instrumentations-node": "^0.69.0",
-		"@opentelemetry/exporter-trace-otlp-proto": "^0.211.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.214.0",
 		"@opentelemetry/resources": "^2.0.1",
 		"@opentelemetry/sdk-node": "^0.211.0",
 		"@opentelemetry/sdk-trace-node": "^2.6.1",
