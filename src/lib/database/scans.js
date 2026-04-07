@@ -135,7 +135,8 @@ export async function getPublicScans() {
 			.from(scans)
 			.leftJoin(scanGroups, eq(scanGroups.id, scans.group_id))
 			.where(eq(scanGroups.public, true))
-			.orderBy(desc(scans.created_at));
+			.orderBy(desc(scans.created_at))
+			.limit(5000);
 	});
 }
 
@@ -157,7 +158,8 @@ export async function getScansByUser(userId) {
 			.from(scans)
 			.leftJoin(scanGroups, eq(scanGroups.id, scans.group_id))
 			.where(eq(scans.created_by, userId))
-			.orderBy(desc(scans.created_at));
+			.orderBy(desc(scans.created_at))
+			.limit(5000);
 	});
 }
 

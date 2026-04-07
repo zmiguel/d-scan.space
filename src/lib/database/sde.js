@@ -28,7 +28,7 @@ export async function addSDEDataEntry(data) {
 	await withSpan('database.sde.add_data_entry', async () => {
 		await db.insert(sde).values({
 			release_date: new Date(data.release_date),
-			release_version: String(data.release_version),
+			release_version: data.release_version,
 			run_date: sql`now()`,
 			success: data.success
 		});

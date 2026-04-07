@@ -61,8 +61,8 @@ async function handleDelete(response, span, attempt, fullResponse) {
 	});
 	if (response.url.includes('character')) {
 		const idStr = response.url.split('/').pop();
-		if (typeof idStr === 'string' && idStr.length > 0) {
-			await biomassCharacter(parseInt(idStr));
+		if (typeof idStr === 'string' && /^\d+$/.test(idStr)) {
+			await biomassCharacter(parseInt(idStr, 10));
 		}
 	}
 	span.setStatus({ code: 0 });
@@ -128,6 +128,20 @@ export async function fetchGET(url, maxRetries = 3) {
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
+						// Rate limited — honour x-esi-error-limit-reset before giving up
+						if (response.status === 429) {
+							const resetSeconds = parseInt(
+								response.headers.get('x-esi-error-limit-reset') ?? '60',
+								10
+							);
+							logger.warn(
+								{ url, resetSeconds },
+								'ESI rate limited (429) — waiting for error limit reset'
+							);
+							span.addEvent('ESI rate limited', { resetSeconds });
+							await new Promise((resolve) => setTimeout(resolve, resetSeconds * 1000));
+							return null;
+						}
 						// deleted edge case
 						if (response.status === 404 && ['character'].includes(resourceType)) {
 							// Handle the deleted edge case
@@ -288,6 +302,20 @@ export async function fetchPOST(url, body, maxRetries = 3) {
 
 					// Check if response is not ok and throw error
 					if (!response.ok) {
+						// Rate limited — honour x-esi-error-limit-reset before giving up
+						if (response.status === 429) {
+							const resetSeconds = parseInt(
+								response.headers.get('x-esi-error-limit-reset') ?? '60',
+								10
+							);
+							logger.warn(
+								{ url, resetSeconds },
+								'ESI rate limited (429) — waiting for error limit reset'
+							);
+							span.addEvent('ESI rate limited', { resetSeconds });
+							await new Promise((resolve) => setTimeout(resolve, resetSeconds * 1000));
+							return null;
+						}
 						// deleted edge case
 						if (
 							response.status === 404 &&
