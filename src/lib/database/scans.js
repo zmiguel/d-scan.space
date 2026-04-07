@@ -30,7 +30,8 @@ export async function getScansByGroupID(id) {
 			.select({
 				id: scans.id,
 				scan_type: scans.scan_type,
-				created_at: scans.created_at
+				created_at: scans.created_at,
+				data: scans.data
 			})
 			.from(scans)
 			.where(eq(scans.group_id, id));

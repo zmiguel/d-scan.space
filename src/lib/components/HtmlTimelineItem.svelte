@@ -2,16 +2,21 @@
 	import { twMerge } from 'tailwind-merge';
 	import { getContext } from 'svelte';
 
-	export let htmlTitle = '';
-	export let date = '';
-	export let svgClass = 'w-3 h-3 text-primary-600 dark:text-primary-400';
-	export let classDiv = '';
-	export let classLi = '';
-	export let classTime = '';
-	export let classH3 = '';
+	/** @type {{ htmlTitle?: string, date?: string, svgClass?: string, classDiv?: string, classLi?: string, classTime?: string, classH3?: string, icon?: import('svelte').Snippet, title?: import('svelte').Snippet, children?: import('svelte').Snippet }} */
+	let {
+		htmlTitle = '',
+		date = '',
+		svgClass = 'w-3 h-3 text-primary-600 dark:text-primary-400',
+		classDiv = '',
+		classLi = '',
+		classTime = '',
+		classH3 = '',
+		icon,
+		title,
+		children
+	} = $props();
 
-	let order = 'default';
-	order = getContext('order');
+	const order = getContext('order') || 'default';
 
 	const liClasses = {
 		default: 'mb-10 ms-4',
@@ -41,14 +46,16 @@
 		group: 'text-lg font-semibold text-gray-900 dark:text-white'
 	};
 
-	let liCls = twMerge(liClasses[order], classLi);
-	let divCls = twMerge(divClasses[order], classDiv);
-	let timeCls = twMerge(timeClasses[order], classTime);
-	const h3Cls = twMerge(
-		order === 'vertical'
-			? 'flex items-center mb-1 text-lg font-semibold text-gray-900 dark:text-white'
-			: 'text-lg font-semibold text-gray-900 dark:text-white',
-		classH3
+	const liCls = $derived(twMerge(liClasses[order], classLi));
+	const divCls = $derived(twMerge(divClasses[order], classDiv));
+	const timeCls = $derived(twMerge(timeClasses[order], classTime));
+	const h3Cls = $derived(
+		twMerge(
+			order === 'vertical'
+				? 'flex items-center gap-1.5 min-w-0 overflow-hidden mb-1 text-lg font-semibold text-gray-900 dark:text-white'
+				: 'text-lg font-semibold text-gray-900 dark:text-white',
+			classH3
+		)
 	);
 </script>
 
@@ -56,7 +63,9 @@
 	<div class={divCls}></div>
 
 	{#if order !== 'default'}
-		<slot name="icon">
+		{#if icon}
+			{@render icon()}
+		{:else}
 			<svg
 				aria-hidden="true"
 				class={svgClass}
@@ -70,16 +79,20 @@
 					clip-rule="evenodd"
 				/>
 			</svg>
-		</slot>
+		{/if}
 	{:else if date}
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		<time class={timeCls}>{@html date}</time>
 	{/if}
 
-	{#if htmlTitle}
+	{#if title || htmlTitle}
 		<h3 class={h3Cls}>
-			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-			{@html htmlTitle}
+			{#if title}
+				{@render title()}
+			{:else}
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+				{@html htmlTitle}
+			{/if}
 		</h3>
 	{/if}
 
@@ -89,5 +102,5 @@
 		{/if}
 	{/if}
 
-	<slot></slot>
+	{@render children?.()}
 </li>

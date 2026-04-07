@@ -287,7 +287,8 @@ describe('getPublicScans', () => {
 			from: vi.fn().mockReturnThis(),
 			leftJoin: vi.fn().mockReturnThis(),
 			where: vi.fn().mockReturnThis(),
-			orderBy: vi.fn().mockResolvedValue([{ id: 1 }])
+			orderBy: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([{ id: 1 }])
 		};
 		mockDb.select.mockReturnValue(mockSelect);
 
@@ -298,6 +299,7 @@ describe('getPublicScans', () => {
 		expect(mockSelect.leftJoin).toHaveBeenCalled();
 		expect(mockSelect.where).toHaveBeenCalled();
 		expect(mockSelect.orderBy).toHaveBeenCalled();
+		expect(mockSelect.limit).toHaveBeenCalledWith(5000);
 		expect(result).toHaveLength(1);
 	});
 });
@@ -308,7 +310,8 @@ describe('getScansByUser', () => {
 			from: vi.fn().mockReturnThis(),
 			leftJoin: vi.fn().mockReturnThis(),
 			where: vi.fn().mockReturnThis(),
-			orderBy: vi.fn().mockResolvedValue([{ id: 'scan1', public: true }])
+			orderBy: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([{ id: 'scan1', public: true }])
 		};
 		mockDb.select.mockReturnValue(mockSelect);
 
@@ -319,6 +322,7 @@ describe('getScansByUser', () => {
 		expect(mockSelect.leftJoin).toHaveBeenCalled();
 		expect(mockSelect.where).toHaveBeenCalled();
 		expect(mockSelect.orderBy).toHaveBeenCalled();
+		expect(mockSelect.limit).toHaveBeenCalledWith(5000);
 		expect(result).toEqual([{ id: 'scan1', public: true }]);
 	});
 });
