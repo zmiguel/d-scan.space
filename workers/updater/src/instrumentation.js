@@ -252,7 +252,7 @@ export function startInstrumentation() {
 	}
 }
 
-async function shutdownTelemetry(signal) {
+export async function shutdownTelemetry(signal) {
 	try {
 		logger.info(`Received ${signal}. Flushing telemetry...`);
 		await sdk.shutdown();
@@ -260,10 +260,5 @@ async function shutdownTelemetry(signal) {
 		logger.info('OpenTelemetry SDK shut down successfully');
 	} catch (error) {
 		logger.error('Error shutting down OpenTelemetry SDK:', error);
-	} finally {
-		process.exit(0);
 	}
 }
-
-process.on('SIGTERM', () => shutdownTelemetry('SIGTERM'));
-process.on('SIGINT', () => shutdownTelemetry('SIGINT'));

@@ -133,15 +133,21 @@ export const alliances = pgTable(
 
 // STATIC DATA
 
-export const systems = pgTable('systems', {
-	id: bigint({ mode: 'number' }).primaryKey(),
-	name: text().notNull(),
-	constellation: text().notNull(),
-	region: text().notNull(),
-	sec_status: doublePrecision().notNull(),
-	last_seen: timestamp(),
-	updated_at: timestamp().defaultNow().notNull()
-});
+export const systems = pgTable(
+	'systems',
+	{
+		id: bigint({ mode: 'number' }).primaryKey(),
+		name: text().notNull(),
+		constellation: text().notNull(),
+		region: text().notNull(),
+		sec_status: doublePrecision().notNull(),
+		last_seen: timestamp(),
+		updated_at: timestamp().defaultNow().notNull()
+	},
+	(table) => ({
+		nameIdx: index('systems_name_idx').on(table.name)
+	})
+);
 
 export const sde = pgTable('sde', {
 	id: integer().primaryKey().generatedAlwaysAsIdentity(),

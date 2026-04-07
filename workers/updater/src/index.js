@@ -1,6 +1,6 @@
 import { Cron } from 'croner';
 import { readFileSync } from 'fs';
-import { startInstrumentation } from './instrumentation.js';
+import { startInstrumentation, shutdownTelemetry } from './instrumentation.js';
 import { config } from './config.js';
 import logger from '../../../src/lib/logger.js';
 import { updateDynamicData } from './services/dynamic.js';
@@ -12,13 +12,11 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 setInterval(() => {}, 1 << 30);
 
 process.on('uncaughtException', (error) => {
-	console.error('Uncaught Exception:', error);
 	logger.error(error, 'Uncaught Exception');
 	process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
-	console.error('Unhandled Rejection:', reason);
 	logger.error(reason, 'Unhandled Rejection');
 	process.exit(1);
 });
@@ -55,12 +53,13 @@ const staticJob = new Cron(config.STATIC_UPDATE_CRON, async () => {
 logger.info(`Static job scheduled. Next run: ${staticJob.nextRun()}`);
 
 // Handle graceful shutdown
-const shutdown = () => {
+const shutdown = async (signal) => {
 	logger.info('Stopping Updater Worker...');
 	dynamicJob.stop();
 	staticJob.stop();
+	await shutdownTelemetry(signal);
 	process.exit(0);
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

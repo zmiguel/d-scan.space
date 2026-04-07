@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import logger from '$lib/logger';
 import { SvelteKitAuth } from '@auth/sveltekit';
 import EveOnline from '@auth/sveltekit/providers/eveonline';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
@@ -145,7 +146,7 @@ export const {
 					await ensurePrimaryCharacter(userId, profile);
 					await updateLinkedCharacter(userId, profile);
 				} catch (error) {
-					void error;
+					logger.error({ err: error }, 'Failed to sync character data during login');
 				}
 			}
 

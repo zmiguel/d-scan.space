@@ -70,7 +70,10 @@ class RetryingSpanExporter {
 			return attempt(currentAttempt + 1);
 		};
 
-		attempt();
+		attempt().catch((e) => {
+			logger.error(e, 'Span export unexpected error');
+			resultCallback({ code: ExportResultCode.FAILED, error: e });
+		});
 	}
 
 	async shutdown() {
