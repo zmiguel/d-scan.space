@@ -1,0 +1,1 @@
+CREATE INDEX "systems_name_idx" ON "systems" USING btree ("name");
