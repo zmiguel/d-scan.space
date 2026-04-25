@@ -304,6 +304,58 @@ describe('wrappers', () => {
 			expect(biomassCharacter).not.toHaveBeenCalled();
 		});
 
+		it('should handle 429 rate limit and return null', async () => {
+			vi.useFakeTimers();
+			global.fetch.mockResolvedValue({
+				ok: false,
+				status: 429,
+				statusText: 'Too Many Requests',
+				headers: {
+					entries: () => [],
+					get: (header) => (header === 'x-esi-error-limit-reset' ? '1' : null)
+				},
+				clone: () => ({
+					json: async () => ({ error: 'rate limited' }),
+					text: async () => 'rate limited'
+				}),
+				url: 'http://test.com'
+			});
+
+			const promise = fetchGET('http://test.com', 1);
+			await vi.advanceTimersByTimeAsync(1000);
+			const result = await promise;
+
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith('ESI rate limited', { resetSeconds: 1 });
+			vi.useRealTimers();
+		});
+
+		it('should use default 60s wait when x-esi-error-limit-reset header is absent', async () => {
+			vi.useFakeTimers();
+			global.fetch.mockResolvedValue({
+				ok: false,
+				status: 429,
+				statusText: 'Too Many Requests',
+				headers: {
+					entries: () => [],
+					get: () => null
+				},
+				clone: () => ({
+					json: async () => ({ error: 'rate limited' }),
+					text: async () => 'rate limited'
+				}),
+				url: 'http://test.com'
+			});
+
+			const promise = fetchGET('http://test.com', 1);
+			await vi.advanceTimersByTimeAsync(60000);
+			const result = await promise;
+
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith('ESI rate limited', { resetSeconds: 60 });
+			vi.useRealTimers();
+		});
+
 		it('should stringify unknown GET errors', async () => {
 			global.fetch.mockRejectedValueOnce({});
 
@@ -404,6 +456,58 @@ describe('wrappers', () => {
 
 			expect(biomassCharacter).toHaveBeenCalledWith(123);
 			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 0 });
+		});
+
+		it('should handle 429 rate limit and return null', async () => {
+			vi.useFakeTimers();
+			global.fetch.mockResolvedValue({
+				ok: false,
+				status: 429,
+				statusText: 'Too Many Requests',
+				headers: {
+					entries: () => [],
+					get: (header) => (header === 'x-esi-error-limit-reset' ? '1' : null)
+				},
+				clone: () => ({
+					json: async () => ({ error: 'rate limited' }),
+					text: async () => 'rate limited'
+				}),
+				url: 'http://test.com'
+			});
+
+			const promise = fetchPOST('http://test.com', {}, 1);
+			await vi.advanceTimersByTimeAsync(1000);
+			const result = await promise;
+
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith('ESI rate limited', { resetSeconds: 1 });
+			vi.useRealTimers();
+		});
+
+		it('should use default 60s wait when x-esi-error-limit-reset header is absent', async () => {
+			vi.useFakeTimers();
+			global.fetch.mockResolvedValue({
+				ok: false,
+				status: 429,
+				statusText: 'Too Many Requests',
+				headers: {
+					entries: () => [],
+					get: () => null
+				},
+				clone: () => ({
+					json: async () => ({ error: 'rate limited' }),
+					text: async () => 'rate limited'
+				}),
+				url: 'http://test.com'
+			});
+
+			const promise = fetchPOST('http://test.com', {}, 1);
+			await vi.advanceTimersByTimeAsync(60000);
+			const result = await promise;
+
+			expect(result).toBeNull();
+			expect(mockSpan.addEvent).toHaveBeenCalledWith('ESI rate limited', { resetSeconds: 60 });
+			vi.useRealTimers();
 		});
 
 		it('should handle deleted non-character resource without biomass', async () => {

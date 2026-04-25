@@ -92,7 +92,7 @@ const getMatchResult = (lines, scanType) => {
 	}
 
 	const total = lines.length;
-	const matchPercent = total > 0 ? (matched / total) * 100 : 0;
+	const matchPercent = (matched / total) * 100;
 
 	return {
 		type: scanType.type,
@@ -132,18 +132,16 @@ export function detectScanType(lines) {
 		[null]
 	);
 
-	if (closest) {
-		logger.warn(
-			{
-				closest_type: closest.type,
-				match_percent: closest.match_percent,
-				matched_lines: closest.matched,
-				total_lines: closest.total,
-				failed_lines: closest.failed_lines
-			},
-			'Scan type detection failed; closest scan type did not fully match'
-		);
-	}
+	logger.warn(
+		{
+			closest_type: closest.type,
+			match_percent: closest.match_percent,
+			matched_lines: closest.matched,
+			total_lines: closest.total,
+			failed_lines: closest.failed_lines
+		},
+		'Scan type detection failed; closest scan type did not fully match'
+	);
 
 	return { type: 'unknown' };
 }
