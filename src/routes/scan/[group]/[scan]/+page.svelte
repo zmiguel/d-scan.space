@@ -60,8 +60,6 @@
 				: typeof systemValue?.name === 'string'
 					? systemValue.name
 					: null;
-		const constellation =
-			typeof systemValue?.constellation === 'string' ? systemValue.constellation : null;
 		const region = typeof systemValue?.region === 'string' ? systemValue.region : null;
 		const security =
 			typeof systemValue?.security === 'number' ? systemValue.security.toFixed(2) : null;
@@ -72,12 +70,11 @@
 					.replace(/\.\d+Z$/, '')
 			: '';
 		const timeLabel = timestamp ? ` @ ${timestamp}` : '';
-		if (systemName || constellation || region) {
+		if (systemName || region) {
 			const securityLabel = security ?? '?';
 			const systemLabel = systemName ?? 'Unknown System';
-			const constellationLabel = constellation ?? 'Unknown Constellation';
 			const regionLabel = region ?? 'Unknown Region';
-			return `[${securityLabel}] ${systemLabel} > ${constellationLabel} > ${regionLabel}${timeLabel}`;
+			return `[${securityLabel}] ${systemLabel} > ${regionLabel}${timeLabel}`;
 		}
 		return `Unknown System${timeLabel}`;
 	});
@@ -156,7 +153,7 @@
 	});
 </script>
 
-<MetaTags title={scanTitle} description={scanSummary} showImage={false} />
+<MetaTags title={scanTitle} description={scanSummary} showImage={false} appendSiteName={false} />
 
 <div class="container mx-auto px-0">
 	{#if showCopiedToast}
