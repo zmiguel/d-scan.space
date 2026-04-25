@@ -699,4 +699,47 @@ describe('routes/scan/+page.server.js tracing', () => {
 
 		expect(result).toEqual(expect.objectContaining({ status: 303 }));
 	});
+
+	it('update succeeds when no scan_group is provided (existingGroup is null)', async () => {
+		const request = buildRequest({ scan_content: 'line' });
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: { auth: vi.fn().mockResolvedValue(null) }
+		});
+
+		expect(mockGetScanGroupByID).not.toHaveBeenCalled();
+		expect(result).toEqual(expect.objectContaining({ status: 303 }));
+	});
+
+	it('update returns 403 when scan group is owned by a different user', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockGetScanGroupByID.mockResolvedValue({ id: 'group-1', created_by: 'owner-user' });
+
+		await expect(
+			actions.update({
+				request,
+				event: {},
+				locals: {
+					auth: vi.fn().mockResolvedValue({ user: { id: 'other-user' } })
+				}
+			})
+		).rejects.toMatchObject({ status: 403, message: 'Forbidden' });
+	});
+
+	it('update succeeds when scan group is owned by the current user', async () => {
+		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
+		mockGetScanGroupByID.mockResolvedValue({ id: 'group-1', created_by: 'owner-user', system: null });
+
+		const result = await actions.update({
+			request,
+			event: {},
+			locals: {
+				auth: vi.fn().mockResolvedValue({ user: { id: 'owner-user' } })
+			}
+		});
+
+		expect(result).toEqual(expect.objectContaining({ status: 303 }));
+	});
 });

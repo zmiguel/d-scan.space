@@ -242,6 +242,19 @@ export const actions = {
 				let targetScanGroupId = originalScanGroupId;
 				const scanId = uid.randomUUID(12);
 
+				const existingGroup = originalScanGroupId
+					? await getScanGroupByID(originalScanGroupId)
+					: null;
+
+				if (existingGroup?.created_by && existingGroup.created_by !== createdBy) {
+					span.setAttributes({
+						'scan.error': 'forbidden',
+						'response.status': 403
+					});
+					logger.warn('Scan update rejected: user does not own this scan group');
+					throw error(403, 'Forbidden');
+				}
+
 				span.setAttributes({
 					'scan.content_lines': lines.length,
 					'scan.type': scanTypeResult.type,

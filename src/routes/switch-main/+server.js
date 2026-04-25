@@ -35,7 +35,11 @@ export async function POST(event) {
 				return new Response('Bad Request', { status: 400 });
 			}
 
-			span.setAttributes({ 'auth.logged_in': true, 'user.id': session.user.id, 'character.id': characterId });
+			span.setAttributes({
+				'auth.logged_in': true,
+				'user.id': session.user.id,
+				'character.id': characterId
+			});
 
 			const [linkedAccount] = await db
 				.select({
