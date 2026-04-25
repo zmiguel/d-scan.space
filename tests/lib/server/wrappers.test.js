@@ -21,7 +21,8 @@ vi.mock('../../../src/lib/database/characters.js', () => ({
 }));
 
 const mocks = vi.hoisted(() => ({
-	agentClose: vi.fn()
+	agentClose: vi.fn(),
+	fetch: vi.fn()
 }));
 
 vi.mock('undici', () => ({
@@ -29,7 +30,8 @@ vi.mock('undici', () => ({
 		constructor() {
 			this.close = mocks.agentClose;
 		}
-	}
+	},
+	fetch: mocks.fetch
 }));
 
 import { fetchGET, fetchPOST } from '../../../src/lib/server/wrappers.js';
@@ -37,13 +39,9 @@ import { recordEsiRequest } from '../../../src/lib/server/metrics.js';
 import { biomassCharacter } from '../../../src/lib/database/characters.js';
 import { withSpan } from '../../../src/lib/server/tracer.js';
 
-// Mock global fetch
-// global.fetch = vi.fn(); // Move to beforeEach
-
 describe('wrappers', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
-		global.fetch = vi.fn();
 	});
 
 	describe('fetchGET', () => {
@@ -63,11 +61,11 @@ describe('wrappers', () => {
 				redirected: false,
 				type: 'basic'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			const result = await fetchGET('https://esi.evetech.net/v1/characters/1/');
 
-			expect(global.fetch).toHaveBeenCalledWith(
+			expect(mocks.fetch).toHaveBeenCalledWith(
 				'https://esi.evetech.net/v1/characters/1/',
 				expect.objectContaining({ method: 'GET' })
 			);
@@ -97,12 +95,12 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchGET('http://test.com', 2);
 			expect(result).toBeNull();
 
-			expect(global.fetch).toHaveBeenCalledTimes(2);
+			expect(mocks.fetch).toHaveBeenCalledTimes(2);
 		});
 
 		it('should handle deleted character (404 with deleted error)', async () => {
@@ -120,7 +118,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/characters/123'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchGET('https://esi.evetech.net/v1/characters/123');
 
@@ -143,7 +141,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/characters/456'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchGET('https://esi.evetech.net/v1/characters/456');
 
@@ -178,11 +176,11 @@ describe('wrappers', () => {
 				redirected: false,
 				type: 'basic'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			await fetchGETWithFlags('https://esi.evetech.net/v1/characters/1/');
 
-			expect(global.fetch).toHaveBeenCalledWith(
+			expect(mocks.fetch).toHaveBeenCalledWith(
 				'https://esi.evetech.net/v1/characters/1/',
 				expect.objectContaining({
 					headers: expect.objectContaining({ 'X-Compatibility-Date': '2099-01-01' })
@@ -204,7 +202,7 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchGET('http://test.com');
 			expect(result).toBeNull();
@@ -226,7 +224,7 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchGET('http://test.com', 1);
 			expect(result).toBeNull();
@@ -237,7 +235,7 @@ describe('wrappers', () => {
 		});
 
 		it('should handle network error (fetch throws) and decrement concurrency', async () => {
-			global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
+			mocks.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
 			const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
 			const result = await fetchGET('http://test.com', 1);
@@ -246,7 +244,7 @@ describe('wrappers', () => {
 		});
 
 		it('should add GET fetch failure event details', async () => {
-			global.fetch.mockRejectedValueOnce(new Error('Network Error'));
+			mocks.fetch.mockRejectedValueOnce(new Error('Network Error'));
 
 			const result = await fetchGET('http://test.com', 1);
 			expect(result).toBeNull();
@@ -275,7 +273,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/characters/'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchGET('https://esi.evetech.net/v1/characters/');
 
@@ -297,7 +295,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/corporations/123'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchGET('https://esi.evetech.net/v1/corporations/123');
 
@@ -306,7 +304,7 @@ describe('wrappers', () => {
 
 		it('should handle 429 rate limit and return null', async () => {
 			vi.useFakeTimers();
-			global.fetch.mockResolvedValue({
+			mocks.fetch.mockResolvedValue({
 				ok: false,
 				status: 429,
 				statusText: 'Too Many Requests',
@@ -332,7 +330,7 @@ describe('wrappers', () => {
 
 		it('should use default 60s wait when x-esi-error-limit-reset header is absent', async () => {
 			vi.useFakeTimers();
-			global.fetch.mockResolvedValue({
+			mocks.fetch.mockResolvedValue({
 				ok: false,
 				status: 429,
 				statusText: 'Too Many Requests',
@@ -357,7 +355,7 @@ describe('wrappers', () => {
 		});
 
 		it('should stringify unknown GET errors', async () => {
-			global.fetch.mockRejectedValueOnce({});
+			mocks.fetch.mockRejectedValueOnce({});
 
 			const result = await fetchGET('http://test.com', 1);
 			expect(result).toBeNull();
@@ -389,12 +387,12 @@ describe('wrappers', () => {
 				redirected: false,
 				type: 'basic'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			const body = { ids: [1, 2] };
 			const result = await fetchPOST('https://esi.evetech.net/v1/universe/names/', body);
 
-			expect(global.fetch).toHaveBeenCalledWith(
+			expect(mocks.fetch).toHaveBeenCalledWith(
 				'https://esi.evetech.net/v1/universe/names/',
 				expect.objectContaining({
 					method: 'POST',
@@ -427,12 +425,12 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchPOST('http://test.com', {}, 2);
 			expect(result).toBeNull();
 
-			expect(global.fetch).toHaveBeenCalledTimes(2);
+			expect(mocks.fetch).toHaveBeenCalledTimes(2);
 		});
 
 		it('should handle deleted character (404 with deleted error)', async () => {
@@ -450,7 +448,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/characters/123'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchPOST('https://esi.evetech.net/v1/characters/123', {});
 
@@ -460,7 +458,7 @@ describe('wrappers', () => {
 
 		it('should handle 429 rate limit and return null', async () => {
 			vi.useFakeTimers();
-			global.fetch.mockResolvedValue({
+			mocks.fetch.mockResolvedValue({
 				ok: false,
 				status: 429,
 				statusText: 'Too Many Requests',
@@ -486,7 +484,7 @@ describe('wrappers', () => {
 
 		it('should use default 60s wait when x-esi-error-limit-reset header is absent', async () => {
 			vi.useFakeTimers();
-			global.fetch.mockResolvedValue({
+			mocks.fetch.mockResolvedValue({
 				ok: false,
 				status: 429,
 				statusText: 'Too Many Requests',
@@ -525,7 +523,7 @@ describe('wrappers', () => {
 				}),
 				url: 'https://esi.evetech.net/v1/corporations/123'
 			};
-			global.fetch.mockResolvedValue(deletedResponse);
+			mocks.fetch.mockResolvedValue(deletedResponse);
 
 			await fetchPOST('https://esi.evetech.net/v1/corporations/123', {});
 
@@ -545,7 +543,7 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchPOST('http://test.com', {});
 			expect(result).toBeNull();
@@ -569,7 +567,7 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(errorResponse);
+			mocks.fetch.mockResolvedValue(errorResponse);
 
 			const result = await fetchPOST('http://test.com', {});
 			expect(result).toBeNull();
@@ -580,7 +578,7 @@ describe('wrappers', () => {
 		});
 
 		it('should handle network error (fetch throws) and decrement concurrency', async () => {
-			global.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
+			mocks.fetch.mockRejectedValueOnce(new TypeError('Network Error'));
 			const { esiConcurrentRequests } = await import('../../../src/lib/server/metrics.js');
 
 			const result = await fetchPOST('http://test.com', {}, 1);
@@ -590,9 +588,9 @@ describe('wrappers', () => {
 
 		it('should handle POST network error fallback', async () => {
 			const error = new Error('Network Error');
-			global.fetch.mockRejectedValueOnce(error);
-			global.fetch.mockRejectedValueOnce(error);
-			global.fetch.mockRejectedValueOnce(error);
+			mocks.fetch.mockRejectedValueOnce(error);
+			mocks.fetch.mockRejectedValueOnce(error);
+			mocks.fetch.mockRejectedValueOnce(error);
 
 			const result = await fetchPOST('https://esi.evetech.net/v1/post', {});
 			expect(result).toBeNull();
@@ -622,7 +620,7 @@ describe('wrappers', () => {
 				redirected: false,
 				type: 'basic'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			await fetchPOST('http://test.com', { a: 1 }, 1);
 
@@ -650,14 +648,14 @@ describe('wrappers', () => {
 				}),
 				url: 'http://test.com'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			const result = await fetchPOST('http://test.com', {}, 1);
 			expect(result).toBeNull();
 		});
 
 		it('should stringify unknown POST errors', async () => {
-			global.fetch.mockRejectedValueOnce({});
+			mocks.fetch.mockRejectedValueOnce({});
 
 			const result = await fetchPOST('http://test.com', {}, 1);
 			expect(result).toBeNull();
@@ -687,11 +685,11 @@ describe('wrappers', () => {
 				redirected: false,
 				type: 'basic'
 			};
-			global.fetch.mockResolvedValue(mockResponse);
+			mocks.fetch.mockResolvedValue(mockResponse);
 
 			await fetchPOST('http://test.com', undefined, 1);
 
-			expect(global.fetch).toHaveBeenCalled();
+			expect(mocks.fetch).toHaveBeenCalled();
 		});
 	});
 
@@ -705,7 +703,7 @@ describe('wrappers', () => {
 
 	describe('createPreview', () => {
 		it('should handle null payload in error preview', async () => {
-			global.fetch.mockResolvedValueOnce({
+			mocks.fetch.mockResolvedValueOnce({
 				ok: false,
 				status: 500,
 				statusText: 'Internal Server Error',
@@ -718,7 +716,7 @@ describe('wrappers', () => {
 				url: 'https://esi.evetech.net/v1/test'
 			});
 
-			const result = await fetchGET('https://esi.evetech.net/v1/test');
+			const result = await fetchGET('https://esi.evetech.net/v1/test', 1);
 			expect(result).toBeNull();
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
 				'Fetch Failed',
@@ -744,7 +742,7 @@ describe('wrappers', () => {
 
 			for (const { url, type } of types) {
 				vi.clearAllMocks();
-				global.fetch.mockResolvedValueOnce({
+				mocks.fetch.mockResolvedValueOnce({
 					ok: true,
 					status: 200,
 					statusText: 'OK',
