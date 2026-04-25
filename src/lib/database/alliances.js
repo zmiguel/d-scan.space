@@ -12,7 +12,11 @@ export async function getAlliancesByID(ids) {
 }
 
 export async function getAllAlliances() {
-	return db.select().from(alliances);
+	return withSpan('database.alliances.get_all', async (span) => {
+		const result = await db.select().from(alliances);
+		span.setAttributes({ 'alliances.count': result.length });
+		return result;
+	});
 }
 
 export async function addOrUpdateAlliancesDB(data) {

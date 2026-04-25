@@ -12,7 +12,11 @@ export async function getCorporationsByID(ids) {
 }
 
 export async function getAllCorporations() {
-	return db.select().from(corporations);
+	return withSpan('database.corporations.get_all', async (span) => {
+		const result = await db.select().from(corporations);
+		span.setAttributes({ 'corporations.count': result.length });
+		return result;
+	});
 }
 
 export async function addOrUpdateCorporationsDB(data) {
