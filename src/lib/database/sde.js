@@ -105,12 +105,15 @@ export async function updateSystemsLastSeen(systemIds) {
 		return;
 	}
 
-	await db
-		.update(systems)
-		.set({
-			last_seen: sql`now()`
-		})
-		.where(inArray(systems.id, systemIds));
+	await withSpan('database.sde.update_systems_last_seen', async (span) => {
+		span.setAttributes({ 'systems.ids.length': systemIds.length });
+		await db
+			.update(systems)
+			.set({
+				last_seen: sql`now()`
+			})
+			.where(inArray(systems.id, systemIds));
+	});
 }
 
 /**

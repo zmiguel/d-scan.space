@@ -141,6 +141,13 @@ describe('scan_type detection', () => {
 		splitSpy.mockRestore();
 	});
 
+	it('coerces non-string lines to strings', () => {
+		// number: 42 → '42', no tabs, ≤2 spaces → local
+		expect(detectScanType([42])).toEqual({ type: 'local', supported: true });
+		// null: null ?? '' → '', treated as local (no tabs, 0 spaces)
+		expect(detectScanType([null])).toEqual({ type: 'local', supported: true });
+	});
+
 	it('returns unknown when lines are mixed types', () => {
 		const lines = ['Pilot One', '5\tSome\tThing\t-'];
 		expect(detectScanType(lines)).toEqual({ type: 'unknown' });

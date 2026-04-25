@@ -39,7 +39,11 @@ export async function getCharactersByName(names) {
 }
 
 export async function getAllCharacters() {
-	return db.select().from(characters);
+	return withSpan('database.characters.get_all', async (span) => {
+		const result = await db.select().from(characters);
+		span.setAttributes({ 'characters.count': result.length });
+		return result;
+	});
 }
 
 export async function addOrUpdateCharactersDB(data) {

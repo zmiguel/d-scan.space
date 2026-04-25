@@ -331,6 +331,29 @@ describe('directional', () => {
 			const result = await createNewDirectionalScan(raw);
 			expect(result.off_grid.total_objects).toBe(1); // Default to off grid
 		});
+
+		it('should use UNKNOWN_LABEL when name field is empty', async () => {
+			// 4 fields: typeId, empty-name, typeName, distance
+			const raw = '123\t\tType\t10 km';
+			getTypeHierarchyMetadata.mockResolvedValue(
+				new Map([
+					[
+						123,
+						{
+							typeId: 123,
+							typeName: 'Type',
+							categoryId: 1,
+							categoryName: 'Cat',
+							groupId: 1,
+							groupName: 'Grp',
+							mass: 1
+						}
+					]
+				])
+			);
+			const result = await createNewDirectionalScan(raw);
+			expect(result.on_grid.total_objects).toBe(1);
+		});
 	});
 
 	it('should sort results correctly', async () => {

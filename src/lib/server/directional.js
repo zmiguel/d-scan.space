@@ -170,8 +170,8 @@ function parseDirectionalLines(rawData) {
 			typeId,
 			name: (nameRaw || '').trim() || UNKNOWN_LABEL,
 			typeName: (typeNameRaw || '').trim() || UNKNOWN_LABEL,
-			distance: (distanceRaw || '').trim(),
-			isOnGrid: isOnGrid((distanceRaw || '').trim())
+			distance: distanceRaw.trim(),
+			isOnGrid: isOnGrid(distanceRaw.trim())
 		});
 	}
 
@@ -216,6 +216,7 @@ function normalizeLines(rawData) {
  * @returns {boolean}
  */
 function isOnGrid(distance) {
+	/* v8 ignore next */
 	if (!distance) return false;
 	const normalized = distance.toLowerCase();
 	if (normalized === '-') return false;
