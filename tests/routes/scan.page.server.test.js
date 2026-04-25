@@ -730,7 +730,11 @@ describe('routes/scan/+page.server.js tracing', () => {
 
 	it('update succeeds when scan group is owned by the current user', async () => {
 		const request = buildRequest({ scan_content: 'line', scan_group: 'group-1' });
-		mockGetScanGroupByID.mockResolvedValue({ id: 'group-1', created_by: 'owner-user', system: null });
+		mockGetScanGroupByID.mockResolvedValue({
+			id: 'group-1',
+			created_by: 'owner-user',
+			system: null
+		});
 
 		const result = await actions.update({
 			request,
