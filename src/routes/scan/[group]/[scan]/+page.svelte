@@ -52,8 +52,7 @@
 
 	const formatCount = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : null);
 
-	const scanSummary = $derived.by(() => {
-		const parts = [];
+	const scanTitle = $derived.by(() => {
 		const systemValue = data?.system;
 		const systemName =
 			typeof systemValue === 'string'
@@ -66,15 +65,22 @@
 		const region = typeof systemValue?.region === 'string' ? systemValue.region : null;
 		const security =
 			typeof systemValue?.security === 'number' ? systemValue.security.toFixed(2) : null;
+		const timestamp = data?.created_at
+			? new Date(data.created_at).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '')
+			: '';
+		const timeLabel = timestamp ? ` @ ${timestamp}` : '';
 		if (systemName || constellation || region) {
 			const securityLabel = security ?? '?';
 			const systemLabel = systemName ?? 'Unknown System';
 			const constellationLabel = constellation ?? 'Unknown Constellation';
 			const regionLabel = region ?? 'Unknown Region';
-			parts.push(
-				`Location: [${securityLabel}] ${systemLabel} > ${constellationLabel} > ${regionLabel}`
-			);
+			return `[${securityLabel}] ${systemLabel} > ${constellationLabel} > ${regionLabel}${timeLabel}`;
 		}
+		return `Unknown System${timeLabel}`;
+	});
+
+	const scanSummary = $derived.by(() => {
+		const parts = [];
 
 		const local = data?.local;
 		if (local) {
@@ -147,7 +153,7 @@
 	});
 </script>
 
-<MetaTags title={`Scan ${data.params.scan}`} description={scanSummary} showImage={false} />
+<MetaTags title={scanTitle} description={scanSummary} showImage={false} />
 
 <div class="container mx-auto px-0">
 	{#if showCopiedToast}
