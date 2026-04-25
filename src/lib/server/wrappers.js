@@ -2,7 +2,7 @@ import { biomassCharacter } from '../database/characters.js';
 import { USER_AGENT, ESI_MAX_CONNECTIONS, ESI_TEST_FLAGS } from './constants.js';
 import { withSpan } from './tracer.js';
 import { recordEsiRequest, esiConcurrentRequests } from './metrics.js';
-import { Agent } from 'undici';
+import { Agent, fetch } from 'undici';
 import logger from '../logger.js';
 
 const esiAgent = new Agent({
