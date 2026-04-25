@@ -11,6 +11,7 @@
 	 * @property {'website' | 'article'} [type] - Content type ('website' or 'article').
 	 * @property {string} [color] - Discord sidebar color (Hex code).
 	 * @property {boolean} [noIndex] - If true, hides page from Google.
+	 * @property {boolean} [appendSiteName] - If false, omits '| D-Scan Space!' suffix.
 	 */
 
 	/** @type {Props} */
@@ -22,13 +23,13 @@
 		showImage = true,
 		type = 'website',
 		color = '#101828',
-		noIndex = false
+		noIndex = false,
+		appendSiteName = true
 	} = $props();
 
 	// --- Derived State (Runes) ---
 
-	// Append site name automatically
-	let fullTitle = $derived(`${title} | D-Scan Space!`);
+	let fullTitle = $derived(appendSiteName ? `${title} | D-Scan Space!` : title);
 
 	// Get current absolute URL
 	let currentUrl = $derived($page.url.href);
