@@ -183,7 +183,9 @@
 		<!-- Sidebar (15-20% width) -->
 		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-2 dark:bg-gray-800">
 			<!-- Row 1: Update current scan -->
-			<UpdateScan {data} />
+			{#if data.canUpdateScan}
+				<UpdateScan {data} />
+			{/if}
 
 			<!-- Row 2: Timeline of related scans -->
 			<ScanTimeLine {data} />

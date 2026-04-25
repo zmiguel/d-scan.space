@@ -215,10 +215,12 @@ export async function load(event) {
 			});
 
 			const canEditSystem = !scanGroup.system && !!userId && scanGroup.created_by === userId;
+			const canUpdateScan = !scanGroup.created_by || scanGroup.created_by === userId;
 
 			return {
 				system: thisScan.system,
 				canEditSystem,
+				canUpdateScan,
 				created_at: thisScan.created_at,
 				local: localScan ? localScan.data : null,
 				directional: directionalScan ? directionalScan.data : null,
