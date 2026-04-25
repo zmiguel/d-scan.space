@@ -66,7 +66,10 @@
 		const security =
 			typeof systemValue?.security === 'number' ? systemValue.security.toFixed(2) : null;
 		const timestamp = data?.created_at
-			? new Date(data.created_at).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '')
+			? new Date(data.created_at)
+					.toISOString()
+					.replace('T', ' ')
+					.replace(/\.\d+Z$/, '')
 			: '';
 		const timeLabel = timestamp ? ` @ ${timestamp}` : '';
 		if (systemName || constellation || region) {
