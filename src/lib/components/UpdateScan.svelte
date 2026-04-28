@@ -16,9 +16,12 @@
 			return;
 		}
 
-		const absoluteUrl = new URL(location, window.location.origin).toString();
+		const url = new URL(location, window.location.origin);
+		const segments = url.pathname.split('/').filter(Boolean);
+		// Copy the group URL (/scan/<group>) instead of the specific scan URL
+		const groupUrl = new URL('/' + segments.slice(0, 2).join('/'), url.origin).toString();
 		try {
-			await navigator.clipboard.writeText(absoluteUrl);
+			await navigator.clipboard.writeText(groupUrl);
 		} catch {
 			// Ignore clipboard write failures (e.g., permission denied)
 		}
