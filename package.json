@@ -52,7 +52,7 @@
 		"flowbite-svelte": "^1.33.1",
 		"flowbite-svelte-icons": "^3.1.0",
 		"import-in-the-middle": "^3.0.1",
-		"js-yaml": "^4.1.1",
+		"js-yaml": "^4.3.0",
 		"pg": "^8.20.0",
 		"pino": "^10.3.1",
 		"pino-pretty": "^13.1.3",
