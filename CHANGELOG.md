@@ -3,6 +3,28 @@
 Notable changes to D-Scan Space. Work in progress is tracked in
 [`docs/review-fixes-plan.md`](docs/review-fixes-plan.md).
 
+## 1.3.1 – 2026-10-02
+
+### Added
+
+- **Scan link previews**: shared scan links (Discord, etc.) show a generated 1200×630
+  image per scan (`/scan/<group>/<scan>/og.png`): system with security, local pilot /
+  corp / alliance counts with the top alliances, and the d-scan ship total, class bar,
+  on/off grid and top classes. Rendered on the server with resvg (WASM) and bundled Inter
+  fonts; cached for a day. The text preview uses "Top:" instead of "Top alliances:" /
+  "Top ships:".
+
+### Fixed
+
+- `/scan` (listed in the sitemap) answered 500; it now redirects to the home page.
+
+### Changed
+
+- SEO: the home page is titled "EVE Online D-Scan & Local Scan Analyzer", its paste
+  prompt is the page's `<h1>` and a one-line description sits under the form. All scan
+  pages are `noindex` (public ones were indexable). Structured data adds a `WebSite`
+  entry and the app's URL and free offer; the ignored `keywords` meta tag is gone.
+
 ## 1.3.0 (updater 1.1.0) – 2026-10-02
 
 ### Added

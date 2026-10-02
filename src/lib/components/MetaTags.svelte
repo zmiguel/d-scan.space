@@ -11,8 +11,10 @@
 	 * @property {'website' | 'article'} [type] - Content type ('website' or 'article').
 	 * @property {string} [color] - Discord sidebar color (Hex code).
 	 * @property {boolean} [noIndex] - If true, asks search engines not to index the page
-	 *   (private scans, per-user pages, errors).
+	 *   (scans, per-user pages, errors).
 	 * @property {boolean} [appendSiteName] - If false, omits '| D-Scan Space!' suffix.
+	 * @property {number} [imageWidth] - Image size in pixels; 600+ wide uses the large card.
+	 * @property {number} [imageHeight]
 	 */
 
 	/** @type {Props} */
@@ -25,7 +27,9 @@
 		type = 'website',
 		color = '#101828',
 		noIndex = false,
-		appendSiteName = true
+		appendSiteName = true,
+		imageWidth = 96,
+		imageHeight = 96
 	} = $props();
 
 	// --- Derived State (Runes) ---
@@ -72,12 +76,15 @@
 		<meta property="og:image:alt" content={imageAlt} />
 
 		<!-- Image Hints -->
-		<meta property="og:image:width" content="96" />
-		<meta property="og:image:height" content="96" />
+		<meta property="og:image:width" content={String(imageWidth)} />
+		<meta property="og:image:height" content={String(imageHeight)} />
 	{/if}
 
-	<!-- 4. Twitter Cards (the default image is a small square icon, so use the small card) -->
-	<meta name="twitter:card" content="summary" />
+	<!-- 4. Twitter Cards: small card for the square icon, large card for wide previews -->
+	<meta
+		name="twitter:card"
+		content={showImage && imageWidth >= 600 ? 'summary_large_image' : 'summary'}
+	/>
 	<meta name="twitter:title" content={title} />
 	<meta name="twitter:description" content={description} />
 	{#if showImage}
