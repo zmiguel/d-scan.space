@@ -5,6 +5,7 @@ import {
 	setScanGroupSystemIfOwnerAndUnset
 } from '$lib/database/scans.js';
 import { getSystemByName } from '$lib/database/sde.js';
+import { findPairedScan } from '$lib/server/scan-pairing.js';
 import { withSpan } from '$lib/server/tracer.js';
 import { error, fail, redirect } from '@sveltejs/kit';
 
@@ -148,29 +149,7 @@ export async function load(event) {
 				throw error(404, 'Scan group not found');
 			}
 
-			const thisScanDate = new Date(thisScan.created_at);
-			let priorOppositeScan = null;
-
-			if (groupScans.length > 1) {
-				for (const scanItem of groupScans) {
-					if (scanItem.id === thisScan.id) {
-						continue;
-					}
-
-					if (scanItem.scan_type === thisScan.scan_type) {
-						continue;
-					}
-
-					const scanItemDate = new Date(scanItem.created_at);
-					if (scanItemDate >= thisScanDate) {
-						continue;
-					}
-
-					if (!priorOppositeScan || scanItemDate > new Date(priorOppositeScan.created_at)) {
-						priorOppositeScan = scanItem;
-					}
-				}
-			}
+			let priorOppositeScan = findPairedScan(groupScans, thisScan);
 
 			if (priorOppositeScan) {
 				const priorScanResult = await withSpan(

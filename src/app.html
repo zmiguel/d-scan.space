@@ -4,10 +4,6 @@
 		<meta charset="utf-8" />
 		<!-- Page-specific tags (title, description, robots, canonical, theme-color, Open Graph)
 		     are rendered per route by src/lib/components/MetaTags.svelte. -->
-		<meta
-			name="keywords"
-			content="EVE Online, d-scan, directional scan, local intel, intel tool, EVE intel, scan parser, dscan tool, EVE utilities"
-		/>
 		<meta name="application-name" content="D-Scan Space" />
 		<meta name="color-scheme" content="dark light" />
 		<meta name="format-detection" content="telephone=no" />
@@ -21,13 +17,25 @@
 		<script type="application/ld+json">
 			{
 				"@context": "https://schema.org",
-				"@type": "WebApplication",
-				"name": "D-Scan Space!",
-				"applicationCategory": "GameApplication",
-				"operatingSystem": "Web",
-				"description": "EVE Online intel tool for parsing and visualizing directional scans and local chat data.",
-				"keywords": "EVE Online, d-scan, directional scan, local intel, intel tool",
-				"inLanguage": "en"
+				"@graph": [
+					{
+						"@type": "WebSite",
+						"name": "D-Scan Space!",
+						"alternateName": "D-Scan Space",
+						"url": "https://d-scan.space/"
+					},
+					{
+						"@type": "WebApplication",
+						"name": "D-Scan Space!",
+						"url": "https://d-scan.space/",
+						"applicationCategory": "GameApplication",
+						"operatingSystem": "Web",
+						"description": "EVE Online intel tool for parsing and visualizing directional scans and local chat data.",
+						"isAccessibleForFree": true,
+						"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+						"inLanguage": "en"
+					}
+				]
 			}
 		</script>
 		<script

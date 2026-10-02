@@ -47,7 +47,12 @@
 	}
 </script>
 
-<MetaTags title="Home" image="/favicon-96x96.png" imageAlt="Preview" />
+<MetaTags
+	title="EVE Online D-Scan & Local Scan Analyzer"
+	description="Paste an EVE Online directional scan or local member list to see ship classes, fleet roles, on/off-grid split and the alliances and corporations in system."
+	image="/favicon-96x96.png"
+	imageAlt="D-Scan Space"
+/>
 
 <div class="content-center">
 	{#if isLoading}
@@ -64,10 +69,13 @@
 	<!-- Hidden, not unmounted, while processing so the pasted text survives a rejection. -->
 	<div class="container mx-auto px-0" class:hidden={isLoading}>
 		<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
-			<Label for="textarea-id" class="mb-2"
-				>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
-				<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
-			>
+			<!-- The one heading of the page doubles as the paste prompt (kept short on purpose). -->
+			<h1 class="mb-2 text-sm font-medium text-gray-900 dark:text-white">
+				<Label for="textarea-id"
+					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
+					<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
+				>
+			</h1>
 			<Textarea
 				id="textarea-id"
 				placeholder="Paste your data"
@@ -90,6 +98,11 @@
 				data-rybbit-event="scan_submit"
 				data-rybbit-prop-form="create">Process</Button
 			>
+			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+				EVE Online d-scan and local analyzer: copy the scan or local member list in game (Ctrl+A,
+				Ctrl+C) and paste it above to see ship classes, fleet roles, on/off grid, and the alliances
+				and corporations in system.
+			</p>
 		</form>
 	</div>
 </div>

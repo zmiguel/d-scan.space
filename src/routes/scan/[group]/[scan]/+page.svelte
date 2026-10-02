@@ -101,7 +101,7 @@
 				: [];
 
 			if (topAlliances.length) {
-				parts.push(`Top alliances: ${topAlliances.join(', ')}`);
+				parts.push(`Top: ${topAlliances.join(', ')}`);
 			}
 		}
 
@@ -117,7 +117,7 @@
 				.map((group) => `${group.name} (${group.total})`);
 
 			if (shipGroups.length) {
-				parts.push(`Top ships: ${shipGroups.join(', ')}`);
+				parts.push(`Top: ${shipGroups.join(', ')}`);
 			}
 		}
 
@@ -159,12 +159,16 @@
 	$effect(() => () => clearTimeout(hideToastTimeout));
 </script>
 
+<!-- Scans are short-lived intel: never indexed, but shared links get a generated preview. -->
 <MetaTags
 	title={scanTitle}
 	description={scanSummary}
-	showImage={false}
+	image="/scan/{data.params.group}/{data.params.scan}/og.png"
+	imageAlt={scanTitle}
+	imageWidth={1200}
+	imageHeight={630}
 	appendSiteName={false}
-	noIndex={!data.isPublic}
+	noIndex
 />
 
 <div class="container mx-auto px-0">

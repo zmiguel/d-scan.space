@@ -11,6 +11,14 @@ import {
 } from '$lib/server/scan-submission.js';
 
 /**
+ * `/scan` has no page of its own (only the form actions). A plain visit goes to the
+ * paste form; after a failed non-JavaScript submission the browser follows a 303.
+ */
+export function load({ request }) {
+	redirect(request.method === 'GET' ? 301 : 303, '/');
+}
+
+/**
  * Paste problems (empty, too large, unrecognized format, nothing resolvable) are
  * returned with `fail()` so the form keeps the text and shows the reason and the first
  * offending lines. Programming/authorization errors still use `error()`.
