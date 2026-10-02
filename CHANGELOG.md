@@ -3,6 +3,24 @@
 Notable changes to D-Scan Space. Work in progress is tracked in
 [`docs/review-fixes-plan.md`](docs/review-fixes-plan.md).
 
+## 1.3.2 – 2026-10-02
+
+### Added
+
+- **Stats page**: headline numbers (total scans, scans in the last 30 days, pilots
+  tracked, alliances seen in the last 30 days); charts of scans per day (local / d-scan),
+  pilots in local scans per day and the busiest UTC hours; and what scans of the last 30
+  days contained: most scanned systems and regions, most seen alliances, the
+  ship-class mix on d-scan, and average local / d-scan size. Lists that name systems,
+  regions or alliances use public scans only; counts without names (ship mix, averages,
+  pilots per day, scans per day/hour) include private scans. The installed SDE build is
+  shown at the bottom.
+
+### Changed
+
+- Stats page: "Groups w/o System" is removed; cards use the white light-mode background
+  of the rest of the site.
+
 ## 1.3.1 – 2026-10-02
 
 ### Added

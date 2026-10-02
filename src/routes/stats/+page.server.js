@@ -1,29 +1,57 @@
 import {
+	ACTIVITY_DAYS,
+	HOURS_DAYS,
 	getAllianceStats,
 	getCharacterStats,
 	getCorporationStats,
+	getScanHighlights,
+	getScanActivity,
 	getScanStats
 } from '$lib/database/stats';
+import { getLastInstalledSDEVersion } from '$lib/database/sde';
 import { withSpan } from '$lib/server/tracer';
+import { fillDays, fillHours, shipMix } from '$lib/utils/statsTrends.js';
 
-/** The stats page is public and each load scans four tables; serve it from memory. */
+/** The stats page is public and each load scans several tables; serve it from memory. */
 const STATS_TTL_MS = 60_000;
 
 /** @type {{ expires: number, value: Promise<any> } | null} */
 let cached = null;
 
-function loadStats() {
-	return Promise.all([
-		withSpan('route.stats.fetch_scans', async () => getScanStats()),
-		withSpan('route.stats.fetch_characters', async () => getCharacterStats()),
-		withSpan('route.stats.fetch_corporations', async () => getCorporationStats()),
-		withSpan('route.stats.fetch_alliances', async () => getAllianceStats())
-	]).then(([scanStats, characterStats, corporationStats, allianceStats]) => ({
+async function loadStats() {
+	const [scanStats, characterStats, corporationStats, allianceStats, activity, highlights, sde] =
+		await Promise.all([
+			withSpan('route.stats.fetch_scans', async () => getScanStats()),
+			withSpan('route.stats.fetch_characters', async () => getCharacterStats()),
+			withSpan('route.stats.fetch_corporations', async () => getCorporationStats()),
+			withSpan('route.stats.fetch_alliances', async () => getAllianceStats()),
+			withSpan('route.stats.fetch_activity', async () => getScanActivity()),
+			withSpan('route.stats.fetch_highlights', async () => getScanHighlights()),
+			withSpan('route.stats.fetch_sde', async () => getLastInstalledSDEVersion())
+		]);
+
+	const now = new Date();
+	return {
 		scanStats,
 		characterStats,
 		corporationStats,
-		allianceStats
-	}));
+		allianceStats,
+		activity: {
+			days: ACTIVITY_DAYS,
+			hoursDays: HOURS_DAYS,
+			scansPerDay: fillDays(activity.perDay, ACTIVITY_DAYS, { local: 0, directional: 0 }, now),
+			scansPerHour: fillHours(activity.perHour)
+		},
+		highlights: {
+			systems: highlights.systems,
+			regions: highlights.regions,
+			alliances: highlights.alliances,
+			ships: shipMix(highlights.shipGroups),
+			averages: highlights.averages,
+			pilotsPerDay: fillDays(highlights.pilotsPerDay, ACTIVITY_DAYS, { pilots: 0 }, now)
+		},
+		sde: sde ? { version: sde.release_version, releasedAt: sde.release_date } : null
+	};
 }
 
 /** Test hook: forget the cached stats. */

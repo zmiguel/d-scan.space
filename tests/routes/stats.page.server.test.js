@@ -7,10 +7,28 @@ vi.mock('../../src/lib/server/tracer.js', () => ({
 }));
 
 vi.mock('../../src/lib/database/stats.js', () => ({
+	ACTIVITY_DAYS: 30,
+	HOURS_DAYS: 90,
 	getScanStats: mockScanStats,
 	getCharacterStats: vi.fn(async () => ({ totalCharacters: 2 })),
 	getCorporationStats: vi.fn(async () => ({ totalCorporations: 3 })),
-	getAllianceStats: vi.fn(async () => ({ totalAlliances: 4 }))
+	getAllianceStats: vi.fn(async () => ({ totalAlliances: 4 })),
+	getScanActivity: vi.fn(async () => ({ perDay: [], perHour: [] })),
+	getScanHighlights: vi.fn(async () => ({
+		systems: [],
+		regions: [],
+		alliances: [],
+		shipGroups: [],
+		averages: {},
+		pilotsPerDay: []
+	}))
+}));
+
+vi.mock('../../src/lib/database/sde.js', () => ({
+	getLastInstalledSDEVersion: vi.fn(async () => ({
+		release_version: 3201939,
+		release_date: new Date('2026-09-30T11:00:00Z')
+	}))
 }));
 
 import { _resetStatsCache, load } from '../../src/routes/stats/+page.server.js';
