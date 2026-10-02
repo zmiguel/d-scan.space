@@ -36,6 +36,48 @@
       "when": 1775594320116,
       "tag": "0004_cold_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790847181133,
+      "tag": "0005_account_owner_hash",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790848939862,
+      "tag": "0006_model_env_scan_schemas",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790848981711,
+      "tag": "0007_scan_owner_set_null_and_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790849011170,
+      "tag": "0008_timestamptz",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790850369687,
+      "tag": "0009_characters_lower_name_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790862149966,
+      "tag": "0010_refresh_attempted_at",
+      "breakpoints": true
     }
   ]
 }

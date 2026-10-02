@@ -1,44 +1,41 @@
 <script>
 	import { Tabs, TabItem, Badge } from 'flowbite-svelte';
 	import { UsersGroupSolid, InfoCircleSolid, RocketSolid } from 'flowbite-svelte-icons';
+	import PairedScanNotice from './PairedScanNotice.svelte';
 	import TabOverview from './TabOverview.svelte';
 	import TabLocalScan from './TabLocalScan.svelte';
 	import TabDirectionalScan from './TabDirectionalScan.svelte';
 
 	let { data } = $props();
 
-	// Derive corps and pilots from data to avoid reactive loops
+	// Flattened lists for the Local tab. New objects carry the parent tickers the
+	// highlighting needs (`alliance_ticker`, `corporation_ticker`); the loaded scan data is
+	// not modified.
 	const corps = $derived(
-		!data.local || !Array.isArray(data.local.alliances)
-			? []
-			: (() => {
-					let allCorps = [];
-					data.local.alliances.forEach((alliance) => {
-						let temp = alliance.corporations;
-						temp.forEach((corp) => (corp.alliance_ticker = alliance.ticker));
-						allCorps = [...allCorps, ...temp];
-					});
-					// sort by number
-					return allCorps.sort((a, b) => b.character_count - a.character_count);
-				})()
+		Array.isArray(data.local?.alliances)
+			? data.local.alliances
+					.flatMap((alliance) =>
+						(alliance.corporations ?? []).map((corp) => ({
+							...corp,
+							alliance_ticker: alliance.ticker
+						}))
+					)
+					// most pilots first
+					.sort((a, b) => b.character_count - a.character_count)
+			: []
 	);
 
 	const pilots = $derived(
-		!corps || corps.length === 0
-			? []
-			: (() => {
-					let allPilots = [];
-					corps.forEach((corp) => {
-						let temp = corp.characters;
-						temp.forEach((character) => {
-							character.corporation_ticker = corp.ticker;
-							character.alliance_ticker = corp.alliance_ticker;
-						});
-						allPilots = [...allPilots, ...temp];
-					});
-					// sort alpha
-					return allPilots.sort((a, b) => a.name.localeCompare(b.name));
-				})()
+		corps
+			.flatMap((corp) =>
+				(corp.characters ?? []).map((character) => ({
+					...character,
+					corporation_ticker: corp.ticker,
+					alliance_ticker: corp.alliance_ticker
+				}))
+			)
+			// alphabetical
+			.sort((a, b) => a.name.localeCompare(b.name))
 	);
 
 	const localCount = $derived(formatCountValue(data.local?.total_pilots));
@@ -64,7 +61,24 @@
 	}
 </script>
 
-<div class="scan-tabs min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700">
+<div
+	class={[
+		'scan-tabs relative min-h-[500px] rounded-sm bg-gray-100 p-0 dark:bg-gray-700',
+		data.pairedScan && 'has-aside'
+	]}
+>
+	{#if data.pairedScan}
+		<!-- right end of the tab row; the tab list keeps room for it (`.has-aside`) -->
+		<div
+			class="absolute top-0 right-1 z-10 flex h-[2.375rem] items-center sm:right-2 sm:h-[2.875rem]"
+		>
+			<PairedScanNotice
+				group={data.params.group}
+				createdAt={data.created_at}
+				paired={data.pairedScan}
+			/>
+		</div>
+	{/if}
 	<Tabs tabStyle="underline" classes={{ content: 'p-3 bg-gray-100 dark:bg-gray-700 mt-0' }}>
 		<!-- Tab 1: Overview -->
 		<TabItem
@@ -135,5 +149,9 @@
 
 	.scan-tabs :global([role='tablist'] > *) {
 		margin-right: 0;
+	}
+
+	.scan-tabs.has-aside :global([role='tablist']) {
+		padding-right: 2.5rem;
 	}
 </style>

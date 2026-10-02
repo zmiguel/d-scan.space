@@ -244,4 +244,28 @@ describe('local', () => {
 		const corpNames = result.alliances[0].corporations.map((corp) => corp.name);
 		expect(corpNames).toEqual(['Corp A', 'Corp B']);
 	});
+
+	it('treats differently cased names as one pilot and accepts the canonical DB spelling', async () => {
+		const bob = {
+			id: 7,
+			name: 'Bob',
+			updated_at: new Date().toISOString(),
+			corporation_id: 10,
+			corporation_name: 'Corp',
+			corporation_ticker: 'C',
+			alliance_id: null,
+			alliance_name: null,
+			alliance_ticker: null
+		};
+		getCharactersByName.mockResolvedValueOnce([bob]).mockResolvedValueOnce([]);
+
+		const result = await createNewLocalScan(['bob', 'Bob']);
+
+		expect(getCharactersByName.mock.calls[0][0]).toEqual(['bob']);
+		expect(addCharactersFromESI).not.toHaveBeenCalled();
+		expect(result.total_pilots).toBe(1);
+		expect(result.alliances[0].corporations[0].characters).toEqual([
+			{ id: 7, name: 'Bob', sec_status: undefined }
+		]);
+	});
 });

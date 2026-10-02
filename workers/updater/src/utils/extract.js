@@ -1,99 +1,73 @@
-import AdmZip from 'adm-zip';
-import fs from 'fs';
-import path from 'path';
+import yauzl from 'yauzl';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import logger from '../../../../src/lib/logger.js';
 
-export async function extractZipNonBlocking(zipPath, tempDir, files = []) {
-	logger.info(`[ExtractWorker] Starting extraction from ${zipPath} to ${tempDir}`);
-
-	// Ensure temp directory exists
-	if (!fs.existsSync(tempDir)) {
-		fs.mkdirSync(tempDir, { recursive: true });
-	}
-
-	const zip = new AdmZip(zipPath);
-	const zipEntries = zip.getEntries();
-
-	if (files.length === 0) {
-		// Extract all files
-		let extractedCount = 0;
-		let failedCount = 0;
-		const totalEntries = zipEntries.filter((entry) => !entry.isDirectory).length;
-
-		for (const entry of zipEntries) {
-			if (!entry.isDirectory) {
-				try {
-					const outputPath = path.join(tempDir, entry.entryName);
-					const outputDir = path.dirname(outputPath);
-
-					// Ensure output directory exists
-					if (!fs.existsSync(outputDir)) {
-						fs.mkdirSync(outputDir, { recursive: true });
-					}
-
-					// Extract the file content and write it manually for better control
-					const fileData = zip.readFile(entry);
-					if (fileData) {
-						fs.writeFileSync(outputPath, fileData);
-						extractedCount++;
-					} else {
-						failedCount++;
-					}
-				} catch {
-					failedCount++;
-				}
-			}
-		}
-
-		logger.info(
-			`[ExtractWorker] Extraction complete: ${extractedCount}/${totalEntries} files extracted, ${failedCount} failed`
+/** @returns {Promise<import('yauzl').ZipFile>} */
+function openZip(zipPath) {
+	return new Promise((resolve, reject) => {
+		yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (err, zip) =>
+			err ? reject(err) : resolve(zip)
 		);
+	});
+}
 
-		return {
-			extractedFiles: extractedCount,
-			totalFiles: totalEntries,
-			failedFiles: failedCount,
-			requestedFiles: files.length,
-			method: 'admzip'
-		};
-	} else {
-		// Extract specific files
-		let extractedCount = 0;
+/**
+ * Streams the requested files out of a zip archive into `destDir`, one entry at a time,
+ * without loading the archive or an entry into memory (the SDE zip is ~100 MB).
+ *
+ * Entries are matched by base name and written as `destDir/<requested name>`: output
+ * paths never come from the archive, so crafted entry names (`../x`, absolute paths)
+ * cannot write outside `destDir` (zip-slip). yauzl additionally rejects such names.
+ *
+ * @param {string} zipPath
+ * @param {string} destDir
+ * @param {string[]} fileNames base names to extract, e.g. `types.jsonl`
+ * @returns {Promise<{ extractedFiles: number, totalBytes: number }>}
+ */
+export async function extractZipEntries(zipPath, destDir, fileNames) {
+	await fs.promises.mkdir(destDir, { recursive: true });
+	const wanted = new Set(fileNames.map((name) => path.basename(name)));
+	/** @type {Map<string, number>} */
+	const extracted = new Map();
 
-		for (const fileName of files) {
-			const normalizedFileName = fileName.replace(/\\/g, '/');
-			const entry = zip.getEntry(normalizedFileName);
-
-			if (!entry) {
-				throw new Error(`File not found in zip: ${fileName}`);
-			}
-
-			try {
-				const outputPath = path.join(tempDir, entry.entryName);
-				const outputDir = path.dirname(outputPath);
-
-				// Ensure output directory exists
-				if (!fs.existsSync(outputDir)) {
-					fs.mkdirSync(outputDir, { recursive: true });
+	const zip = await openZip(zipPath);
+	try {
+		await new Promise((resolve, reject) => {
+			zip.on('error', reject);
+			zip.on('end', resolve);
+			zip.on('entry', (entry) => {
+				const base = path.posix.basename(entry.fileName);
+				if (entry.fileName.endsWith('/') || !wanted.has(base) || extracted.has(base)) {
+					zip.readEntry();
+					return;
 				}
-
-				// Extract the file content and write it manually for better control
-				const fileData = zip.readFile(entry);
-				if (fileData) {
-					fs.writeFileSync(outputPath, fileData);
-					extractedCount++;
-				} else {
-					throw new Error(`Failed to read file data for: ${fileName}`);
-				}
-			} catch (error) {
-				logger.error(`[ExtractWorker] Failed to extract ${fileName}: ${error.message}`);
-				throw error;
-			}
-		}
-		return {
-			extractedFiles: extractedCount,
-			requestedFiles: files.length,
-			method: 'admzip'
-		};
+				zip.openReadStream(entry, (err, stream) => {
+					if (err) {
+						reject(err);
+						return;
+					}
+					pipeline(stream, fs.createWriteStream(path.join(destDir, base))).then(() => {
+						extracted.set(base, entry.uncompressedSize);
+						logger.info(`[Extract] ${base}: ${entry.uncompressedSize} bytes`);
+						zip.readEntry();
+					}, reject);
+				});
+			});
+			zip.readEntry();
+		});
+	} finally {
+		zip.close();
 	}
+
+	const missing = [...wanted].filter((name) => !extracted.has(name));
+	if (missing.length > 0) {
+		throw new Error(`Files not found in zip: ${missing.join(', ')}`);
+	}
+
+	return {
+		extractedFiles: extracted.size,
+		totalBytes: [...extracted.values()].reduce((sum, size) => sum + size, 0)
+	};
 }

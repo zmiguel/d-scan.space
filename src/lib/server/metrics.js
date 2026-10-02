@@ -57,7 +57,7 @@ if (pool) {
 				observableResult.observe(dbConnectionPoolIdle, idle);
 				observableResult.observe(dbConnectionPoolWaiting, waiting);
 			} catch (error) {
-				logger.warn({ msg: 'Failed to observe database pool metrics', error });
+				logger.warn({ err: error }, 'Failed to observe database pool metrics');
 			}
 		},
 		[dbConnectionPoolSize, dbConnectionPoolInUse, dbConnectionPoolIdle, dbConnectionPoolWaiting]
@@ -84,9 +84,10 @@ export const esiResponseStatusCounter = meter.createCounter('esi_response_status
 	unit: '1'
 });
 
-// Track the latest ESI rate limit values
-let latestEsiErrorLimitRemain = 0;
-let latestEsiErrorLimitReset = 0;
+// Latest ESI error-limit values; unknown (not observed) until the first ESI response, so
+// a restart does not look like an exhausted error budget.
+let latestEsiErrorLimitRemain = NaN;
+let latestEsiErrorLimitReset = NaN;
 
 export const esiErrorLimitRemain = meter.createObservableGauge('esi_error_limit_remain', {
 	description: 'Remaining ESI error limit before rate limiting',

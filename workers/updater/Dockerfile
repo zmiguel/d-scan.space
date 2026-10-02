@@ -1,4 +1,4 @@
-FROM node:24-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 
@@ -6,18 +6,16 @@ WORKDIR /app
 COPY workers/updater/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy worker source code
+# Worker source, shared library (incl. database schema) and drizzle migrations
 COPY workers/updater/src ./workers/updater/src
-
-# Copy shared schema from root
-COPY src/lib/database/schema.js ./src/lib/database/schema.js
-
-# Copy shared library
+COPY workers/updater/package.json ./workers/updater/package.json
 COPY src/lib ./src/lib
-
-# Copy drizzle migrations
 COPY drizzle ./drizzle
 
-HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD pgrep -f "node workers/updater/src/index.js" || exit 1
-CMD ["node", "workers/updater/src/index.js"]
+USER node
+
+# Healthy while a job run (or startup) succeeded within HEALTHCHECK_MAX_AGE_MS.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["node", "workers/updater/src/healthcheck.js"]
+# --import loads OpenTelemetry before the worker so pg is instrumented.
+CMD ["node", "--import", "./workers/updater/src/instrumentation.js", "workers/updater/src/index.js"]

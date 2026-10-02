@@ -1,21 +1,12 @@
 <script>
 	import { Button } from 'flowbite-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import MetaTags from '$lib/components/MetaTags.svelte';
 
 	const blame = $derived.by(() => {
-		const status = $page.status ?? 0;
-		if (status === 418) {
-			return {
-				title: "I'm a teapot, but so are you!",
-				subtitle:
-					'While your attempt was good and well formatted, your data returned nothing.\nAre you sure you copied the right thing?',
-				action: 'Try Again',
-				help: 'Double-check what you copied, then paste it again and reprocess.'
-			};
-		}
+		const status = page.status ?? 0;
 		const isUserError = status >= 400 && status < 500;
 		return {
 			title: isUserError ? 'Plot twist: user error detected.' : 'Our fault. Something is broken.',
@@ -34,10 +25,10 @@
 	}
 </script>
 
-<MetaTags title={blame.title} description={blame.subtitle} />
+<MetaTags title={blame.title} description={blame.subtitle} noIndex />
 
 <div class="mx-auto max-w-2xl text-center">
-	<div class="mb-4 text-6xl">{$page.status === 418 ? '🫖' : '🛰️'}</div>
+	<div class="mb-4 text-6xl">🛰️</div>
 	<h1 class="text-3xl font-bold text-red-500">{blame.title}</h1>
 	<p class="mt-2 text-lg whitespace-pre-line text-gray-600 dark:text-gray-300">
 		{blame.subtitle}
@@ -46,8 +37,8 @@
 	<div
 		class="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200"
 	>
-		<div class="font-semibold">Status: {$page.status}</div>
-		<div class="mt-1">{$page.error?.message ?? 'No additional details.'}</div>
+		<div class="font-semibold">Status: {page.status}</div>
+		<div class="mt-1">{page.error?.message ?? 'No additional details.'}</div>
 	</div>
 	<Button color="primary" class="mt-6 cursor-pointer" onclick={handleGoHome}>{blame.action}</Button>
 </div>

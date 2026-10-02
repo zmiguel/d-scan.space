@@ -1,4 +1,4 @@
-import { getScansByGroupID, getScanGroupByID } from '$lib/database/scans.js';
+import { getLatestScanIdInGroup, getScanGroupByID } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer.js';
 import { error, redirect } from '@sveltejs/kit';
 
@@ -19,19 +19,15 @@ export async function load(event) {
 				throw error(404, 'Scan group not found');
 			}
 
-			const groupScans = await getScansByGroupID(group);
-			if (!groupScans || groupScans.length === 0) {
+			const latestScanId = await getLatestScanIdInGroup(group);
+			if (!latestScanId) {
 				span.setAttributes({ 'scan.found': false, 'response.status': 404 });
 				throw error(404, 'No scans found in this group');
 			}
 
-			const latest = groupScans.reduce((a, b) =>
-				new Date(a.created_at) > new Date(b.created_at) ? a : b
-			);
+			span.setAttributes({ 'scan.id': latestScanId, 'scan.found': true });
 
-			span.setAttributes({ 'scan.id': latest.id, 'scan.found': true });
-
-			redirect(302, `/scan/${group}/${latest.id}`);
+			redirect(302, `/scan/${group}/${latestScanId}`);
 		},
 		{ 'route.id': 'scan_group_redirect' },
 		{},

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { trace } from '@opentelemetry/api';
+import { error, redirect } from '@sveltejs/kit';
 
 const { mockTracer, mockSpan } = vi.hoisted(() => {
 	const mockSpan = {
@@ -104,20 +105,27 @@ describe('tracer', () => {
 			);
 		});
 
+		/** Captures what SvelteKit's `error()` / `redirect()` throw. */
+		const thrownBy = (fn) => {
+			try {
+				fn();
+			} catch (thrown) {
+				return thrown;
+			}
+			throw new Error('expected a throw');
+		};
+
 		it('should handle SvelteKit redirects', async () => {
-			const redirectError = {
-				status: 302,
-				location: '/login',
-				constructor: { name: 'Redirect' }
-			};
+			const redirectError = thrownBy(() => redirect(302, '/login'));
 			const fn = vi.fn().mockRejectedValue(redirectError);
 
-			await expect(withSpan('test-span', fn)).rejects.toEqual(redirectError);
+			await expect(withSpan('test-span', fn)).rejects.toBe(redirectError);
 
 			expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 				expect.objectContaining({
 					'sveltekit.redirect': true,
-					'http.response.status_code': 302
+					'http.response.status_code': 302,
+					'http.response.redirect.location': '/login'
 				})
 			);
 			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
@@ -125,10 +133,10 @@ describe('tracer', () => {
 		});
 
 		it('should treat 4xx HttpErrors as handled client errors', async () => {
-			const httpError = { status: 404, message: 'Not found' };
+			const httpError = thrownBy(() => error(404, 'Not found'));
 			const fn = vi.fn().mockRejectedValue(httpError);
 
-			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+			await expect(withSpan('test-span', fn)).rejects.toBe(httpError);
 
 			expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -146,10 +154,10 @@ describe('tracer', () => {
 		});
 
 		it('should tag 422 HttpErrors as warnings', async () => {
-			const httpError = { status: 422, message: 'Validation failed' };
+			const httpError = thrownBy(() => error(422, 'Validation failed'));
 			const fn = vi.fn().mockRejectedValue(httpError);
 
-			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+			await expect(withSpan('test-span', fn)).rejects.toBe(httpError);
 
 			expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -166,17 +174,29 @@ describe('tracer', () => {
 			expect(mockSpan.recordException).not.toHaveBeenCalled();
 		});
 
-		it('should fallback to string message for HttpErrors without message', async () => {
-			const httpError = { status: 400 };
+		it('should name the status for HttpErrors without a message', async () => {
+			const httpError = thrownBy(() => error(400));
 			const fn = vi.fn().mockRejectedValue(httpError);
 
-			await expect(withSpan('test-span', fn)).rejects.toEqual(httpError);
+			await expect(withSpan('test-span', fn)).rejects.toBe(httpError);
 
 			expect(mockSpan.addEvent).toHaveBeenCalledWith(
 				'client_error',
-				expect.objectContaining({ status: 400, message: '[object Object]' })
+				expect.objectContaining({ status: 400 })
 			);
+			expect(mockSpan.addEvent.mock.calls[0][1].message).not.toBe('[object Object]');
 			expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
+		});
+
+		it('should record real errors that carry an HTTP status as errors', async () => {
+			// e.g. a failed upstream fetch: not a SvelteKit HttpError, must not be hidden.
+			const upstream = Object.assign(new Error('ESI 404'), { status: 404 });
+			const fn = vi.fn().mockRejectedValue(upstream);
+
+			await expect(withSpan('test-span', fn)).rejects.toBe(upstream);
+
+			expect(mockSpan.recordException).toHaveBeenCalledWith(upstream);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith(expect.objectContaining({ code: 2 })); // ERROR
 		});
 
 		it('should use SvelteKit event for parent context and attributes', async () => {

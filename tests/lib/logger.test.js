@@ -1,84 +1,33 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
-// Mock pino
-const mockPino = vi.fn(() => ({
-	info: vi.fn(),
-	error: vi.fn()
-}));
+const mockPino = vi.fn(() => ({ info: vi.fn(), error: vi.fn() }));
 mockPino.stdTimeFunctions = { isoTime: vi.fn() };
-
-vi.mock('pino', () => ({
-	default: mockPino
-}));
+vi.mock('pino', () => ({ default: mockPino }));
 
 describe('logger', () => {
-	it('should configure pino correctly', async () => {
-		await import('../../src/lib/logger.js');
-
-		expect(mockPino).toHaveBeenCalledWith(
-			expect.objectContaining({
-				level: expect.any(String),
-				mixin: expect.any(Function),
-				formatters: expect.objectContaining({
-					level: expect.any(Function)
-				}),
-				timestamp: expect.any(Function)
-			})
-		);
-	});
-
-	it('should add app name in mixin', async () => {
-		await import('../../src/lib/logger.js');
-
-		const config = mockPino.mock.calls[0][0];
-		const mixinResult = config.mixin();
-
-		expect(mixinResult).toHaveProperty('app');
-	});
-
-	it('should add db env in mixin', async () => {
-		const originalDbEnv = process.env.DB_ENV;
-		process.env.DB_ENV = 'test';
+	afterEach(() => {
+		vi.unstubAllEnvs();
 		vi.resetModules();
 		mockPino.mockClear();
-
-		await import('../../src/lib/logger.js');
-
-		const config = mockPino.mock.calls[0][0];
-		const mixinResult = config.mixin();
-
-		expect(mixinResult).toHaveProperty('env', 'test');
-
-		process.env.DB_ENV = originalDbEnv;
 	});
 
-	it('should format level correctly', async () => {
+	it('tags every log line with the process and the DB_ENV environment', async () => {
+		vi.stubEnv('DB_ENV', 'preview');
 		await import('../../src/lib/logger.js');
 
-		const config = mockPino.mock.calls[0][0];
-		const levelResult = config.formatters.level('info', 30);
-
-		expect(levelResult).toEqual({ level: 'info', priority: 30 });
+		expect(mockPino.mock.calls[0][0].mixin()).toEqual({ app: 'MAIN', env: 'preview' });
 	});
 
-	it('should determine app name correctly', async () => {
+	it('identifies the updater worker from its entry script', async () => {
 		const { getAppName } = await import('../../src/lib/logger.js');
-
-		// Default (MAIN)
-		expect(getAppName()).toBe('MAIN');
-
-		// Updater
 		const originalArgv = process.argv;
-		Object.defineProperty(process, 'argv', {
-			value: ['node', 'updater.js'],
-			writable: true
-		});
-
-		expect(getAppName()).toBe('UPDATER');
-
-		Object.defineProperty(process, 'argv', {
-			value: originalArgv,
-			writable: true
-		});
+		try {
+			process.argv = ['node', '/app/workers/updater/src/index.js'];
+			expect(getAppName()).toBe('UPDATER');
+			process.argv = ['node', '/app/build/index.js'];
+			expect(getAppName()).toBe('MAIN');
+		} finally {
+			process.argv = originalArgv;
+		}
 	});
 });

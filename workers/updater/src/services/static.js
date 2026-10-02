@@ -1,3 +1,13 @@
+/**
+ * Static data (SDE) import.
+ *
+ * When CCP publishes a new SDE build: stream the JSONL zip (~100 MB) to a private temp
+ * directory, extract the needed files one entry at a time, read them line by line and
+ * upsert NPC corporations, solar systems, categories, groups and types. Each table is
+ * upserted in its own transaction (src/lib/database/sde.js), rows referencing a missing
+ * parent are skipped instead of failing the table on its foreign key, and the temp
+ * directory is always removed.
+ */
 import { withSpan } from '../../../../src/lib/server/tracer.js';
 import logger from '../../../../src/lib/logger.js';
 import {
@@ -8,13 +18,31 @@ import {
 	addOrUpdateGroupsDB,
 	addOrUpdateTypesDB
 } from '../../../../src/lib/database/sde.js';
-import { SDE_FILE, SDE_VERSION } from '../../../../src/lib/server/constants.js';
-import fs from 'fs';
-import path from 'path';
-import { extractZipNonBlocking } from '../utils/extract.js';
+import { SDE_FILE, SDE_VERSION, USER_AGENT } from '../../../../src/lib/server/constants.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import readline from 'node:readline';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { extractZipEntries } from '../utils/extract.js';
 import { addOrUpdateCorporationsDB } from '../../../../src/lib/database/corporations.js';
 import { fetchGET } from '../../../../src/lib/server/wrappers.js';
 import { recordCronJob } from '../../../../src/lib/server/metrics.js';
+
+/** The SDE zip is ~100 MB; give slow links time but never hang forever. */
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+const PROGRESS_EVERY_BYTES = 10 * 1024 * 1024;
+
+const SDE_FILES = [
+	'npcCorporations.jsonl',
+	'mapRegions.jsonl',
+	'mapConstellations.jsonl',
+	'mapSolarSystems.jsonl',
+	'categories.jsonl',
+	'groups.jsonl',
+	'types.jsonl'
+];
 
 export async function updateStaticData() {
 	const startTime = Date.now();
@@ -22,27 +50,19 @@ export async function updateStaticData() {
 	try {
 		logger.info('[SDEUpdater] Updating static data...');
 		await withSpan('worker.static.cron', async () => {
-			// Get SDE version and compare it to the last entry in DB
-			const [updated, version] = await withSpan('worker.static.check_version', async (span) => {
-				let lastInstalledVersion = await getLastInstalledSDEVersion();
+			const [upToDate, version] = await withSpan('worker.static.check_version', async (span) => {
+				const lastInstalledVersion = await getLastInstalledSDEVersion();
 				const latestOnlineVersion = await getOnlineVersion();
 
-				// if lastInstalledVersion is an array, get the first element
-				if (Array.isArray(lastInstalledVersion)) {
-					lastInstalledVersion = lastInstalledVersion[0];
-				}
-
 				span.setAttributes({
-					'sde.installed': JSON.stringify(lastInstalledVersion),
+					'sde.installed': JSON.stringify(lastInstalledVersion ?? null),
 					'sde.online': JSON.stringify(latestOnlineVersion)
 				});
 
-				// If no previous version exists, force an update
 				if (!lastInstalledVersion) {
 					logger.info('[SDEUpdater] No previous SDE data found, update needed.');
 					return [false, latestOnlineVersion];
 				}
-
 				if (lastInstalledVersion.release_version === latestOnlineVersion.release_version) {
 					logger.info('[SDEUpdater] Static data is up to date, no update needed.');
 					return [true, latestOnlineVersion];
@@ -51,807 +71,300 @@ export async function updateStaticData() {
 				return [false, latestOnlineVersion];
 			});
 
-			// no update needed
-			if (updated) {
-				// Record skipped CRON job (no update needed)
-				const duration = Date.now() - startTime;
-				recordCronJob('updateStaticData', duration, true);
-				return;
+			if (upToDate) return;
+
+			const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'dscan-sde-'));
+			try {
+				logger.info('[SDEUpdater] Downloading and extracting SDE files...');
+				await downloadAndExtractSDE(SDE_FILE, tempDir, SDE_FILES);
+
+				logger.info('[SDEUpdater] Updating NPC corporations...');
+				const npcUpdateSuccess = await updateNPCCorps(tempDir);
+
+				logger.info('[SDEUpdater] Updating universe data...');
+				const universeUpdateSuccess = await updateUniverse(tempDir);
+
+				logger.info('[SDEUpdater] Updating item data...');
+				const itemUpdateSuccess = await updateItems(tempDir);
+
+				const success = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
+				logger.info(
+					{ npcUpdateSuccess, universeUpdateSuccess, itemUpdateSuccess },
+					`[SDEUpdater] Recording SDE build ${version.release_version}: ${success ? 'success' : 'failure'}`
+				);
+				// A failed import is recorded but not counted as installed, so it is retried.
+				await addSDEDataEntry({
+					release_date: version.release_date,
+					release_version: version.release_version,
+					success
+				});
+			} finally {
+				await fs.promises.rm(tempDir, { recursive: true, force: true });
+				logger.info('[SDEUpdater] Temporary files cleaned up');
 			}
-
-			// update needed
-
-			// extract only the files we need to save memory and time
-			const filesToExtract = [
-				// we need this to update NPC corps
-				'npcCorporations.jsonl',
-				// and these to update the universe
-				'mapRegions.jsonl',
-				'mapConstellations.jsonl',
-				'mapSolarSystems.jsonl',
-				// stuff in space & more
-				'categories.jsonl',
-				'groups.jsonl',
-				'types.jsonl'
-			];
-
-			logger.info('[SDEUpdater] Downloading and extracting SDE files...');
-
-			await downloadAndExtractSDE(SDE_FILE, filesToExtract);
-
-			// update NPC corps
-			logger.info('[SDEUpdater] Updating NPC corporations...');
-			const npcUpdateSuccess = await updateNPCCorps();
-			logger.info(
-				'[SDEUpdater] NPC corporations update ' + (npcUpdateSuccess ? 'succeeded' : 'failed')
-			);
-
-			// update the universe
-			logger.info('[SDEUpdater] Updating universe data...');
-			const universeUpdateSuccess = await updateUniverse();
-			logger.info(
-				'[SDEUpdater] Universe data update ' + (universeUpdateSuccess ? 'succeeded' : 'failed')
-			);
-
-			// update items
-			logger.info('[SDEUpdater] Updating item data...');
-			const itemUpdateSuccess = await updateItems();
-			logger.info('[SDEUpdater] Item data update ' + (itemUpdateSuccess ? 'succeeded' : 'failed'));
-
-			// save the SDE data entry
-			const final_result = npcUpdateSuccess && universeUpdateSuccess && itemUpdateSuccess;
-			logger.info(
-				'[SDEUpdater] Recording new SDE version in database... ' +
-					(final_result ? 'success' : 'failure')
-			);
-			await addSDEDataEntry({
-				release_date: version.release_date,
-				release_version: version.release_version,
-				success: final_result
-			});
-
-			// Update done
-			// clean up files
-			logger.info('[SDEUpdater] Cleaning up temporary files...');
-			await cleanupTemp();
 		});
 
 		logger.info('[SDEUpdater] Static data update completed.');
-
-		// Record successful CRON job
-		const duration = Date.now() - startTime;
-		recordCronJob('updateStaticData', duration, true);
-
+		recordCronJob('updateStaticData', Date.now() - startTime, true);
 		return true;
 	} catch (error) {
-		const duration = Date.now() - startTime;
-		recordCronJob('updateStaticData', duration, false);
+		recordCronJob('updateStaticData', Date.now() - startTime, false);
 		throw error;
 	}
 }
 
 async function getOnlineVersion() {
 	return await withSpan('worker.static.get_online_version', async (span) => {
-		try {
-			// fetch the version data from the SDE Links
-			const response = await fetchGET(SDE_VERSION);
-
-			if (!response) {
-				throw new Error(`Failed to fetch SDE version`);
-			}
-
-			const text = await response.text();
-			let sdeData;
-
-			try {
-				// Try to parse the whole text as JSON first
-				sdeData = JSON.parse(text);
-			} catch {
-				// If that fails, assume it's JSONL and take the first line
-				const lines = text.trim().split('\n');
-				if (lines.length > 0) {
-					sdeData = JSON.parse(lines[0]);
-				}
-			}
-
-			if (!sdeData) {
-				throw new Error('Failed to parse SDE version data');
-			}
-
-			// Extract version information
-			const buildNumber = sdeData.buildNumber;
-			const releaseDate = sdeData.releaseDate;
-
-			span.setAttributes({
-				'sde.build_number': buildNumber,
-				'sde.release_date': releaseDate
-			});
-
-			return {
-				release_version: buildNumber,
-				release_date: releaseDate
-			};
-		} catch (error) {
-			span.setStatus({ code: 2, message: `Failed to get online version: ${error.message}` });
-			throw error;
+		const response = await fetchGET(SDE_VERSION);
+		if (!response || !response.ok) {
+			throw new Error(
+				`Failed to fetch SDE version (${response ? response.status : 'no response'})`
+			);
 		}
+
+		// The version file is JSONL: one object per line, the first one is the SDE build.
+		const text = (await response.text()).trim();
+		const sdeData = JSON.parse(text.split('\n')[0]);
+		if (!sdeData?.buildNumber) {
+			throw new Error('Failed to parse SDE version data');
+		}
+
+		span.setAttributes({
+			'sde.build_number': sdeData.buildNumber,
+			'sde.release_date': sdeData.releaseDate
+		});
+		return { release_version: sdeData.buildNumber, release_date: sdeData.releaseDate };
 	});
 }
 
-async function downloadAndExtractSDE(url, files = []) {
+/**
+ * Streams the SDE zip to disk (backpressure, timeout, size check), then extracts the
+ * requested files. The zip itself is deleted afterwards.
+ */
+async function downloadAndExtractSDE(url, tempDir, files) {
 	await withSpan('worker.static.download_extract', async (span) => {
-		const tempDir = './temp';
-		const zipPath = path.join(tempDir, 'sde_download.zip');
-
+		const zipPath = path.join(tempDir, 'sde.zip');
 		try {
-			// Create temp directory if it doesn't exist
-			if (!fs.existsSync(tempDir)) {
-				fs.mkdirSync(tempDir, { recursive: true });
-			}
-
-			// Download the zip file using streaming to avoid blocking
-			span.addEvent('Downloading SDE zip file');
-			const response = await fetch(url);
-			if (!response.ok) {
-				span.setStatus({ code: 2, message: `Failed to download SDE: HTTP ${response.status}` });
+			const response = await fetch(url, {
+				headers: { 'User-Agent': USER_AGENT },
+				signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
+			});
+			if (!response.ok || !response.body) {
 				throw new Error(`Failed to download SDE: HTTP ${response.status} ${response.statusText}`);
 			}
 
-			// Stream the download to avoid blocking the event loop
-			const fileStream = fs.createWriteStream(zipPath);
-			const reader = response.body.getReader();
+			const expectedBytes = Number(response.headers.get('content-length')) || null;
 			let downloadedBytes = 0;
-			const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-
-					fileStream.write(value);
-					downloadedBytes += value.length;
-
-					// Log progress periodically during download (every ~1MB)
-					if (downloadedBytes % (1024 * 1024) === 0) {
+			let nextProgress = PROGRESS_EVERY_BYTES;
+			const progress = new Transform({
+				transform(chunk, _encoding, callback) {
+					downloadedBytes += chunk.length;
+					if (downloadedBytes >= nextProgress) {
+						nextProgress += PROGRESS_EVERY_BYTES;
 						span.addEvent('Download progress', {
 							downloadedBytes,
-							totalBytes: contentLength,
-							progress: contentLength > 0 ? Math.round((downloadedBytes / contentLength) * 100) : 0
+							expectedBytes: expectedBytes ?? -1
 						});
 					}
+					callback(null, chunk);
 				}
-			} finally {
-				reader.releaseLock();
-				fileStream.end();
+			});
+
+			await pipeline(Readable.fromWeb(response.body), progress, fs.createWriteStream(zipPath));
+
+			if (expectedBytes !== null && downloadedBytes !== expectedBytes) {
+				throw new Error(`SDE download truncated: ${downloadedBytes} of ${expectedBytes} bytes`);
 			}
+			span.setAttributes({ 'sde.download_bytes': downloadedBytes, 'sde.url': response.url });
 
-			// Wait for the file to be fully written
-			await new Promise((resolve, reject) => {
-				fileStream.on('finish', resolve);
-				fileStream.on('error', reject);
+			const result = await extractZipEntries(zipPath, tempDir, files);
+			span.setAttributes({
+				'sde.extracted_files': result.extractedFiles,
+				'sde.extracted_bytes': result.totalBytes
 			});
-
-			span.addEvent('SDE zip file downloaded', { size: downloadedBytes });
-
-			// Extract the zip file using non-blocking extraction with fallback
-			span.addEvent('Extracting zip file');
-			const extractionResult = await extractZipNonBlocking(zipPath, tempDir, files);
-			span.addEvent('Extraction completed', {
-				...extractionResult,
-				message: `Extracted ${extractionResult.extractedFiles} files using ${extractionResult.method}`
-			});
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			span.setStatus({ code: 2, message: errorMessage });
-			throw error;
 		} finally {
-			// Always clean up the zip file
-			if (fs.existsSync(zipPath)) {
-				fs.unlinkSync(zipPath);
-				span.addEvent('Zip file deleted');
-			}
+			await fs.promises.rm(zipPath, { force: true });
 		}
-
-		span.setStatus({ code: 0, message: 'SDE extraction completed successfully' });
 	});
 }
 
-async function cleanupTemp() {
-	// cleans up the ./temp directory after tasks are done
-	const tempDir = './temp';
-	if (fs.existsSync(tempDir)) {
-		fs.rmSync(tempDir, { recursive: true, force: true });
-		logger.info('Temporary files cleaned up');
+/**
+ * Calls `onRecord` for every JSON line of a JSONL file, streaming (never holds the file).
+ * Unparsable lines are counted and skipped.
+ * @param {string} filePath
+ * @param {(record: any) => void} onRecord
+ * @returns {Promise<{ lines: number, invalid: number }>}
+ */
+export async function readJsonLines(filePath, onRecord) {
+	const input = fs.createReadStream(filePath, { encoding: 'utf8' });
+	const lines = readline.createInterface({ input, crlfDelay: Infinity });
+	let count = 0;
+	let invalid = 0;
+	for await (const line of lines) {
+		if (!line.trim()) continue;
+		count++;
+		let record;
+		try {
+			record = JSON.parse(line);
+		} catch {
+			invalid++;
+			continue;
+		}
+		onRecord(record);
 	}
+	return { lines: count, invalid };
 }
 
-async function updateNPCCorps() {
-	return await withSpan('worker.static.update_npc_corps', async (span) => {
+// Row mappers: SDE JSONL record -> database row, or null when it must be skipped.
+
+export function toNpcCorporation(record) {
+	if (record.deleted === true) return null;
+	const name = record.name?.en;
+	const ticker = record.tickerName;
+	if (!record._key || !name || !ticker) return null;
+	return { id: record._key, name, ticker, alliance_id: null, npc: true };
+}
+
+export function toSystem(record, constellationNames, regionNames) {
+	const { _key: id, constellationID, regionID, securityStatus } = record;
+	const name = record.name?.en;
+	if (!id || !name || securityStatus === undefined) return null;
+	const constellation = constellationNames.get(constellationID);
+	const region = regionNames.get(regionID);
+	if (!constellation || !region) return null;
+	return { id, name, constellation, region, sec_status: Number(securityStatus) };
+}
+
+export function toCategory(record) {
+	const name = record.name?.en;
+	if (!record._key || !name) return null;
+	return { id: record._key, name };
+}
+
+export function toGroup(record) {
+	const name = record.name?.en;
+	if (!record._key || !name || !record.categoryID) return null;
+	return {
+		id: record._key,
+		name,
+		anchorable: record.anchorable || false,
+		anchored: record.anchored || false,
+		fittable_non_singleton: record.fittableNonSingleton || false,
+		category_id: record.categoryID,
+		icon_id: record.iconID || null
+	};
+}
+
+export function toType(record) {
+	const name = record.name?.en;
+	if (!record._key || !name || !record.groupID) return null;
+	return {
+		id: record._key,
+		name,
+		mass: record.mass || 0,
+		volume: record.volume || 0,
+		capacity: record.capacity || null,
+		faction_id: record.factionID || 0,
+		race_id: record.raceID || 0,
+		group_id: record.groupID,
+		market_group_id: record.marketGroupID || null,
+		icon_id: record.iconID || null
+	};
+}
+
+/**
+ * Reads a JSONL file through a mapper and records counts on the span.
+ * @returns {Promise<any[]>} mapped rows
+ */
+async function readRows(tempDir, fileName, mapper, span, label) {
+	const rows = [];
+	let skipped = 0;
+	const { lines, invalid } = await readJsonLines(path.join(tempDir, fileName), (record) => {
+		const row = mapper(record);
+		if (row) rows.push(row);
+		else skipped++;
+	});
+	span.setAttributes({
+		[`${label}.lines`]: lines,
+		[`${label}.invalid_json`]: invalid,
+		[`${label}.skipped`]: skipped,
+		[`${label}.valid`]: rows.length
+	});
+	if (invalid + skipped > 0) {
+		logger.warn({ file: fileName, invalid, skipped }, '[SDEUpdater] Skipped SDE records');
+	}
+	return rows;
+}
+
+/** Runs an import step; failures are logged/recorded and reported as `false`. */
+async function importStep(spanName, fn) {
+	return await withSpan(spanName, async (span) => {
 		try {
-			const jsonlFilePath = path.join('./temp', 'npcCorporations.jsonl');
-
-			span.addEvent('Reading npcCorporations.jsonl file');
-
-			// Check if the file exists
-			if (!fs.existsSync(jsonlFilePath)) {
-				span.setStatus({ code: 2, message: 'npcCorporations.jsonl file not found' });
-				throw new Error('npcCorporations.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Parsing NPC corporations data');
-
-			// Helper function to read JSONL file asynchronously without blocking
-			const readJSONLAsync = async (filePath) => {
-				return new Promise((resolve, reject) => {
-					const lines = [];
-					const stream = fs.createReadStream(filePath, {
-						encoding: 'utf8',
-						highWaterMark: 64 * 1024
-					});
-					let buffer = '';
-
-					stream.on('data', (chunk) => {
-						buffer += chunk;
-						const newlineIndex = buffer.lastIndexOf('\n');
-						if (newlineIndex !== -1) {
-							const completeLines = buffer.substring(0, newlineIndex);
-							buffer = buffer.substring(newlineIndex + 1);
-							lines.push(...completeLines.split('\n'));
-						}
-					});
-
-					stream.on('end', () => {
-						if (buffer.trim()) {
-							lines.push(buffer);
-						}
-						resolve(lines);
-					});
-
-					stream.on('error', reject);
-				});
-			};
-
-			// Read and parse the JSONL file
-			const lines = await readJSONLAsync(jsonlFilePath);
-
-			// Transform the data to match our database schema
-			const corporationsData = [];
-			let totalCorps = 0;
-			let skippedCorps = 0;
-
-			for (const line of lines) {
-				if (!line.trim()) continue; // Skip empty lines
-
-				totalCorps++;
-				const corpData = JSON.parse(line);
-
-				// Skip if corporation is deleted
-				if (corpData.deleted === true) {
-					skippedCorps++;
-					continue;
-				}
-
-				// Extract the required fields
-				const id = corpData._key;
-				const name = corpData.name?.en;
-				const ticker = corpData.tickerName;
-
-				// Validate required fields
-				if (!name || !ticker) {
-					logger.warn(`Skipping NPC corporation ${id} due to missing name or ticker`);
-					span.addEvent('Skipping corporation with missing data', {
-						corpId: id,
-						hasName: !!name,
-						hasTicker: !!ticker
-					});
-					skippedCorps++;
-					continue;
-				}
-
-				corporationsData.push({
-					id,
-					name,
-					ticker,
-					alliance_id: null, // NPC corps don't have alliances
-					npc: true // Mark as NPC corporation
-				});
-			}
-
-			span.setAttributes({
-				'npc_corps.total_in_file': totalCorps,
-				'npc_corps.skipped': skippedCorps,
-				'npc_corps.valid_corps': corporationsData.length
-			});
-
-			span.addEvent('Updating NPC corporations in database', {
-				corporationsCount: corporationsData.length
-			});
-
-			// Update the database with NPC corporations
-			await addOrUpdateCorporationsDB(corporationsData);
-
-			span.addEvent('NPC corporations updated successfully', {
-				updatedCount: corporationsData.length
-			});
-
-			span.setStatus({ code: 0, message: 'NPC corporations updated successfully' });
+			await fn(span);
 			return true;
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			logger.error(`Error updating NPC corporations: ${errorMessage}`);
-			span.setStatus({ code: 2, message: errorMessage });
+			logger.error({ err: error }, `[SDEUpdater] ${spanName} failed`);
+			span.setStatus({ code: 2, message: error?.message ?? String(error) });
 			return false;
 		}
 	});
 }
 
-async function updateUniverse() {
-	return await withSpan('worker.static.update_universe', async (span) => {
-		try {
-			const tempDir = './temp';
-			const systemsData = [];
-
-			span.addEvent('Starting universe data processing');
-
-			// Helper function to read JSONL file asynchronously without blocking
-			const readJSONLAsync = async (filePath) => {
-				return new Promise((resolve, reject) => {
-					const lines = [];
-					const stream = fs.createReadStream(filePath, {
-						encoding: 'utf8',
-						highWaterMark: 64 * 1024
-					});
-					let buffer = '';
-
-					stream.on('data', (chunk) => {
-						buffer += chunk;
-						const newlineIndex = buffer.lastIndexOf('\n');
-						if (newlineIndex !== -1) {
-							const completeLines = buffer.substring(0, newlineIndex);
-							buffer = buffer.substring(newlineIndex + 1);
-							lines.push(...completeLines.split('\n'));
-						}
-					});
-
-					stream.on('end', () => {
-						if (buffer.trim()) {
-							lines.push(buffer);
-						}
-						resolve(lines);
-					});
-
-					stream.on('error', reject);
-				});
-			};
-
-			// Load regions from mapRegions.jsonl
-			const regionsPath = path.join(tempDir, 'mapRegions.jsonl');
-			const regionMap = new Map(); // regionID -> region name
-
-			if (!fs.existsSync(regionsPath)) {
-				span.setStatus({ code: 2, message: 'mapRegions.jsonl file not found' });
-				throw new Error('mapRegions.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading mapRegions.jsonl file');
-			const regionLines = await readJSONLAsync(regionsPath);
-
-			for (const line of regionLines) {
-				if (!line.trim()) continue;
-				const regionData = JSON.parse(line);
-				const regionId = regionData._key;
-				const regionName = regionData.name?.en;
-
-				if (regionId && regionName) {
-					regionMap.set(regionId, regionName);
-				}
-			}
-
-			span.addEvent('Loaded regions', { totalRegions: regionMap.size });
-
-			// Load constellations from mapConstellations.jsonl
-			const constellationsPath = path.join(tempDir, 'mapConstellations.jsonl');
-			const constellationMap = new Map(); // constellationID -> constellation name
-
-			if (!fs.existsSync(constellationsPath)) {
-				span.setStatus({ code: 2, message: 'mapConstellations.jsonl file not found' });
-				throw new Error('mapConstellations.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading mapConstellations.jsonl file');
-			const constellationLines = await readJSONLAsync(constellationsPath);
-
-			for (const line of constellationLines) {
-				if (!line.trim()) continue;
-				const constellationData = JSON.parse(line);
-				const constellationId = constellationData._key;
-				const constellationName = constellationData.name?.en;
-
-				if (constellationId && constellationName) {
-					constellationMap.set(constellationId, constellationName);
-				}
-			}
-
-			span.addEvent('Loaded constellations', { totalConstellations: constellationMap.size });
-
-			// Load solar systems from mapSolarSystems.jsonl
-			const solarSystemsPath = path.join(tempDir, 'mapSolarSystems.jsonl');
-
-			if (!fs.existsSync(solarSystemsPath)) {
-				span.setStatus({ code: 2, message: 'mapSolarSystems.jsonl file not found' });
-				throw new Error('mapSolarSystems.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading mapSolarSystems.jsonl file');
-			const solarSystemLines = await readJSONLAsync(solarSystemsPath);
-
-			let processedSystems = 0;
-			let skippedSystems = 0;
-
-			for (const line of solarSystemLines) {
-				if (!line.trim()) continue;
-
-				try {
-					const systemData = JSON.parse(line);
-					const systemId = systemData._key;
-					const systemName = systemData.name?.en;
-					const constellationId = systemData.constellationID;
-					const regionId = systemData.regionID;
-					const securityStatus = systemData.securityStatus;
-
-					// Validate required fields
-					if (
-						!systemId ||
-						!systemName ||
-						constellationId === undefined ||
-						regionId === undefined ||
-						securityStatus === undefined
-					) {
-						logger.warn(`Skipping solar system ${systemId} due to missing required fields`);
-						span.addEvent('Skipping system with missing data', {
-							systemId,
-							hasName: !!systemName,
-							hasConstellationId: constellationId !== undefined,
-							hasRegionId: regionId !== undefined,
-							hasSecurityStatus: securityStatus !== undefined
-						});
-						skippedSystems++;
-						continue;
-					}
-
-					// Get constellation and region names from maps
-					const constellationName = constellationMap.get(constellationId);
-					const regionName = regionMap.get(regionId);
-
-					if (!constellationName || !regionName) {
-						logger.warn(
-							`Skipping solar system ${systemId} (${systemName}) due to missing constellation or region mapping`
-						);
-						span.addEvent('Skipping system with missing mapping', {
-							systemId,
-							systemName,
-							constellationId,
-							regionId,
-							hasConstellationMapping: !!constellationName,
-							hasRegionMapping: !!regionName
-						});
-						skippedSystems++;
-						continue;
-					}
-
-					systemsData.push({
-						id: systemId,
-						name: systemName,
-						constellation: constellationName,
-						region: regionName,
-						sec_status: parseFloat(securityStatus)
-					});
-
-					processedSystems++;
-
-					// Log progress every 1000 systems
-					if (processedSystems % 1000 === 0) {
-						span.addEvent('Processing progress', {
-							systemsProcessed: processedSystems,
-							systemsSkipped: skippedSystems
-						});
-					}
-				} catch (parseError) {
-					logger.warn(`Failed to parse solar system line: ${parseError.message}`);
-					skippedSystems++;
-				}
-			}
-
-			span.setAttributes({
-				'universe.regions_loaded': regionMap.size,
-				'universe.constellations_loaded': constellationMap.size,
-				'universe.systems_processed': processedSystems,
-				'universe.systems_skipped': skippedSystems,
-				'universe.systems_found': systemsData.length
-			});
-
-			span.addEvent('Updating systems in database', {
-				systemsCount: systemsData.length
-			});
-
-			// Update the database with systems data
-			if (systemsData.length > 0) {
-				await addOrUpdateSystemsDB(systemsData);
-				span.addEvent('Systems updated successfully', {
-					updatedCount: systemsData.length
-				});
-			} else {
-				span.addEvent('No systems found to update');
-			}
-
-			span.setStatus({ code: 0, message: 'Universe data updated successfully' });
-			return true;
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			logger.error(`Error updating Universe: ${errorMessage}`);
-			span.setStatus({ code: 2, message: errorMessage });
-			return false;
-		}
+function updateNPCCorps(tempDir) {
+	return importStep('worker.static.update_npc_corps', async (span) => {
+		const corporations = await readRows(
+			tempDir,
+			'npcCorporations.jsonl',
+			toNpcCorporation,
+			span,
+			'npc_corps'
+		);
+		await addOrUpdateCorporationsDB(corporations);
 	});
 }
 
-async function updateItems() {
-	return await withSpan('worker.static.update_items', async (span) => {
-		try {
-			const tempDir = './temp';
+function updateUniverse(tempDir) {
+	return importStep('worker.static.update_universe', async (span) => {
+		const names = (rows) => new Map(rows.map((row) => [row.id, row.name]));
+		const named = (record) =>
+			record._key && record.name?.en ? { id: record._key, name: record.name.en } : null;
 
-			span.addEvent('Starting item data processing');
+		const regions = names(await readRows(tempDir, 'mapRegions.jsonl', named, span, 'regions'));
+		const constellations = names(
+			await readRows(tempDir, 'mapConstellations.jsonl', named, span, 'constellations')
+		);
+		const systems = await readRows(
+			tempDir,
+			'mapSolarSystems.jsonl',
+			(record) => toSystem(record, constellations, regions),
+			span,
+			'systems'
+		);
+		await addOrUpdateSystemsDB(systems);
+	});
+}
 
-			// Helper function to read JSONL file asynchronously without blocking
-			const readJSONLAsync = async (filePath) => {
-				return new Promise((resolve, reject) => {
-					const lines = [];
-					const stream = fs.createReadStream(filePath, {
-						encoding: 'utf8',
-						highWaterMark: 64 * 1024
-					});
-					let buffer = '';
+function updateItems(tempDir) {
+	return importStep('worker.static.update_items', async (span) => {
+		const categories = await readRows(tempDir, 'categories.jsonl', toCategory, span, 'categories');
+		const categoryIds = new Set(categories.map((c) => c.id));
 
-					stream.on('data', (chunk) => {
-						buffer += chunk;
-						const newlineIndex = buffer.lastIndexOf('\n');
-						if (newlineIndex !== -1) {
-							const completeLines = buffer.substring(0, newlineIndex);
-							buffer = buffer.substring(newlineIndex + 1);
-							lines.push(...completeLines.split('\n'));
-						}
-					});
+		// inv_groups.category_id and inv_types.group_id are foreign keys: rows whose parent
+		// is not part of this SDE are skipped instead of failing the whole table.
+		const allGroups = await readRows(tempDir, 'groups.jsonl', toGroup, span, 'groups');
+		const groups = allGroups.filter((group) => categoryIds.has(group.category_id));
+		const groupIds = new Set(groups.map((g) => g.id));
 
-					stream.on('end', () => {
-						if (buffer.trim()) {
-							lines.push(buffer);
-						}
-						resolve(lines);
-					});
+		const allTypes = await readRows(tempDir, 'types.jsonl', toType, span, 'types');
+		const types = allTypes.filter((type) => groupIds.has(type.group_id));
 
-					stream.on('error', reject);
-				});
-			};
+		span.setAttributes({
+			'groups.orphaned': allGroups.length - groups.length,
+			'types.orphaned': allTypes.length - types.length
+		});
 
-			// Process categories
-			const categoriesPath = path.join(tempDir, 'categories.jsonl');
-			const categoriesData = [];
-
-			if (!fs.existsSync(categoriesPath)) {
-				span.setStatus({ code: 2, message: 'categories.jsonl file not found' });
-				throw new Error('categories.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading categories.jsonl file');
-			const categoryLines = await readJSONLAsync(categoriesPath);
-
-			let categoryCount = 0;
-			let skippedCategories = 0;
-
-			for (const line of categoryLines) {
-				if (!line.trim()) continue;
-
-				try {
-					const categoryData = JSON.parse(line);
-					const id = categoryData._key;
-					const name = categoryData.name?.en;
-
-					// Validate required fields
-					if (!id || !name) {
-						logger.warn(`Skipping category ${id} due to missing name`);
-						span.addEvent('Skipping category with missing data', {
-							categoryId: id,
-							hasName: !!name
-						});
-						skippedCategories++;
-						continue;
-					}
-
-					categoriesData.push({
-						id,
-						name
-					});
-
-					categoryCount++;
-				} catch (parseError) {
-					logger.warn(`Error parsing category line: ${parseError.message}`);
-					skippedCategories++;
-				}
-			}
-
-			span.setAttributes({
-				'categories.total_in_file': categoryCount,
-				'categories.skipped': skippedCategories,
-				'categories.valid': categoriesData.length
-			});
-
-			span.addEvent('Updating categories in database', {
-				categoriesCount: categoriesData.length
-			});
-
-			if (categoriesData.length > 0) {
-				await addOrUpdateCategoriesDB(categoriesData);
-				span.addEvent('Categories updated successfully', {
-					updatedCount: categoriesData.length
-				});
-			}
-
-			// Process groups
-			const groupsPath = path.join(tempDir, 'groups.jsonl');
-			const groupsData = [];
-
-			if (!fs.existsSync(groupsPath)) {
-				span.setStatus({ code: 2, message: 'groups.jsonl file not found' });
-				throw new Error('groups.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading groups.jsonl file');
-			const groupLines = await readJSONLAsync(groupsPath);
-
-			let groupCount = 0;
-			let skippedGroups = 0;
-
-			for (const line of groupLines) {
-				if (!line.trim()) continue;
-
-				try {
-					const groupData = JSON.parse(line);
-					const id = groupData._key;
-					const name = groupData.name?.en;
-					const categoryId = groupData.categoryID;
-
-					// Validate required fields
-					if (!id || !name || categoryId === undefined || categoryId === 0) {
-						logger.warn(`Skipping group ${id} due to missing required fields`);
-						span.addEvent('Skipping group with missing data', {
-							groupId: id,
-							hasName: !!name,
-							hasCategoryId: categoryId !== undefined
-						});
-						skippedGroups++;
-						continue;
-					}
-
-					groupsData.push({
-						id,
-						name,
-						anchorable: groupData.anchorable || false,
-						anchored: groupData.anchored || false,
-						fittable_non_singleton: groupData.fittableNonSingleton || false,
-						category_id: categoryId,
-						icon_id: groupData.iconID || null
-					});
-
-					groupCount++;
-				} catch (parseError) {
-					logger.warn(`Error parsing group line: ${parseError.message}`);
-					skippedGroups++;
-				}
-			}
-
-			span.setAttributes({
-				'groups.total_in_file': groupCount,
-				'groups.skipped': skippedGroups,
-				'groups.valid': groupsData.length
-			});
-
-			span.addEvent('Updating groups in database', {
-				groupsCount: groupsData.length
-			});
-
-			if (groupsData.length > 0) {
-				await addOrUpdateGroupsDB(groupsData);
-				span.addEvent('Groups updated successfully', {
-					updatedCount: groupsData.length
-				});
-			}
-
-			// Process types
-			const typesPath = path.join(tempDir, 'types.jsonl');
-			const typesData = [];
-
-			if (!fs.existsSync(typesPath)) {
-				span.setStatus({ code: 2, message: 'types.jsonl file not found' });
-				throw new Error('types.jsonl file not found in temp directory');
-			}
-
-			span.addEvent('Reading types.jsonl file');
-			const typeLines = await readJSONLAsync(typesPath);
-
-			let typeCount = 0;
-			let skippedTypes = 0;
-
-			for (const line of typeLines) {
-				if (!line.trim()) continue;
-
-				try {
-					const typeData = JSON.parse(line);
-					const id = typeData._key;
-					const name = typeData.name?.en;
-					const groupId = typeData.groupID;
-
-					// Validate required fields
-					if (!id || !name || groupId === undefined || groupId === 0) {
-						logger.warn(`Skipping type ${id} due to missing required fields`);
-						span.addEvent('Skipping type with missing data', {
-							typeId: id,
-							hasName: !!name,
-							hasGroupId: groupId !== undefined
-						});
-						skippedTypes++;
-						continue;
-					}
-
-					typesData.push({
-						id,
-						name,
-						mass: typeData.mass || 0,
-						volume: typeData.volume || 0,
-						capacity: typeData.capacity || null,
-						faction_id: typeData.factionID || 0,
-						race_id: typeData.raceID || 0,
-						group_id: groupId,
-						market_group_id: typeData.marketGroupID || null,
-						icon_id: typeData.iconID || null
-					});
-
-					typeCount++;
-				} catch (parseError) {
-					logger.warn(`Error parsing type line: ${parseError.message}`);
-					skippedTypes++;
-				}
-			}
-
-			span.setAttributes({
-				'types.total_in_file': typeCount,
-				'types.skipped': skippedTypes,
-				'types.valid': typesData.length
-			});
-
-			span.addEvent('Updating types in database', {
-				typesCount: typesData.length
-			});
-
-			if (typesData.length > 0) {
-				await addOrUpdateTypesDB(typesData);
-				span.addEvent('Types updated successfully', {
-					updatedCount: typesData.length
-				});
-			}
-
-			span.addEvent('Item data update completed successfully', {
-				totalCategories: categoriesData.length,
-				totalGroups: groupsData.length,
-				totalTypes: typesData.length
-			});
-
-			span.setStatus({ code: 0, message: 'Item data updated successfully' });
-			return true;
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			logger.error(`Error updating item data: ${errorMessage}`);
-			span.setStatus({ code: 2, message: errorMessage });
-			return false;
-		}
+		await addOrUpdateCategoriesDB(categories);
+		await addOrUpdateGroupsDB(groups);
+		await addOrUpdateTypesDB(types);
 	});
 }

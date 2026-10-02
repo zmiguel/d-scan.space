@@ -38,8 +38,7 @@ vi.mock('../../../src/lib/database/schema.js', () => ({
 import {
 	getCorporationsByID,
 	addOrUpdateCorporationsDB,
-	updateCorporationsLastSeen,
-	getAllCorporations
+	updateCorporationsLastSeen
 } from '../../../src/lib/database/corporations.js';
 
 describe('database/corporations', () => {
@@ -60,21 +59,6 @@ describe('database/corporations', () => {
 			expect(mockDb.select).toHaveBeenCalled();
 			expect(mockSelect.where).toHaveBeenCalled();
 			expect(result).toEqual([{ id: 1, name: 'Corp1' }]);
-		});
-	});
-
-	describe('getAllCorporations', () => {
-		it('should fetch all corporations', async () => {
-			const mockSelect = {
-				from: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }])
-			};
-			mockDb.select.mockReturnValue(mockSelect);
-
-			const result = await getAllCorporations();
-
-			expect(mockDb.select).toHaveBeenCalled();
-			expect(mockSelect.from).toHaveBeenCalled();
-			expect(result).toHaveLength(2);
 		});
 	});
 

@@ -54,41 +54,44 @@ export async function addOrUpdateSystemsDB(data) {
 			'systems.total_batches': totalBatches
 		});
 
-		for (let i = 0; i < totalBatches; i++) {
-			const start = i * BATCH_SIZE;
-			const end = Math.min(start + BATCH_SIZE, data.length);
-			const batch = data.slice(start, end);
+		// One transaction per table: a failed batch leaves the previous data intact.
+		await db.transaction(async (tx) => {
+			for (let i = 0; i < totalBatches; i++) {
+				const start = i * BATCH_SIZE;
+				const end = Math.min(start + BATCH_SIZE, data.length);
+				const batch = data.slice(start, end);
 
-			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
-				batchNumber: i + 1,
-				batchSize: batch.length,
-				startIndex: start,
-				endIndex: end - 1
-			});
+				span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+					batchNumber: i + 1,
+					batchSize: batch.length,
+					startIndex: start,
+					endIndex: end - 1
+				});
 
-			await db
-				.insert(systems)
-				.values(batch)
-				.onConflictDoUpdate({
-					target: systems.id,
-					set: {
-						name: sql`excluded.name`,
-						constellation: sql`excluded.constellation`,
-						region: sql`excluded.region`,
-						sec_status: sql`excluded.sec_status`,
-						last_seen: sql`systems.last_seen`, // Preserve existing last_seen
-						updated_at: sql`now()`
-					},
-					where: sql`
+				await tx
+					.insert(systems)
+					.values(batch)
+					.onConflictDoUpdate({
+						target: systems.id,
+						set: {
+							name: sql`excluded.name`,
+							constellation: sql`excluded.constellation`,
+							region: sql`excluded.region`,
+							sec_status: sql`excluded.sec_status`,
+							last_seen: sql`systems.last_seen`, // Preserve existing last_seen
+							updated_at: sql`now()`
+						},
+						where: sql`
 						systems.name IS DISTINCT FROM excluded.name OR
 						systems.constellation IS DISTINCT FROM excluded.constellation OR
 						systems.region IS DISTINCT FROM excluded.region OR
 						systems.sec_status IS DISTINCT FROM excluded.sec_status
 					`
-				});
+					});
 
-			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
-		}
+				span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+			}
+		});
 
 		span.addEvent('All batches completed successfully', {
 			totalSystemsProcessed: data.length
@@ -135,32 +138,34 @@ export async function addOrUpdateCategoriesDB(data) {
 			'categories.total_batches': totalBatches
 		});
 
-		for (let i = 0; i < totalBatches; i++) {
-			const start = i * BATCH_SIZE;
-			const end = Math.min(start + BATCH_SIZE, data.length);
-			const batch = data.slice(start, end);
+		await db.transaction(async (tx) => {
+			for (let i = 0; i < totalBatches; i++) {
+				const start = i * BATCH_SIZE;
+				const end = Math.min(start + BATCH_SIZE, data.length);
+				const batch = data.slice(start, end);
 
-			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
-				batchNumber: i + 1,
-				batchSize: batch.length
-			});
-
-			await db
-				.insert(invCategories)
-				.values(batch)
-				.onConflictDoUpdate({
-					target: invCategories.id,
-					set: {
-						name: sql`excluded.name`,
-						updated_at: sql`now()`
-					},
-					where: sql`
-						inv_categories.name IS DISTINCT FROM excluded.name
-					`
+				span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+					batchNumber: i + 1,
+					batchSize: batch.length
 				});
 
-			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
-		}
+				await tx
+					.insert(invCategories)
+					.values(batch)
+					.onConflictDoUpdate({
+						target: invCategories.id,
+						set: {
+							name: sql`excluded.name`,
+							updated_at: sql`now()`
+						},
+						where: sql`
+						inv_categories.name IS DISTINCT FROM excluded.name
+					`
+					});
+
+				span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+			}
+		});
 
 		span.addEvent('All batches completed successfully', {
 			totalCategoriesProcessed: data.length
@@ -187,31 +192,32 @@ export async function addOrUpdateGroupsDB(data) {
 			'groups.total_batches': totalBatches
 		});
 
-		for (let i = 0; i < totalBatches; i++) {
-			const start = i * BATCH_SIZE;
-			const end = Math.min(start + BATCH_SIZE, data.length);
-			const batch = data.slice(start, end);
+		await db.transaction(async (tx) => {
+			for (let i = 0; i < totalBatches; i++) {
+				const start = i * BATCH_SIZE;
+				const end = Math.min(start + BATCH_SIZE, data.length);
+				const batch = data.slice(start, end);
 
-			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
-				batchNumber: i + 1,
-				batchSize: batch.length
-			});
+				span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+					batchNumber: i + 1,
+					batchSize: batch.length
+				});
 
-			await db
-				.insert(invGroups)
-				.values(batch)
-				.onConflictDoUpdate({
-					target: invGroups.id,
-					set: {
-						name: sql`excluded.name`,
-						anchorable: sql`excluded.anchorable`,
-						anchored: sql`excluded.anchored`,
-						fittable_non_singleton: sql`excluded.fittable_non_singleton`,
-						category_id: sql`excluded.category_id`,
-						icon_id: sql`excluded.icon_id`,
-						updated_at: sql`now()`
-					},
-					where: sql`
+				await tx
+					.insert(invGroups)
+					.values(batch)
+					.onConflictDoUpdate({
+						target: invGroups.id,
+						set: {
+							name: sql`excluded.name`,
+							anchorable: sql`excluded.anchorable`,
+							anchored: sql`excluded.anchored`,
+							fittable_non_singleton: sql`excluded.fittable_non_singleton`,
+							category_id: sql`excluded.category_id`,
+							icon_id: sql`excluded.icon_id`,
+							updated_at: sql`now()`
+						},
+						where: sql`
 						inv_groups.name IS DISTINCT FROM excluded.name OR
 						inv_groups.anchorable IS DISTINCT FROM excluded.anchorable OR
 						inv_groups.anchored IS DISTINCT FROM excluded.anchored OR
@@ -219,10 +225,11 @@ export async function addOrUpdateGroupsDB(data) {
 						inv_groups.category_id IS DISTINCT FROM excluded.category_id OR
 						inv_groups.icon_id IS DISTINCT FROM excluded.icon_id
 					`
-				});
+					});
 
-			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
-		}
+				span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+			}
+		});
 
 		span.addEvent('All batches completed successfully', {
 			totalGroupsProcessed: data.length
@@ -249,34 +256,35 @@ export async function addOrUpdateTypesDB(data) {
 			'types.total_batches': totalBatches
 		});
 
-		for (let i = 0; i < totalBatches; i++) {
-			const start = i * BATCH_SIZE;
-			const end = Math.min(start + BATCH_SIZE, data.length);
-			const batch = data.slice(start, end);
+		await db.transaction(async (tx) => {
+			for (let i = 0; i < totalBatches; i++) {
+				const start = i * BATCH_SIZE;
+				const end = Math.min(start + BATCH_SIZE, data.length);
+				const batch = data.slice(start, end);
 
-			span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
-				batchNumber: i + 1,
-				batchSize: batch.length
-			});
+				span.addEvent(`Processing batch ${i + 1}/${totalBatches}`, {
+					batchNumber: i + 1,
+					batchSize: batch.length
+				});
 
-			await db
-				.insert(invTypes)
-				.values(batch)
-				.onConflictDoUpdate({
-					target: invTypes.id,
-					set: {
-						name: sql`excluded.name`,
-						mass: sql`excluded.mass`,
-						volume: sql`excluded.volume`,
-						capacity: sql`excluded.capacity`,
-						faction_id: sql`excluded.faction_id`,
-						race_id: sql`excluded.race_id`,
-						group_id: sql`excluded.group_id`,
-						market_group_id: sql`excluded.market_group_id`,
-						icon_id: sql`excluded.icon_id`,
-						updated_at: sql`now()`
-					},
-					where: sql`
+				await tx
+					.insert(invTypes)
+					.values(batch)
+					.onConflictDoUpdate({
+						target: invTypes.id,
+						set: {
+							name: sql`excluded.name`,
+							mass: sql`excluded.mass`,
+							volume: sql`excluded.volume`,
+							capacity: sql`excluded.capacity`,
+							faction_id: sql`excluded.faction_id`,
+							race_id: sql`excluded.race_id`,
+							group_id: sql`excluded.group_id`,
+							market_group_id: sql`excluded.market_group_id`,
+							icon_id: sql`excluded.icon_id`,
+							updated_at: sql`now()`
+						},
+						where: sql`
 						inv_types.name IS DISTINCT FROM excluded.name OR
 						inv_types.mass IS DISTINCT FROM excluded.mass OR
 						inv_types.volume IS DISTINCT FROM excluded.volume OR
@@ -287,10 +295,11 @@ export async function addOrUpdateTypesDB(data) {
 						inv_types.market_group_id IS DISTINCT FROM excluded.market_group_id OR
 						inv_types.icon_id IS DISTINCT FROM excluded.icon_id
 					`
-				});
+					});
 
-			span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
-		}
+				span.addEvent(`Completed batch ${i + 1}/${totalBatches}`);
+			}
+		});
 
 		span.addEvent('All batches completed successfully', {
 			totalTypesProcessed: data.length
@@ -395,6 +404,35 @@ export async function getSystemByName(name) {
 }
 
 /**
+ * Looks up solar systems by name, case-insensitively, in one query.
+ * @param {string[]} names
+ * @returns {Promise<Map<string, {id:number,name:string,constellation:string,region:string,secStatus:number}>>}
+ *   keyed by lower-cased name
+ */
+export async function getSystemsByNames(names) {
+	return await withSpan('database.sde.get_systems_by_names', async (span) => {
+		const lowered = [...new Set(names.map((name) => name.trim().toLowerCase()).filter(Boolean))];
+		span.setAttributes({ 'system.lookup_count': lowered.length });
+		if (lowered.length === 0) {
+			return new Map();
+		}
+
+		const rows = await db
+			.select({
+				id: systems.id,
+				name: systems.name,
+				constellation: systems.constellation,
+				region: systems.region,
+				secStatus: systems.sec_status
+			})
+			.from(systems)
+			.where(inArray(sql`lower(${systems.name})`, lowered));
+
+		return new Map(rows.map((row) => [row.name.toLowerCase(), row]));
+	});
+}
+
+/**
  * Searches solar systems by name prefix for autocomplete use cases.
  * @param {string} query
  * @param {number} limit
@@ -407,7 +445,9 @@ export async function searchSystemsByName(query, limit = 10) {
 			return [];
 		}
 
-		const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(25, Number(limit))) : 10;
+		const boundedLimit = Number.isFinite(limit)
+			? Math.max(1, Math.min(25, Math.trunc(Number(limit))))
+			: 10;
 		span.setAttributes({
 			'system.search_query': trimmed,
 			'system.search_limit': boundedLimit

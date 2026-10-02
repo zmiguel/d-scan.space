@@ -1,8 +1,11 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { getNodeCount, listGroups } from './directional.js';
 
-export const INTERESTING_RULES = [
-	// Ship Groups
+/**
+ * Rules matched against the SDE group id of a type (`inv_groups.id`). Group ids and type
+ * ids are separate number spaces, so they live in separate lists/maps.
+ */
+export const INTERESTING_GROUP_RULES = [
 	{ id: 25, min_count: 25, min_percent: 20 }, //		T1			Frigates
 	{ id: 26, min_count: 25, min_percent: 20 }, //		T1			Cruiser
 	{ id: 27, min_count: 20, min_percent: 10 }, //		T1			Battleships
@@ -42,8 +45,11 @@ export const INTERESTING_RULES = [
 	{ id: 1972, min_count: 1, min_percent: null }, //	Special		Flag Cruisers
 	{ id: 2001, min_count: 1, min_percent: null }, //	Special		Citizen Ships
 	{ id: 4594, min_count: 1, min_percent: null }, //	T2			Lancer Dreadnought
-	{ id: 4902, min_count: 1, min_percent: null }, //	T1			Expedition Command Ship
-	// Individual Ship Types
+	{ id: 4902, min_count: 1, min_percent: null } //	T1			Expedition Command Ship
+];
+
+/** Rules matched against a type id (`inv_types.id`); they take priority over group rules. */
+export const INTERESTING_TYPE_RULES = [
 	{ id: 615, min_count: 1, min_percent: null }, //	Special		Immolator
 	{ id: 617, min_count: 1, min_percent: null }, //	Special		Echo
 	{ id: 635, min_count: 1, min_percent: null }, //	Special		Opux Luxury Yacht
@@ -103,6 +109,8 @@ export const INTERESTING_RULES = [
 	{ id: 74141, min_count: 1, min_percent: null }, //	AT			Geri
 	{ id: 74316, min_count: 1, min_percent: null } //	AT			Bestla
 ];
+
+export const INTERESTING_RULES = { groups: INTERESTING_GROUP_RULES, types: INTERESTING_TYPE_RULES };
 
 function toNumber(value) {
 	if (value === null || value === undefined) return null;
@@ -214,22 +222,26 @@ function collectTotals(section, location, state) {
 /**
  * Builds the list of interesting leaf items for a directional scan.
  *
- * Rules are evaluated with type-id priority over group-id:
- * - If a leaf typeId has a rule, that rule decides whether it's interesting.
- * - Otherwise, if its parent groupId has a rule, the group rule decides.
+ * `rules` holds two separate lists, matched against different ids:
+ * - `types`: matched against the leaf's type id; decides when present,
+ * - `groups`: matched against the leaf's parent group id; used when no type rule exists.
+ * Missing or invalid lists count as empty; `rules` null/undefined means the defaults.
  *
  * An item is interesting if:
  * - both `min_count` and `min_percent` pass when both are provided, or
  * - the single provided threshold passes.
  * - `min_count`: minimum count (type or group total)
  * - `min_percent`: minimum percentage of total scan items (on+off), in percent points (e.g. 1 == 1%)
+ *
+ * @param {any} onGrid
+ * @param {any} offGrid
+ * @param {{ groups?: Array<object | number>, types?: Array<object | number> } | null} [rules]
  */
-export function buildInterestingItems(onGrid, offGrid, interestingIds = INTERESTING_RULES) {
-	const rules = normalizeRules(interestingIds ?? INTERESTING_RULES);
-	if (rules.length === 0) return [];
-
-	const ruleById = new Map();
-	for (const rule of rules) ruleById.set(rule.id, rule);
+export function buildInterestingItems(onGrid, offGrid, rules = INTERESTING_RULES) {
+	const { groups: groupRules, types: typeRules } = rules ?? INTERESTING_RULES;
+	const typeRuleById = new Map(normalizeRules(typeRules).map((rule) => [rule.id, rule]));
+	const groupRuleById = new Map(normalizeRules(groupRules).map((rule) => [rule.id, rule]));
+	if (typeRuleById.size === 0 && groupRuleById.size === 0) return [];
 
 	const state = {
 		total: 0,
@@ -242,8 +254,9 @@ export function buildInterestingItems(onGrid, offGrid, interestingIds = INTEREST
 
 	const interesting = [];
 	for (const typeEntry of state.types.values()) {
-		const typeRule = ruleById.get(typeEntry.id) ?? null;
-		const groupRule = typeEntry.groupId !== null ? (ruleById.get(typeEntry.groupId) ?? null) : null;
+		const typeRule = typeRuleById.get(typeEntry.id) ?? null;
+		const groupRule =
+			typeEntry.groupId !== null ? (groupRuleById.get(typeEntry.groupId) ?? null) : null;
 
 		let isInteresting = false;
 		if (typeRule) {

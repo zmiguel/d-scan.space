@@ -9,7 +9,19 @@ The tracing system provides:
 - **Automatic instrumentation** for SvelteKit hooks, load functions, and form actions
 - **Custom span creation** for business logic and database operations
 - **SvelteKit integration** with access to request context and routing information
-- **Production-ready configuration** with retry logic and performance optimization
+- **One shared setup** for the app and the updater worker (`src/lib/server/telemetry.js`)
+
+## Setup and configuration
+
+- `src/lib/server/telemetry.js` starts the NodeSDK. The app loads it through `src/instrumentation.server.js` (SvelteKit `kit.experimental.instrumentation.server`), the worker through `node --import ./src/instrumentation.js` (`workers/updater`). Both load it before `pg`, which is auto-instrumented; HTTP/fetch/undici/fs/dns/net auto-instrumentation is off (ESI and request spans are manual).
+- **Export only when configured.** `OTEL_EXPORTER_OTLP_ENDPOINT` empty/unset = no OTLP export. Accepted forms: the collector base URL (`http://collector:4318`, as in the OTel spec) or the traces URL (`http://collector:4318/v1/traces`); traces go to `/v1/traces`, metrics to `/v1/metrics`. `OTEL_EXPORTER_OTLP_AUTHORIZATION` is sent as the `Authorization` header and never logged.
+- **Metrics:** Prometheus `/metrics` on `PROMETHEUS_PORT` is always served; OTLP metrics are pushed every `OTEL_METRIC_EXPORT_INTERVAL` ms (default 15000). For a collector that only accepts traces (OTLP metrics answer 404), set `OTEL_METRICS_EXPORTER=prometheus`. The SDK gets all readers and views explicitly, so it creates no extra env-driven metric/log pipelines and only one MeterProvider exists.
+- **Spans** are batched with the SDK defaults (tune with the standard `OTEL_BSP_*` variables). The OTLP exporter retries network errors and 429/5xx itself; each distinct export error is logged through pino at most once a minute.
+- **Requests:** every request has a SERVER span `server.hooks.handle_request` (`src/hooks.server.js`) with `http.method`, `http.route`, `http.target`, `http.request.user_agent`, `client.address`, `http.response.status_code` and `http.server.duration_ms`. It sits under SvelteKit's own `sveltekit.handle.root` (kind INTERNAL, `kit.experimental.tracing.server`). Query requests by the SERVER span: Tempo/Grafana trace views, span metrics and service graphs select server spans.
+- **Dev:** `npm run dev` reads the OTEL variables from `.env` (`$env/dynamic/private`); the SDK is started once per process even when Vite reloads the instrumentation.
+- **Shutdown:** telemetry is flushed on `sveltekit:shutdown` (app) or SIGINT/SIGTERM (worker), for at most 3 s, so an unreachable collector cannot delay exit past a container's stop timeout.
+
+Local collector example: run any OTLP/HTTP collector (e.g. Grafana Alloy, the OpenTelemetry Collector or Jaeger all-in-one on port 4318) and set `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`.
 
 ## Table of Contents
 
@@ -370,7 +382,7 @@ Trace database operations with relevant context:
 
 ```javascript
 import { withSpan } from '$lib/server/tracer';
-import { db } from '$lib/database/connection';
+import { db } from '$lib/database/client';
 
 export async function searchCharacters(query, limit = 20) {
 	return await withSpan(

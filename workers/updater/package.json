@@ -1,24 +1,32 @@
 {
 	"name": "d-scan-space-updater",
-	"version": "1.0.6",
+	"version": "1.1.0",
 	"type": "module",
 	"main": "src/index.js",
+	"engines": {
+		"node": ">=26.0.0"
+	},
 	"scripts": {
-		"start": "node src/index.js"
+		"start": "node --env-file-if-exists=../../.env --import ./src/instrumentation.js src/index.js"
 	},
 	"dependencies": {
 		"@opentelemetry/api": "^1.9.1",
-		"@opentelemetry/auto-instrumentations-node": "^0.73.0",
-		"@opentelemetry/exporter-trace-otlp-proto": "^0.215.0",
-		"@opentelemetry/resources": "^2.7.0",
-		"@opentelemetry/sdk-node": "^0.215.0",
-		"@opentelemetry/semantic-conventions": "^1.40.0",
-		"adm-zip": "^0.5.17",
+		"@opentelemetry/auto-instrumentations-node": "^0.80.0",
+		"@opentelemetry/core": "^2.11.0",
+		"@opentelemetry/exporter-metrics-otlp-proto": "^0.222.0",
+		"@opentelemetry/exporter-prometheus": "^0.222.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+		"@opentelemetry/resources": "^2.11.0",
+		"@opentelemetry/sdk-metrics": "^2.11.0",
+		"@opentelemetry/sdk-node": "^0.222.0",
+		"@opentelemetry/sdk-trace-node": "^2.11.0",
+		"@opentelemetry/semantic-conventions": "^1.43.0",
 		"croner": "^10.0.1",
-		"drizzle-orm": "^0.45.2",
-		"import-in-the-middle": "^3.0.1",
-		"pg": "^8.20.0",
+		"drizzle-orm": "^0.45.3",
+		"import-in-the-middle": "^3.5.2",
+		"pg": "^8.23.1",
 		"pino": "^10.3.1",
-		"undici": "^8.1.0"
+		"undici": "^8.11.2",
+		"yauzl": "^3.4.0"
 	}
 }

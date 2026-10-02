@@ -7,7 +7,6 @@ export default defineConfig({
 	test: {
 		projects: [
 			{
-				extends: './vite.config.js',
 				test: {
 					name: 'server',
 					environment: 'node',

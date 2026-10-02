@@ -1,5 +1,5 @@
 <script>
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	/**
 	 * @typedef {Object} Props
@@ -10,7 +10,8 @@
 	 * @property {boolean} [showImage] - If false, omits image meta tags.
 	 * @property {'website' | 'article'} [type] - Content type ('website' or 'article').
 	 * @property {string} [color] - Discord sidebar color (Hex code).
-	 * @property {boolean} [noIndex] - If true, hides page from Google.
+	 * @property {boolean} [noIndex] - If true, asks search engines not to index the page
+	 *   (private scans, per-user pages, errors).
 	 * @property {boolean} [appendSiteName] - If false, omits '| D-Scan Space!' suffix.
 	 */
 
@@ -31,12 +32,12 @@
 
 	let fullTitle = $derived(appendSiteName ? `${title} | D-Scan Space!` : title);
 
-	// Get current absolute URL
-	let currentUrl = $derived($page.url.href);
+	// Canonical/OG URL without query string or hash.
+	let currentUrl = $derived(`${page.url.origin}${page.url.pathname}`);
 
 	// Ensure image is absolute (Resolve relative paths like '/og.png')
 	let absoluteImage = $derived(
-		image.startsWith('http') ? image : new URL(image, $page.url.origin).href
+		image.startsWith('http') ? image : new URL(image, page.url.origin).href
 	);
 </script>
 
@@ -44,7 +45,6 @@
 	<!-- 1. Basic HTML Meta Tags -->
 	<title>{fullTitle}</title>
 	<meta name="description" content={description} />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 	<!-- THEME COLOR: The Discord side-bar color -->
 	<meta name="theme-color" content={color} />
@@ -52,7 +52,10 @@
 	{#if noIndex}
 		<meta name="robots" content="noindex, nofollow" />
 	{:else}
-		<meta name="robots" content="index, follow" />
+		<meta
+			name="robots"
+			content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+		/>
 	{/if}
 
 	<!-- 2. Canonical URL -->
@@ -73,8 +76,8 @@
 		<meta property="og:image:height" content="96" />
 	{/if}
 
-	<!-- 4. Twitter Cards -->
-	<meta name="twitter:card" content={showImage ? 'summary_large_image' : 'summary'} />
+	<!-- 4. Twitter Cards (the default image is a small square icon, so use the small card) -->
+	<meta name="twitter:card" content="summary" />
 	<meta name="twitter:title" content={title} />
 	<meta name="twitter:description" content={description} />
 	{#if showImage}

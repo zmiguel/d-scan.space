@@ -1,43 +1,44 @@
 /**
- * All DB functions related to stats
+ * All DB functions related to stats.
+ *
+ * Every counter is `count(*) FILTER (WHERE ...)` over a single table scan: each row is
+ * counted once per bucket, so no `COUNT(DISTINCT ...)` sort/hash is needed. Callers
+ * cache the results (see src/routes/stats/+page.server.js).
  */
 import { db } from '$lib/database/client';
 import { withSpan } from '$lib/server/tracer';
 import { characters, corporations, alliances, scans, scanGroups } from '../database/schema';
 import { eq, sql } from 'drizzle-orm';
 
-export async function getScanStats() {
-	// get stats for scans, how many scans, how many groups
-	return await withSpan('database.stats.get_scan_stats', async () => {
-		const stats = await db
-			.select({
-				totalScans: sql`COUNT(DISTINCT ${scans.id})`.mapWith(Number),
-				totalScanGroups: sql`COUNT(DISTINCT ${scanGroups.id})`.mapWith(Number),
-				publicScans:
-					sql`COUNT(DISTINCT CASE WHEN ${scanGroups.public} = true THEN ${scans.id} END)`.mapWith(
-						Number
-					),
-				publicScanGroups:
-					sql`COUNT(DISTINCT CASE WHEN ${scanGroups.public} = true THEN ${scanGroups.id} END)`.mapWith(
-						Number
-					),
-				scanGroupsWithoutSystem:
-					sql`COUNT(DISTINCT CASE WHEN ${scanGroups.system} IS NULL THEN ${scanGroups.id} END)`.mapWith(
-						Number
-					),
-				localScans:
-					sql`COUNT(DISTINCT CASE WHEN ${scans.scan_type} = 'local' THEN ${scans.id} END)`.mapWith(
-						Number
-					),
-				directionalScans:
-					sql`COUNT(DISTINCT CASE WHEN ${scans.scan_type} = 'directional' THEN ${scans.id} END)`.mapWith(
-						Number
-					)
-			})
-			.from(scanGroups)
-			.leftJoin(scans, eq(scans.group_id, scanGroups.id));
+const count = (condition) =>
+	(condition ? sql`count(*) FILTER (WHERE ${condition})` : sql`count(*)`).mapWith(Number);
 
-		return stats[0];
+/** @param {import('drizzle-orm').AnyColumn} column */
+const seenWithin = (column, interval) =>
+	sql`${column} >= now() - ${sql.raw(`interval '${interval}'`)}`;
+
+export async function getScanStats() {
+	return await withSpan('database.stats.get_scan_stats', async () => {
+		const [scanCounts, groupCounts] = await Promise.all([
+			db
+				.select({
+					totalScans: count(),
+					publicScans: count(sql`${scanGroups.public} = true`),
+					localScans: count(sql`${scans.scan_type} = 'local'`),
+					directionalScans: count(sql`${scans.scan_type} = 'directional'`)
+				})
+				.from(scans)
+				.innerJoin(scanGroups, eq(scanGroups.id, scans.group_id)),
+			db
+				.select({
+					totalScanGroups: count(),
+					publicScanGroups: count(sql`${scanGroups.public} = true`),
+					scanGroupsWithoutSystem: count(sql`${scanGroups.system} IS NULL`)
+				})
+				.from(scanGroups)
+		]);
+
+		return { ...scanCounts[0], ...groupCounts[0] };
 	});
 }
 
@@ -45,35 +46,14 @@ export async function getCharacterStats() {
 	return await withSpan('database.stats.get_character_stats', async () => {
 		const stats = await db
 			.select({
-				totalCharacters: sql`COUNT(DISTINCT ${characters.id})`.mapWith(Number),
-				charactersLastSeen24h:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.last_seen} >= NOW() - INTERVAL '24 hours' THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersLastSeenWeek:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.last_seen} >= NOW() - INTERVAL '7 days' THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersLastSeenMonth:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.last_seen} >= NOW() - INTERVAL '30 days' THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersLastSeenYear:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.last_seen} >= NOW() - INTERVAL '365 days' THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersUpdated24h:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.updated_at} >= NOW() - INTERVAL '24 hours' THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersWithoutAlliance:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.alliance_id} IS NULL THEN ${characters.id} END)`.mapWith(
-						Number
-					),
-				charactersDeleted:
-					sql`COUNT(DISTINCT CASE WHEN ${characters.deleted_at} IS NOT NULL THEN ${characters.id} END)`.mapWith(
-						Number
-					)
+				totalCharacters: count(),
+				charactersLastSeen24h: count(seenWithin(characters.last_seen, '24 hours')),
+				charactersLastSeenWeek: count(seenWithin(characters.last_seen, '7 days')),
+				charactersLastSeenMonth: count(seenWithin(characters.last_seen, '30 days')),
+				charactersLastSeenYear: count(seenWithin(characters.last_seen, '365 days')),
+				charactersUpdated24h: count(seenWithin(characters.updated_at, '24 hours')),
+				charactersWithoutAlliance: count(sql`${characters.alliance_id} IS NULL`),
+				charactersDeleted: count(sql`${characters.deleted_at} IS NOT NULL`)
 			})
 			.from(characters);
 
@@ -85,35 +65,14 @@ export async function getCorporationStats() {
 	return await withSpan('database.stats.get_corporation_stats', async () => {
 		const stats = await db
 			.select({
-				totalCorporations: sql`COUNT(DISTINCT ${corporations.id})`.mapWith(Number),
-				corporationsLastSeen24h:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.last_seen} >= NOW() - INTERVAL '24 hours' THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				corporationsLastSeenWeek:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.last_seen} >= NOW() - INTERVAL '7 days' THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				corporationsLastSeenMonth:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.last_seen} >= NOW() - INTERVAL '30 days' THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				corporationsLastSeenYear:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.last_seen} >= NOW() - INTERVAL '365 days' THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				corporationsUpdated24h:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.updated_at} >= NOW() - INTERVAL '24 hours' THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				corporationsWithoutAlliance:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.alliance_id} IS NULL THEN ${corporations.id} END)`.mapWith(
-						Number
-					),
-				npcCorporations:
-					sql`COUNT(DISTINCT CASE WHEN ${corporations.npc} = true THEN ${corporations.id} END)`.mapWith(
-						Number
-					)
+				totalCorporations: count(),
+				corporationsLastSeen24h: count(seenWithin(corporations.last_seen, '24 hours')),
+				corporationsLastSeenWeek: count(seenWithin(corporations.last_seen, '7 days')),
+				corporationsLastSeenMonth: count(seenWithin(corporations.last_seen, '30 days')),
+				corporationsLastSeenYear: count(seenWithin(corporations.last_seen, '365 days')),
+				corporationsUpdated24h: count(seenWithin(corporations.updated_at, '24 hours')),
+				corporationsWithoutAlliance: count(sql`${corporations.alliance_id} IS NULL`),
+				npcCorporations: count(sql`${corporations.npc} = true`)
 			})
 			.from(corporations);
 
@@ -125,27 +84,12 @@ export async function getAllianceStats() {
 	return await withSpan('database.stats.get_alliance_stats', async () => {
 		const stats = await db
 			.select({
-				totalAlliances: sql`COUNT(DISTINCT ${alliances.id})`.mapWith(Number),
-				alliancesLastSeen24h:
-					sql`COUNT(DISTINCT CASE WHEN ${alliances.last_seen} >= NOW() - INTERVAL '24 hours' THEN ${alliances.id} END)`.mapWith(
-						Number
-					),
-				alliancesLastSeenWeek:
-					sql`COUNT(DISTINCT CASE WHEN ${alliances.last_seen} >= NOW() - INTERVAL '7 days' THEN ${alliances.id} END)`.mapWith(
-						Number
-					),
-				alliancesLastSeenMonth:
-					sql`COUNT(DISTINCT CASE WHEN ${alliances.last_seen} >= NOW() - INTERVAL '30 days' THEN ${alliances.id} END)`.mapWith(
-						Number
-					),
-				alliancesLastSeenYear:
-					sql`COUNT(DISTINCT CASE WHEN ${alliances.last_seen} >= NOW() - INTERVAL '365 days' THEN ${alliances.id} END)`.mapWith(
-						Number
-					),
-				alliancesUpdated24h:
-					sql`COUNT(DISTINCT CASE WHEN ${alliances.updated_at} >= NOW() - INTERVAL '24 hours' THEN ${alliances.id} END)`.mapWith(
-						Number
-					)
+				totalAlliances: count(),
+				alliancesLastSeen24h: count(seenWithin(alliances.last_seen, '24 hours')),
+				alliancesLastSeenWeek: count(seenWithin(alliances.last_seen, '7 days')),
+				alliancesLastSeenMonth: count(seenWithin(alliances.last_seen, '30 days')),
+				alliancesLastSeenYear: count(seenWithin(alliances.last_seen, '365 days')),
+				alliancesUpdated24h: count(seenWithin(alliances.updated_at, '24 hours'))
 			})
 			.from(alliances);
 

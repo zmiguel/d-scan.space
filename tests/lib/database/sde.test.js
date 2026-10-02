@@ -19,7 +19,8 @@ const { mockSpan, mockDb } = vi.hoisted(() => {
 		values: vi.fn(),
 		onConflictDoUpdate: vi.fn(),
 		set: vi.fn(),
-		leftJoin: vi.fn()
+		leftJoin: vi.fn(),
+		transaction: vi.fn()
 	};
 
 	// Chainable mocks setup
@@ -34,6 +35,8 @@ const { mockSpan, mockDb } = vi.hoisted(() => {
 	mockDb.update.mockReturnValue(mockDb);
 	mockDb.set.mockReturnValue(mockDb);
 	mockDb.leftJoin.mockReturnValue(mockDb);
+	// Upserts run in a transaction; the callback gets the same chainable mock as `tx`.
+	mockDb.transaction.mockImplementation((fn) => fn(mockDb));
 
 	return { mockSpan, mockDb };
 });

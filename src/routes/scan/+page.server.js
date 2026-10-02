@@ -1,16 +1,25 @@
-import ShortUniqueId from 'short-unique-id';
-import { error, redirect } from '@sveltejs/kit';
-import { createNewLocalScan } from '$lib/server/local.js';
-import { createNewDirectionalScan } from '$lib/server/directional.js';
+import { newScanGroupId, newScanId } from '$lib/server/ids.js';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { createNewScan, getScanGroupByID, updateScan } from '$lib/database/scans.js';
 import { withSpan } from '$lib/server/tracer';
 import logger from '$lib/logger';
 import { scansProcessedCounter } from '$lib/server/metrics';
-import { detectScanType } from '$lib/utils/scan_type.js';
+import {
+	buildScanFromSubmission,
+	readScanForm,
+	rejectionPayload
+} from '$lib/server/scan-submission.js';
 
-/** @satisfies {import('./$types').Actions} */
+/**
+ * Paste problems (empty, too large, unrecognized format, nothing resolvable) are
+ * returned with `fail()` so the form keeps the text and shows the reason and the first
+ * offending lines. Programming/authorization errors still use `error()`.
+ *
+ * @satisfies {import('./$types').Actions}
+ */
 export const actions = {
-	create: async ({ request, event, locals }) => {
+	create: async (event) => {
+		const { request, locals } = event;
 		return await withSpan(
 			'route.scan.create',
 			async (span) => {
@@ -18,160 +27,60 @@ export const actions = {
 				const createdBy = session?.user?.id ?? null;
 				const primaryCharacterName = session?.eve?.characterName ?? session?.user?.name ?? null;
 
-				const data = await request.formData();
-				const content = /** @type {(string | null)} */ (data.get('scan_content'));
+				const form = await readScanForm(request);
+				if (!form.ok) {
+					return fail(form.status, rejectionPayload(form, span, 'create'));
+				}
+				const data = form.data;
+				const content = data.get('scan_content');
 				const is_public = data.has('is_public');
 
-				if (!content) {
-					span.setAttributes({
-						'scan.error': 'missing_content',
-						'response.status': 400
-					});
-					logger.warn('Scan create rejected: no scan content provided');
-					throw error(400, 'No scan content provided');
+				const built = await buildScanFromSubmission(content, span, event);
+				if (!built.ok) {
+					return fail(built.status, rejectionPayload(built, span, 'create'));
 				}
 
-				let lines = content.split('\n');
-				// remove empty lines
-				lines = lines.filter((line) => line.trim().length > 0);
-
-				const scanTypeResult = await withSpan(
-					'scan.detect_type',
-					async (childSpan) => {
-						childSpan.setAttributes({
-							'scan.content_lines': lines.length
-						});
-						return detectScanType(lines);
-					},
-					{},
-					{},
-					event
-				);
-
-				if (scanTypeResult.type === 'unknown') {
-					span.setAttributes({
-						'scan.error': 'unknown_format',
-						'response.status': 400
-					});
-					logger.warn('Scan create rejected: unrecognized scan format');
-					throw error(400, 'Unrecognized scan format');
-				}
-
-				if (!scanTypeResult.supported) {
-					span.setAttributes({
-						'scan.error': 'unsupported_type',
-						'scan.type': scanTypeResult.type,
-						'response.status': 422
-					});
-					logger.warn(`Scan create rejected: unsupported scan type ${scanTypeResult.type}`);
-					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
-				}
-
-				const uid = new ShortUniqueId();
-				const scanGroupId = uid.randomUUID(8);
-				const scanId = uid.randomUUID(12);
+				const scanGroupId = newScanGroupId();
+				const scanId = newScanId();
 
 				span.setAttributes({
-					'scan.content_lines': lines.length,
 					'scan.is_public': is_public,
-					'scan.type': scanTypeResult.type,
 					'scan.group_id': scanGroupId,
 					'scan.id': scanId,
 					'user.id': createdBy ?? 'anonymous',
 					'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 				});
 
-				let result;
-				switch (scanTypeResult.type) {
-					case 'local':
-						result = await createNewLocalScan(lines);
-						break;
-					case 'directional':
-						result = await createNewDirectionalScan(lines);
-						break;
-					default:
-						span.setAttributes({
-							'scan.error': 'unsupported_type',
-							'scan.type': scanTypeResult.type,
-							'response.status': 422
-						});
-						logger.warn(`Scan create rejected: unsupported scan type ${scanTypeResult.type}`);
-						throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
-				}
-
-				switch (scanTypeResult.type) {
-					case 'local': {
-						const totalPilots = result?.total_pilots ?? 0;
-						if (totalPilots === 0) {
-							span.setAttributes({
-								'scan.error': 'no_valid_characters',
-								'scan.type': scanTypeResult.type,
-								'response.status': 418
-							});
-							logger.warn('Scan create rejected: no valid characters found');
-							throw error(418, 'No valid characters found in scan');
-						}
-						break;
-					}
-					case 'directional': {
-						const onGrid = result?.on_grid?.total_objects ?? 0;
-						const offGrid = result?.off_grid?.total_objects ?? 0;
-						if (onGrid + offGrid === 0) {
-							span.setAttributes({
-								'scan.error': 'no_valid_objects',
-								'scan.type': scanTypeResult.type,
-								'response.status': 418
-							});
-							logger.warn('Scan create rejected: no valid objects found');
-							throw error(418, 'No valid objects found in scan');
-						}
-						break;
-					}
-					default:
-						break;
-				}
-
 				try {
 					await withSpan(
 						'route.scan.persist_new_scan',
-						async () => {
-							return await createNewScan({
+						async () =>
+							createNewScan({
 								scanGroupId,
 								scanId,
 								is_public,
-								type: scanTypeResult.type,
-								data: result,
+								type: built.type,
+								data: built.result,
 								raw_data: content,
 								created_by: createdBy,
 								primary_character_name: primaryCharacterName
-							});
-						},
+							}),
 						{
 							'scan.group_id': scanGroupId,
 							'scan.id': scanId,
-							'scan.type': scanTypeResult.type,
-							'scan.data_lines': lines.length,
-							'scan.is_public': is_public,
-							'user.id': createdBy ?? 'anonymous',
-							'user.primary_character_name': primaryCharacterName ?? 'anonymous'
+							'scan.type': built.type,
+							'scan.data_lines': built.lineCount,
+							'scan.is_public': is_public
 						}
 					);
-				} catch (e) {
-					span.setAttributes({
-						'scan.error': 'persist_failed',
-						'response.status': 500
-					});
-					logger.error('Failed to store scan data', e);
+				} catch (err) {
+					span.setAttributes({ 'scan.error': 'persist_failed', 'response.status': 500 });
+					logger.error({ err }, 'Failed to store scan data');
 					throw error(500, 'Failed to store scan data');
 				}
 
 				logger.info(`Created new scan with ID: ${scanId} in group: ${scanGroupId}`);
-
-				// Record metric for scan processed
-				scansProcessedCounter.add(1, {
-					type: scanTypeResult.type,
-					public: is_public.toString()
-				});
+				scansProcessedCounter.add(1, { type: built.type, public: is_public.toString() });
 
 				return redirect(303, `/scan/${scanGroupId}/${scanId}`);
 			},
@@ -181,7 +90,8 @@ export const actions = {
 		);
 	},
 
-	update: async ({ request, event, locals }) => {
+	update: async (event) => {
+		const { request, locals } = event;
 		return await withSpan(
 			'route.scan.update',
 			async (span) => {
@@ -189,136 +99,57 @@ export const actions = {
 				const createdBy = session?.user?.id ?? null;
 				const primaryCharacterName = session?.eve?.characterName ?? session?.user?.name ?? null;
 
-				const data = await request.formData();
-				const content = /** @type {(string | null)} */ (data.get('scan_content'));
-
-				if (!content) {
-					span.setAttributes({
-						'scan.error': 'missing_content',
-						'response.status': 400
-					});
-					logger.warn('Scan update rejected: no scan content provided');
-					throw error(400, 'No scan content provided');
+				const form = await readScanForm(request);
+				if (!form.ok) {
+					return fail(form.status, rejectionPayload(form, span, 'update'));
 				}
-
-				let lines = content.split('\n');
-				// remove empty lines
-				lines = lines.filter((line) => line.trim().length > 0);
-
-				const scanTypeResult = await withSpan(
-					'scan.detect_type',
-					async (childSpan) => {
-						childSpan.setAttributes({
-							'scan.content_lines': lines.length
-						});
-						return detectScanType(lines);
-					},
-					{},
-					{},
-					event
-				);
-
-				if (scanTypeResult.type === 'unknown') {
-					span.setAttributes({
-						'scan.error': 'unknown_format',
-						'response.status': 400
-					});
-					logger.warn('Scan update rejected: unrecognized scan format');
-					throw error(400, 'Unrecognized scan format');
-				}
-
-				if (!scanTypeResult.supported) {
-					span.setAttributes({
-						'scan.error': 'unsupported_type',
-						'scan.type': scanTypeResult.type,
-						'response.status': 422
-					});
-					logger.warn(`Scan update rejected: unsupported scan type ${scanTypeResult.type}`);
-					throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
-				}
-
-				const uid = new ShortUniqueId();
+				const data = form.data;
+				const content = data.get('scan_content');
 				const originalScanGroupId = data.get('scan_group');
-				let targetScanGroupId = originalScanGroupId;
-				const scanId = uid.randomUUID(12);
 
-				const existingGroup = originalScanGroupId
-					? await getScanGroupByID(originalScanGroupId)
-					: null;
+				if (typeof originalScanGroupId !== 'string' || !originalScanGroupId) {
+					span.setAttributes({ 'scan.error': 'missing_group', 'response.status': 400 });
+					logger.warn('Scan update rejected: no scan group provided');
+					throw error(400, 'No scan group provided');
+				}
 
-				if (existingGroup?.created_by && existingGroup.created_by !== createdBy) {
-					span.setAttributes({
-						'scan.error': 'forbidden',
-						'response.status': 403
-					});
+				// Validate the target group before any ESI/SDE work.
+				const existingGroup = await getScanGroupByID(originalScanGroupId);
+				if (!existingGroup) {
+					span.setAttributes({ 'scan.error': 'group_not_found', 'response.status': 404 });
+					logger.warn('Scan update rejected: scan group not found');
+					throw error(404, 'Scan group not found');
+				}
+
+				// Groups created while logged out (created_by NULL) are collaborative by
+				// design: anyone with the link may append scans. Owned groups only accept
+				// scans from their owner.
+				if (existingGroup.created_by && existingGroup.created_by !== createdBy) {
+					span.setAttributes({ 'scan.error': 'forbidden', 'response.status': 403 });
 					logger.warn('Scan update rejected: user does not own this scan group');
 					throw error(403, 'Forbidden');
 				}
 
+				const built = await buildScanFromSubmission(content, span, event);
+				if (!built.ok) {
+					return fail(built.status, rejectionPayload(built, span, 'update'));
+				}
+
+				const scanId = newScanId();
+				let targetScanGroupId = originalScanGroupId;
+
 				span.setAttributes({
-					'scan.content_lines': lines.length,
-					'scan.type': scanTypeResult.type,
 					'scan.group_id': originalScanGroupId,
 					'scan.id': scanId,
 					'user.id': createdBy ?? 'anonymous',
 					'user.primary_character_name': primaryCharacterName ?? 'anonymous'
 				});
 
-				let result;
-				switch (scanTypeResult.type) {
-					case 'local':
-						result = await createNewLocalScan(lines);
-						break;
-					case 'directional':
-						result = await createNewDirectionalScan(lines);
-						break;
-					default:
-						span.setAttributes({
-							'scan.error': 'unsupported_type',
-							'scan.type': scanTypeResult.type,
-							'response.status': 422
-						});
-						logger.warn(`Scan update rejected: unsupported scan type ${scanTypeResult.type}`);
-						throw error(422, `Unsupported scan type: ${scanTypeResult.type}`);
-				}
-
-				switch (scanTypeResult.type) {
-					case 'local': {
-						const totalPilots = result?.total_pilots ?? 0;
-						if (totalPilots === 0) {
-							span.setAttributes({
-								'scan.error': 'no_valid_characters',
-								'scan.type': scanTypeResult.type,
-								'response.status': 418
-							});
-							logger.warn('Scan update rejected: no valid characters found');
-							throw error(418, 'No valid characters found in scan');
-						}
-						break;
-					}
-					case 'directional': {
-						const onGrid = result?.on_grid?.total_objects ?? 0;
-						const offGrid = result?.off_grid?.total_objects ?? 0;
-						if (onGrid + offGrid === 0) {
-							span.setAttributes({
-								'scan.error': 'no_valid_objects',
-								'scan.type': scanTypeResult.type,
-								'response.status': 418
-							});
-							logger.warn('Scan update rejected: no valid objects found');
-							throw error(418, 'No valid objects found in scan');
-						}
-						break;
-					}
-					default:
-						break;
-				}
-
+				// A d-scan from a different system than the group's starts a new group.
 				let createAsNewGroup = false;
-				if (scanTypeResult.type === 'directional' && originalScanGroupId) {
-					const existingGroup = await getScanGroupByID(originalScanGroupId);
-					const existingSystem = existingGroup?.system ?? null;
-					const directionalSystem = result?.system ?? null;
+				if (built.type === 'directional') {
+					const existingSystem = existingGroup.system ?? null;
+					const directionalSystem = built.result?.system ?? null;
 
 					if (
 						existingSystem &&
@@ -326,7 +157,7 @@ export const actions = {
 						!systemsMatch(existingSystem, directionalSystem)
 					) {
 						createAsNewGroup = true;
-						targetScanGroupId = uid.randomUUID(8);
+						targetScanGroupId = newScanGroupId();
 						span.setAttributes({
 							'scan.group_id.original': originalScanGroupId,
 							'scan.group_id.target': targetScanGroupId,
@@ -337,71 +168,44 @@ export const actions = {
 					}
 				}
 
+				const persisted = {
+					scanGroupId: targetScanGroupId,
+					scanId,
+					type: built.type,
+					data: built.result,
+					raw_data: content,
+					created_by: createdBy,
+					primary_character_name: primaryCharacterName
+				};
+				const persistAttributes = {
+					'scan.group_id': targetScanGroupId,
+					'scan.id': scanId,
+					'scan.type': built.type,
+					'scan.data_lines': built.lineCount
+				};
+
 				try {
 					if (createAsNewGroup) {
 						await withSpan(
 							'route.scan.persist_new_from_update_scan',
-							async () => {
-								return await createNewScan({
-									scanGroupId: targetScanGroupId,
-									scanId,
-									is_public: false,
-									type: scanTypeResult.type,
-									data: result,
-									raw_data: content,
-									created_by: createdBy,
-									primary_character_name: primaryCharacterName
-								});
-							},
-							{
-								'scan.group_id': targetScanGroupId,
-								'scan.id': scanId,
-								'scan.type': scanTypeResult.type,
-								'scan.data_lines': lines.length,
-								'user.id': createdBy ?? 'anonymous',
-								'user.primary_character_name': primaryCharacterName ?? 'anonymous'
-							}
+							async () => createNewScan({ ...persisted, is_public: false }),
+							persistAttributes
 						);
 					} else {
 						await withSpan(
 							'route.scan.persist_update_scan',
-							async () => {
-								return await updateScan({
-									scanGroupId: targetScanGroupId,
-									scanId,
-									type: scanTypeResult.type,
-									data: result,
-									raw_data: content,
-									created_by: createdBy,
-									primary_character_name: primaryCharacterName
-								});
-							},
-							{
-								'scan.group_id': targetScanGroupId,
-								'scan.id': scanId,
-								'scan.type': scanTypeResult.type,
-								'scan.data_lines': lines.length,
-								'user.id': createdBy ?? 'anonymous',
-								'user.primary_character_name': primaryCharacterName ?? 'anonymous'
-							}
+							async () => updateScan(persisted),
+							persistAttributes
 						);
 					}
-				} catch (e) {
-					span.setAttributes({
-						'scan.error': 'persist_failed',
-						'response.status': 500
-					});
-					logger.error('Failed to store scan data', e);
+				} catch (err) {
+					span.setAttributes({ 'scan.error': 'persist_failed', 'response.status': 500 });
+					logger.error({ err }, 'Failed to store scan data');
 					throw error(500, 'Failed to store scan data');
 				}
 
 				logger.info(`Updated scan with ID: ${scanId} in group: ${targetScanGroupId}`);
-
-				// Record metric for scan processed (update)
-				scansProcessedCounter.add(1, {
-					type: scanTypeResult.type,
-					public: 'false' // Updates are always on existing scans
-				});
+				scansProcessedCounter.add(1, { type: built.type, public: 'false' });
 
 				return redirect(303, `/scan/${targetScanGroupId}/${scanId}`);
 			},
@@ -412,11 +216,17 @@ export const actions = {
 	}
 };
 
-function systemsMatch(existingSystem, inferredSystem) {
-	const existingId = Number(existingSystem?.id);
-	const inferredId = Number(inferredSystem?.id);
+/** Positive integer system id, or null (null/undefined/'' must not become 0). */
+function systemId(system) {
+	const id = Number(system?.id ?? NaN);
+	return Number.isInteger(id) && id > 0 ? id : null;
+}
 
-	if (Number.isFinite(existingId) && Number.isFinite(inferredId)) {
+function systemsMatch(existingSystem, inferredSystem) {
+	const existingId = systemId(existingSystem);
+	const inferredId = systemId(inferredSystem);
+
+	if (existingId !== null && inferredId !== null) {
 		return existingId === inferredId;
 	}
 

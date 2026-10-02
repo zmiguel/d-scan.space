@@ -3,43 +3,41 @@
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import { onDestroy } from 'svelte';
+	import ScanSubmitError from '$lib/components/ScanSubmitError.svelte';
+	import { copyText, scanGroupUrl } from '$lib/utils/clipboard.js';
 
 	let { data } = $props();
 
 	// For the sidebar form
 	let isLoading = $state(false);
-	let formError = $state('');
+	/** @type {{ message: string, failedLines?: any[], failedLineCount?: number } | null} */
+	let formError = $state(null);
 	const copiedFlagKey = 'scan-link-copied';
 
-	async function copyRedirectUrl(location) {
+	/** Copies the new scan's group link; the scan page toasts only if this succeeded. */
+	async function copyGroupLink(location) {
 		if (!browser || !location) {
 			return;
 		}
-
-		const absoluteUrl = new URL(location, window.location.origin).toString();
-		try {
-			await navigator.clipboard.writeText(absoluteUrl);
-		} catch {
-			// Ignore clipboard write failures (e.g., permission denied)
+		if (await copyText(scanGroupUrl(location, window.location.origin))) {
+			sessionStorage.setItem(copiedFlagKey, '1');
 		}
-	}
-
-	function markCopiedFlag() {
-		if (!browser) {
-			return;
-		}
-
-		sessionStorage.setItem(copiedFlagKey, '1');
 	}
 
 	function handleSubmit() {
 		isLoading = true;
-		formError = '';
+		formError = null;
 		return async ({ result, update }) => {
 			if (result?.type === 'redirect') {
-				await copyRedirectUrl(result.location);
-				markCopiedFlag();
+				await copyGroupLink(result.location);
 				window.location.assign(result.location);
+				isLoading = false;
+				return;
+			}
+
+			if (result?.type === 'failure') {
+				// Keep the pasted text and explain what is wrong with it.
+				formError = /** @type {any} */ (result.data) ?? { message: 'Scan rejected.' };
 				isLoading = false;
 				return;
 			}
@@ -52,14 +50,14 @@
 	// Reset loading state when component is destroyed or page changes
 	onDestroy(() => {
 		isLoading = false;
-		formError = '';
+		formError = null;
 	});
 
 	// Reset loading state when page data changes (e.g., after navigation)
 	$effect(() => {
 		if (data && data.params) {
 			isLoading = false;
-			formError = '';
+			formError = null;
 		}
 	});
 </script>
@@ -88,32 +86,36 @@
 				<p class="mt-2 text-sm text-gray-600 sm:text-base dark:text-gray-400">Processing...</p>
 			</div>
 		</div>
-	{:else}
-		<form id="update-scan-form" method="POST" action="/scan?/update" use:enhance={handleSubmit}>
-			<!-- Hidden input for scan group -->
-			<input type="hidden" name="scan_group" value={data.params.group} />
-
-			<Textarea
-				id="scan-content"
-				placeholder="Paste your data"
-				rows={4}
-				name="scan_content"
-				required
-				class="mb-2 w-full text-sm sm:text-base"
-			/>
-			{#if formError}
-				<div class="mb-2 text-xs text-red-500 sm:text-sm">{formError}</div>
-			{/if}
-			<Button
-				class="w-full cursor-pointer text-sm sm:text-base"
-				color="primary"
-				type="submit"
-				size="sm"
-				data-rybbit-event="scan_submit"
-				data-rybbit-prop-form="update"
-				data-rybbit-prop-scan={data.params.scan}
-				data-rybbit-prop-group={data.params.group}>Update</Button
-			>
-		</form>
 	{/if}
+	<!-- Hidden, not unmounted, while processing so the pasted text survives a rejection. -->
+	<form
+		id="update-scan-form"
+		method="POST"
+		action="/scan?/update"
+		use:enhance={handleSubmit}
+		class:hidden={isLoading}
+	>
+		<!-- Hidden input for scan group -->
+		<input type="hidden" name="scan_group" value={data.params.group} />
+
+		<Textarea
+			id="scan-content"
+			placeholder="Paste your data"
+			rows={4}
+			name="scan_content"
+			required
+			class="mb-2 w-full text-sm sm:text-base"
+		/>
+		<ScanSubmitError error={formError} compact />
+		<Button
+			class="mt-2 w-full cursor-pointer text-sm sm:text-base"
+			color="primary"
+			type="submit"
+			size="sm"
+			data-rybbit-event="scan_submit"
+			data-rybbit-prop-form="update"
+			data-rybbit-prop-scan={data.params.scan}
+			data-rybbit-prop-group={data.params.group}>Update</Button
+		>
+	</form>
 </div>

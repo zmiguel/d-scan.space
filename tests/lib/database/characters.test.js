@@ -42,181 +42,93 @@ vi.mock('../../../src/lib/database/schema.js', () => ({
 }));
 
 import {
-	getCharactersByName,
 	addOrUpdateCharactersDB,
 	updateCharactersLastSeen,
-	updateCharactersAllianceByCorporation,
-	biomassCharacter,
-	getAllCharacters,
-	getLeastRecentlyUpdatedCharacters
+	biomassCharacters
 } from '../../../src/lib/database/characters.js';
+
+function mockUpdateChain() {
+	const chain = {
+		set: vi.fn().mockReturnThis(),
+		where: vi.fn().mockReturnThis(),
+		then: (resolve) => resolve()
+	};
+	mockDb.update.mockReturnValue(chain);
+	return chain;
+}
 
 describe('database/characters', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	describe('getCharactersByName', () => {
-		it('should fetch characters by name', async () => {
-			const mockSelect = {
-				from: vi.fn().mockReturnThis(),
-				leftJoin: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue([{ id: 1, name: 'Char1' }])
-			};
-			mockDb.select.mockReturnValue(mockSelect);
-
-			const result = await getCharactersByName(['Char1']);
-
-			expect(mockDb.select).toHaveBeenCalled();
-			expect(mockSelect.from).toHaveBeenCalled();
-			expect(mockSelect.leftJoin).toHaveBeenCalledTimes(2); // corps and alliances
-			expect(mockSelect.where).toHaveBeenCalled();
-			expect(result).toEqual([{ id: 1, name: 'Char1' }]);
-		});
-	});
-
-	describe('getAllCharacters', () => {
-		it('should fetch all characters', async () => {
-			const mockSelect = {
-				from: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }])
-			};
-			mockDb.select.mockReturnValue(mockSelect);
-
-			const result = await getAllCharacters();
-
-			expect(mockDb.select).toHaveBeenCalled();
-			expect(mockSelect.from).toHaveBeenCalled();
-			expect(result).toHaveLength(2);
-		});
-	});
-
 	describe('addOrUpdateCharactersDB', () => {
-		it('should upsert characters', async () => {
-			const data = [{ id: 1, name: 'Char1', corporation_id: 10 }];
-
-			const mockInsert = {
+		it('writes one row per id (last wins) with normalized columns', async () => {
+			const insert = {
 				values: vi.fn().mockReturnThis(),
 				onConflictDoUpdate: vi.fn().mockResolvedValue()
 			};
-			mockDb.insert.mockReturnValue(mockInsert);
+			mockDb.insert.mockReturnValue(insert);
 
-			await addOrUpdateCharactersDB(data);
+			await addOrUpdateCharactersDB([
+				{ id: 1, name: 'bob', security_status: -2.5, corporation_id: 10 },
+				{ id: 2, name: 'Alice', sec_status: 1.2, corporation_id: 11, alliance_id: 99 },
+				{ id: 1, name: 'Bob', security_status: -2.5, corporation_id: 10 }
+			]);
 
-			expect(mockDb.insert).toHaveBeenCalled();
-			expect(mockInsert.values).toHaveBeenCalled();
-			expect(mockInsert.onConflictDoUpdate).toHaveBeenCalled();
+			expect(insert.values).toHaveBeenCalledTimes(1);
+			expect(insert.values.mock.calls[0][0]).toEqual([
+				{
+					id: 1,
+					name: 'Bob',
+					sec_status: -2.5,
+					corporation_id: 10,
+					alliance_id: null,
+					esi_cache_expires: null
+				},
+				{
+					id: 2,
+					name: 'Alice',
+					sec_status: 1.2,
+					corporation_id: 11,
+					alliance_id: 99,
+					esi_cache_expires: null
+				}
+			]);
 		});
 
-		it('should skip if data is empty', async () => {
+		it('writes nothing for an empty list', async () => {
 			await addOrUpdateCharactersDB([]);
 			expect(mockDb.insert).not.toHaveBeenCalled();
 		});
 	});
 
 	describe('updateCharactersLastSeen', () => {
-		it('should do nothing if characterIDs is empty', async () => {
+		it('writes nothing for an empty list', async () => {
 			await updateCharactersLastSeen([]);
 			expect(mockDb.update).not.toHaveBeenCalled();
 		});
-
-		it('should update last_seen for given characters', async () => {
-			const characterIDs = [1, 2];
-
-			const mockUpdate = {
-				set: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue()
-			};
-			mockDb.update.mockReturnValue(mockUpdate);
-
-			await updateCharactersLastSeen(characterIDs);
-
-			expect(mockDb.update).toHaveBeenCalled();
-			expect(mockUpdate.set).toHaveBeenCalled();
-			expect(mockUpdate.where).toHaveBeenCalled();
-		});
 	});
 
-	describe('updateCharactersAllianceByCorporation', () => {
-		it('should do nothing if corporationId is missing', async () => {
-			await updateCharactersAllianceByCorporation(null, 123);
+	describe('biomassCharacters', () => {
+		it.each([[[]], [null], [undefined]])('writes nothing for %j', async (ids) => {
+			await biomassCharacters(ids);
 			expect(mockDb.update).not.toHaveBeenCalled();
 		});
 
-		it('should update alliance_id for corporation characters', async () => {
-			const mockUpdate = {
-				set: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue()
-			};
-			mockDb.update.mockReturnValue(mockUpdate);
+		it('moves characters to Doomheim, drops the alliance and marks them deleted', async () => {
+			const update = mockUpdateChain();
 
-			await updateCharactersAllianceByCorporation(42, 9001);
+			await biomassCharacters([1, 2]);
 
-			expect(mockDb.update).toHaveBeenCalled();
-			expect(mockUpdate.set).toHaveBeenCalledWith(
+			expect(update.set).toHaveBeenCalledTimes(1);
+			expect(update.set).toHaveBeenCalledWith(
 				expect.objectContaining({
-					alliance_id: 9001
+					corporation_id: 1000001,
+					alliance_id: null,
+					deleted_at: expect.anything()
 				})
 			);
-			expect(mockUpdate.where).toHaveBeenCalled();
-		});
-
-		it('should allow null alliance id updates', async () => {
-			const mockUpdate = {
-				set: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue()
-			};
-			mockDb.update.mockReturnValue(mockUpdate);
-
-			await updateCharactersAllianceByCorporation(42, null);
-
-			expect(mockUpdate.set).toHaveBeenCalledWith(
-				expect.objectContaining({
-					alliance_id: null
-				})
-			);
-		});
-	});
-
-	describe('getLeastRecentlyUpdatedCharacters', () => {
-		it('should fetch least recently updated characters', async () => {
-			const mockSelect = {
-				from: vi.fn().mockReturnThis(),
-				where: vi.fn().mockReturnThis(),
-				orderBy: vi.fn().mockReturnThis(),
-				limit: vi.fn().mockResolvedValue([{ id: 1 }])
-			};
-			mockDb.select.mockReturnValue(mockSelect);
-
-			const result = await getLeastRecentlyUpdatedCharacters(10);
-
-			expect(mockDb.select).toHaveBeenCalled();
-			expect(mockSelect.from).toHaveBeenCalled();
-			expect(mockSelect.where).toHaveBeenCalled();
-			expect(mockSelect.orderBy).toHaveBeenCalled();
-			expect(mockSelect.limit).toHaveBeenCalledWith(10);
-			expect(result).toHaveLength(1);
-		});
-	});
-
-	describe('biomassCharacter', () => {
-		it('should mark character as deleted (doomheim)', async () => {
-			const id = 1;
-
-			const mockUpdate = {
-				set: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue()
-			};
-			mockDb.update.mockReturnValue(mockUpdate);
-
-			await biomassCharacter(id);
-
-			expect(mockDb.update).toHaveBeenCalled();
-			expect(mockUpdate.set).toHaveBeenCalledWith(
-				expect.objectContaining({
-					corporation_id: 1000001 // DOOMHEIM_ID
-				})
-			);
-			expect(mockUpdate.where).toHaveBeenCalled();
 		});
 	});
 });

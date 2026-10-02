@@ -29,20 +29,21 @@ const buildDirectional = () => ({
 });
 
 describe('interesting items', () => {
-	it('supports legacy numeric ids list', () => {
-		const result = buildInterestingItems(buildDirectional(), null, [30]);
+	it('supports plain numeric ids in a rule list', () => {
+		const result = buildInterestingItems(buildDirectional(), null, { types: [30] });
 		expect(result.map((i) => i.id)).toEqual([30]);
 	});
 
-	it('returns empty when no ids provided', () => {
-		const result = buildInterestingItems(buildDirectional(), null, []);
+	it('returns empty when both rule lists are empty', () => {
+		const result = buildInterestingItems(buildDirectional(), null, { groups: [], types: [] });
 		expect(result).toEqual([]);
 	});
 
-	it('uses default INTERESTING_RULES when not provided', () => {
+	it('uses the default rules when not provided', () => {
+		// Monitor is in the Flag Cruisers group (1972). The fixture's type 30 sits in group 27,
+		// so the Titans *group* rule (30) must not match it.
 		const result = buildInterestingItems(buildDirectional(), null);
-		const ids = result.map((item) => item.id).sort();
-		expect(ids).toEqual([30, 45534].sort());
+		expect(result.map((item) => item.id)).toEqual([45534]);
 	});
 
 	it('aggregates on/off counts and sorts by total desc', () => {
@@ -64,42 +65,43 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, offGrid, [
-			{ id: 30, min_count: 1 },
-			{ id: 1972, min_count: 1 }
-		]);
+		const result = buildInterestingItems(onGrid, offGrid, {
+			types: [{ id: 30, min_count: 1 }],
+			groups: [{ id: 1972, min_count: 1 }]
+		});
 		expect(result[0]).toMatchObject({ id: 30, total: 4, on: 1, off: 3 });
 		expect(result[1]).toMatchObject({ id: 45534, total: 2, on: 2, off: 0 });
 	});
 
 	it('keeps null group when items have no group', () => {
 		const onGrid = { objects: [{ id: 30, name: 'Titan', count: 1 }] };
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1 }]);
+		const result = buildInterestingItems(onGrid, null, { types: [{ id: 30, min_count: 1 }] });
 		expect(result[0].group).toBeNull();
 	});
 
-	it('returns empty when rules is not an array', () => {
+	it('returns empty when rules are not rule lists', () => {
 		const result = buildInterestingItems(buildDirectional(), null, /** @type {any} */ ('bad'));
 		expect(result).toEqual([]);
 	});
 
-	it('uses default rules when interestingIds is null', () => {
+	it('uses default rules when rules is null', () => {
 		const result = buildInterestingItems(buildDirectional(), null, /** @type {any} */ (null));
-		const ids = result.map((i) => i.id).sort();
-		expect(ids).toEqual([30, 45534].sort());
+		expect(result.map((i) => i.id)).toEqual([45534]);
 	});
 
 	it('skips invalid rules (NaN ids / non-numeric ids)', () => {
 		const result = buildInterestingItems(
 			buildDirectional(),
 			null,
-			/** @type {any} */ ([
-				NaN,
-				null,
-				'bad',
-				{ id: 'abc', min_count: 1 },
-				{ id: 30, min_count: 'nope', min_percent: 'nope' }
-			])
+			/** @type {any} */ ({
+				types: [
+					NaN,
+					null,
+					'bad',
+					{ id: 'abc', min_count: 1 },
+					{ id: 30, min_count: 'nope', min_percent: 'nope' }
+				]
+			})
 		);
 		// The only rule that survives normalization has no active thresholds, so nothing is interesting.
 		expect(result).toEqual([]);
@@ -107,7 +109,9 @@ describe('interesting items', () => {
 
 	it('treats min_count=0 and min_percent=0 as disabled thresholds', () => {
 		const onGrid = { objects: [{ id: 30, name: 'Titan', count: 10 }] };
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 0, min_percent: 0 }]);
+		const result = buildInterestingItems(onGrid, null, {
+			types: [{ id: 30, min_count: 0, min_percent: 0 }]
+		});
 		expect(result).toEqual([]);
 	});
 
@@ -115,7 +119,7 @@ describe('interesting items', () => {
 		const onGrid = {
 			objects: [{ id: 6, name: 'Ship', objects: [{ id: 30, name: 'Titan', count: 0 }] }]
 		};
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_percent: 1 }]);
+		const result = buildInterestingItems(onGrid, null, { types: [{ id: 30, min_percent: 1 }] });
 		expect(result).toEqual([]);
 	});
 
@@ -133,7 +137,7 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_percent: 2 }]);
+		const result = buildInterestingItems(onGrid, null, { types: [{ id: 30, min_percent: 2 }] });
 		expect(result.map((i) => i.id)).toEqual([30]);
 	});
 
@@ -151,7 +155,7 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1 }]);
+		const result = buildInterestingItems(onGrid, null, { types: [{ id: 30, min_count: 1 }] });
 		expect(result[0]).toMatchObject({ id: 30, group: 'Ship' });
 	});
 
@@ -173,7 +177,7 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1 }]);
+		const result = buildInterestingItems(onGrid, null, { types: [{ id: 30, min_count: 1 }] });
 		expect(result.map((i) => i.id)).toEqual([30]);
 	});
 
@@ -191,10 +195,12 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [
-			{ id: 1, min_count: 1 },
-			{ id: 2, min_count: 1 }
-		]);
+		const result = buildInterestingItems(onGrid, null, {
+			types: [
+				{ id: 1, min_count: 1 },
+				{ id: 2, min_count: 1 }
+			]
+		});
 		expect(result.map((i) => i.id)).toEqual([1, 2]);
 	});
 
@@ -212,10 +218,12 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [
-			{ id: 10, min_count: 1 },
-			{ id: 11, min_count: 1 }
-		]);
+		const result = buildInterestingItems(onGrid, null, {
+			types: [
+				{ id: 10, min_count: 1 },
+				{ id: 11, min_count: 1 }
+			]
+		});
 		expect(result.map((i) => i.id).sort()).toEqual([10, 11]);
 	});
 
@@ -234,13 +242,15 @@ describe('interesting items', () => {
 			]
 		};
 
-		const result = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1, min_percent: 2 }]);
+		const result = buildInterestingItems(onGrid, null, {
+			types: [{ id: 30, min_count: 1, min_percent: 2 }]
+		});
 		expect(result).toEqual([]);
 	});
 
 	it('uses group rule when no type rule exists', () => {
 		const onGrid = buildDirectional();
-		const result = buildInterestingItems(onGrid, null, [{ id: 27, min_count: 2 }]);
+		const result = buildInterestingItems(onGrid, null, { groups: [{ id: 27, min_count: 2 }] });
 		const ids = result.map((i) => i.id).sort();
 		expect(ids).toEqual([30, 12003].sort());
 	});
@@ -250,10 +260,10 @@ describe('interesting items', () => {
 
 		// Group Battleship (27) qualifies via min_count=2,
 		// but Titan (30) is forced to require min_count=2 and will NOT qualify.
-		const result = buildInterestingItems(onGrid, null, [
-			{ id: 27, min_count: 2 },
-			{ id: 30, min_count: 2 }
-		]);
+		const result = buildInterestingItems(onGrid, null, {
+			groups: [{ id: 27, min_count: 2 }],
+			types: [{ id: 30, min_count: 2 }]
+		});
 
 		expect(result.map((i) => i.id)).toEqual([12003]);
 	});
@@ -262,10 +272,10 @@ describe('interesting items', () => {
 		const onGrid = buildDirectional();
 
 		// Group Battleship (27) fails (needs 50), but Titan (30) passes (needs 1).
-		const result = buildInterestingItems(onGrid, null, [
-			{ id: 27, min_count: 50 },
-			{ id: 30, min_count: 1 }
-		]);
+		const result = buildInterestingItems(onGrid, null, {
+			groups: [{ id: 27, min_count: 50 }],
+			types: [{ id: 30, min_count: 1 }]
+		});
 		expect(result.map((i) => i.id)).toEqual([30]);
 	});
 
@@ -284,10 +294,24 @@ describe('interesting items', () => {
 		};
 
 		// count passes (>=1) but percent is 2% (1/50=2%) => passes at 2%, fails at 3%
-		const pass = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1, min_percent: 2 }]);
-		const fail = buildInterestingItems(onGrid, null, [{ id: 30, min_count: 1, min_percent: 3 }]);
+		const pass = buildInterestingItems(onGrid, null, {
+			types: [{ id: 30, min_count: 1, min_percent: 2 }]
+		});
+		const fail = buildInterestingItems(onGrid, null, {
+			types: [{ id: 30, min_count: 1, min_percent: 3 }]
+		});
 
 		expect(pass.map((i) => i.id)).toEqual([30]);
 		expect(fail).toEqual([]);
+	});
+
+	it('never applies a group rule to a type that merely has the same id', () => {
+		const onGrid = buildDirectional();
+		// Group rule 30 (e.g. Titans) must not match the type with id 30, which is in group 27.
+		expect(buildInterestingItems(onGrid, null, { groups: [{ id: 30, min_count: 1 }] })).toEqual([]);
+		// The same id as a type rule does match it.
+		expect(
+			buildInterestingItems(onGrid, null, { types: [{ id: 30, min_count: 1 }] }).map((i) => i.id)
+		).toEqual([30]);
 	});
 });

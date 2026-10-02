@@ -2,9 +2,8 @@
 	import { twMerge } from 'tailwind-merge';
 	import { getContext } from 'svelte';
 
-	/** @type {{ htmlTitle?: string, date?: string, svgClass?: string, classDiv?: string, classLi?: string, classTime?: string, classH3?: string, icon?: import('svelte').Snippet, title?: import('svelte').Snippet, children?: import('svelte').Snippet }} */
+	/** @type {{ date?: string, svgClass?: string, classDiv?: string, classLi?: string, classTime?: string, classH3?: string, icon?: import('svelte').Snippet, title?: import('svelte').Snippet, children?: import('svelte').Snippet }} */
 	let {
-		htmlTitle = '',
 		date = '',
 		svgClass = 'w-3 h-3 text-primary-600 dark:text-primary-400',
 		classDiv = '',
@@ -81,18 +80,12 @@
 			</svg>
 		{/if}
 	{:else if date}
-		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-		<time class={timeCls}>{@html date}</time>
+		<time class={timeCls}>{date}</time>
 	{/if}
 
-	{#if title || htmlTitle}
+	{#if title}
 		<h3 class={h3Cls}>
-			{#if title}
-				{@render title()}
-			{:else}
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-				{@html htmlTitle}
-			{/if}
+			{@render title()}
 		</h3>
 	{/if}
 

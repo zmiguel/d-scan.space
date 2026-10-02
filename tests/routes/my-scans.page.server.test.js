@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockSpan, mockGetScansByUser } = vi.hoisted(() => {
+const { mockSpan, mockGetUserScansPage } = vi.hoisted(() => {
 	return {
 		mockSpan: {
 			setAttributes: vi.fn(),
 			setStatus: vi.fn(),
 			addEvent: vi.fn()
 		},
-		mockGetScansByUser: vi.fn()
+		mockGetUserScansPage: vi.fn()
 	};
 });
 
@@ -16,7 +16,7 @@ vi.mock('../../src/lib/server/tracer.js', () => ({
 }));
 
 vi.mock('../../src/lib/database/scans.js', () => ({
-	getScansByUser: mockGetScansByUser
+	getUserScansPage: mockGetUserScansPage
 }));
 
 import { load } from '../../src/routes/my-scans/+page.server.js';
@@ -28,6 +28,7 @@ describe('routes/my-scans/+page.server.js', () => {
 
 	it('returns login prompt state when user is not authenticated', async () => {
 		const event = {
+			url: new URL('http://localhost/my-scans'),
 			locals: {
 				auth: vi.fn().mockResolvedValue(null)
 			}
@@ -39,7 +40,7 @@ describe('routes/my-scans/+page.server.js', () => {
 			requiresLogin: true,
 			scans: []
 		});
-		expect(mockGetScansByUser).not.toHaveBeenCalled();
+		expect(mockGetUserScansPage).not.toHaveBeenCalled();
 		expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 			expect.objectContaining({
 				'page.type': 'my_scans_list',
@@ -48,11 +49,12 @@ describe('routes/my-scans/+page.server.js', () => {
 		);
 	});
 
-	it('returns user scans and includes primary character name in tracing attributes', async () => {
+	it('passes URL filters to the user query and returns page data', async () => {
 		const scans = [{ id: 'scan-1', group_id: 'group-1', public: true }];
-		mockGetScansByUser.mockResolvedValue(scans);
+		mockGetUserScansPage.mockResolvedValue({ rows: scans, total: 120, page: 3, pageSize: 50 });
 
 		const event = {
+			url: new URL('http://localhost/my-scans?page=3&q=%20jita%20&type=local'),
 			locals: {
 				auth: vi.fn().mockResolvedValue({
 					user: { id: 'user-1', name: 'Fallback Name' },
@@ -63,12 +65,21 @@ describe('routes/my-scans/+page.server.js', () => {
 
 		const result = await load(event);
 
-		expect(mockGetScansByUser).toHaveBeenCalledWith('user-1');
+		expect(mockGetUserScansPage).toHaveBeenCalledWith('user-1', {
+			page: 3,
+			query: 'jita',
+			type: 'local'
+		});
 		expect(result).toEqual({
 			requiresLogin: false,
-			scans
+			scans,
+			total: 120,
+			page: 3,
+			pageSize: 50,
+			pageCount: 3,
+			query: 'jita',
+			type: 'local'
 		});
-		expect(result.scans[0].public).toBe(true);
 		expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 			expect.objectContaining({
 				'auth.logged_in': true,
@@ -78,10 +89,11 @@ describe('routes/my-scans/+page.server.js', () => {
 		);
 	});
 
-	it('falls back to unknown primary character name when not present in session', async () => {
-		mockGetScansByUser.mockResolvedValue(null);
+	it('ignores invalid page/type values and falls back to unknown character name', async () => {
+		mockGetUserScansPage.mockResolvedValue({ rows: [], total: 0, page: 1, pageSize: 50 });
 
 		const event = {
+			url: new URL('http://localhost/my-scans?page=abc&type=wormhole'),
 			locals: {
 				auth: vi.fn().mockResolvedValue({
 					user: { id: 'user-2' }
@@ -91,11 +103,8 @@ describe('routes/my-scans/+page.server.js', () => {
 
 		const result = await load(event);
 
-		expect(mockGetScansByUser).toHaveBeenCalledWith('user-2');
-		expect(result).toEqual({
-			requiresLogin: false,
-			scans: null
-		});
+		expect(mockGetUserScansPage).toHaveBeenCalledWith('user-2', { page: 1, query: '', type: '' });
+		expect(result).toMatchObject({ scans: [], total: 0, page: 1, pageCount: 1, type: '' });
 		expect(mockSpan.setAttributes).toHaveBeenCalledWith(
 			expect.objectContaining({
 				'scans.user_count': 0,

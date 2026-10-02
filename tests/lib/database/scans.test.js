@@ -45,9 +45,6 @@ import {
 	getScanByID,
 	createNewScan,
 	updateScan,
-	getScansByGroupID,
-	getPublicScans,
-	getScansByUser,
 	getScanGroupByID,
 	setScanGroupSystemIfOwnerAndUnset
 } from '../../../src/lib/database/scans.js';
@@ -73,23 +70,6 @@ describe('scans', () => {
 			expect(mockSelect.leftJoin).toHaveBeenCalled();
 			expect(mockSelect.where).toHaveBeenCalled();
 			expect(result).toEqual([{ id: 1 }]);
-		});
-	});
-
-	describe('getScansByGroupID', () => {
-		it('should fetch scans by group ID', async () => {
-			const mockSelect = {
-				from: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }])
-			};
-			mockDb.select.mockReturnValue(mockSelect);
-
-			const result = await getScansByGroupID('group1');
-
-			expect(mockDb.select).toHaveBeenCalled();
-			expect(mockSelect.from).toHaveBeenCalled();
-			expect(mockSelect.where).toHaveBeenCalled();
-			expect(result).toHaveLength(2);
 		});
 	});
 
@@ -278,52 +258,6 @@ describe('scans', () => {
 
 			expect(mockDb.transaction).toHaveBeenCalled();
 		});
-	});
-});
-
-describe('getPublicScans', () => {
-	it('should fetch public scans', async () => {
-		const mockSelect = {
-			from: vi.fn().mockReturnThis(),
-			leftJoin: vi.fn().mockReturnThis(),
-			where: vi.fn().mockReturnThis(),
-			orderBy: vi.fn().mockReturnThis(),
-			limit: vi.fn().mockResolvedValue([{ id: 1 }])
-		};
-		mockDb.select.mockReturnValue(mockSelect);
-
-		const result = await getPublicScans();
-
-		expect(mockDb.select).toHaveBeenCalled();
-		expect(mockSelect.from).toHaveBeenCalled();
-		expect(mockSelect.leftJoin).toHaveBeenCalled();
-		expect(mockSelect.where).toHaveBeenCalled();
-		expect(mockSelect.orderBy).toHaveBeenCalled();
-		expect(mockSelect.limit).toHaveBeenCalledWith(5000);
-		expect(result).toHaveLength(1);
-	});
-});
-
-describe('getScansByUser', () => {
-	it('should fetch scans by user id', async () => {
-		const mockSelect = {
-			from: vi.fn().mockReturnThis(),
-			leftJoin: vi.fn().mockReturnThis(),
-			where: vi.fn().mockReturnThis(),
-			orderBy: vi.fn().mockReturnThis(),
-			limit: vi.fn().mockResolvedValue([{ id: 'scan1', public: true }])
-		};
-		mockDb.select.mockReturnValue(mockSelect);
-
-		const result = await getScansByUser('user-123');
-
-		expect(mockDb.select).toHaveBeenCalled();
-		expect(mockSelect.from).toHaveBeenCalled();
-		expect(mockSelect.leftJoin).toHaveBeenCalled();
-		expect(mockSelect.where).toHaveBeenCalled();
-		expect(mockSelect.orderBy).toHaveBeenCalled();
-		expect(mockSelect.limit).toHaveBeenCalledWith(5000);
-		expect(result).toEqual([{ id: 'scan1', public: true }]);
 	});
 });
 

@@ -42,12 +42,11 @@
 	 * @property {any} [created_at]
 	 * @property {any} [params]
 	 * @property {any} [system]
+	 * @property {{ id: string, scan_type: 'local' | 'directional', created_at: string } | null} [pairedScan]
 	 */
 
 	/** @type {{ data: Data }} */
 	let { data } = $props();
-	let showCopiedToast = $state(false);
-	let hideCopiedToastTimeout;
 	const copiedFlagKey = 'scan-link-copied';
 
 	const formatCount = (value) => (typeof value === 'number' && !Number.isNaN(value) ? value : null);
@@ -129,42 +128,55 @@
 		return parts.map((part) => `• ${part}`).join('\n');
 	});
 
+	/** @type {{ message: string, ok: boolean } | null} */
+	let toast = $state(null);
+	let hideToastTimeout;
+
+	function showToast(message, ok) {
+		toast = { message, ok };
+		clearTimeout(hideToastTimeout);
+		hideToastTimeout = setTimeout(() => (toast = null), ok ? 3000 : 6000);
+	}
+
+	function handleLinkCopied(copied) {
+		if (copied) showToast('Scan link copied to clipboard.', true);
+		else showToast('Could not copy the link. Copy it from the address bar instead.', false);
+	}
+
+	// Set by the submit forms only when the new scan's link was really copied.
 	$effect(() => {
 		if (!browser) {
 			return;
 		}
 
-		const copied = sessionStorage.getItem(copiedFlagKey);
-		if (copied !== '1') {
+		if (sessionStorage.getItem(copiedFlagKey) !== '1') {
 			return;
 		}
-
 		sessionStorage.removeItem(copiedFlagKey);
-
-		showCopiedToast = true;
-		clearTimeout(hideCopiedToastTimeout);
-		hideCopiedToastTimeout = setTimeout(() => {
-			showCopiedToast = false;
-		}, 3000);
-
-		return () => {
-			clearTimeout(hideCopiedToastTimeout);
-		};
+		showToast('Scan link copied to clipboard.', true);
 	});
+
+	$effect(() => () => clearTimeout(hideToastTimeout));
 </script>
 
-<MetaTags title={scanTitle} description={scanSummary} showImage={false} appendSiteName={false} />
+<MetaTags
+	title={scanTitle}
+	description={scanSummary}
+	showImage={false}
+	appendSiteName={false}
+	noIndex={!data.isPublic}
+/>
 
 <div class="container mx-auto px-0">
-	{#if showCopiedToast}
+	{#if toast}
 		<Toast
-			color="green"
+			color={toast.ok ? 'green' : 'red'}
 			dismissable={false}
 			position="top-right"
-			class="z-50 !border-green-700 !bg-green-600 text-sm font-medium !text-white shadow-lg"
+			class={`z-50 text-sm font-medium !text-white shadow-lg ${toast.ok ? '!border-green-700 !bg-green-600' : '!border-red-700 !bg-red-600'}`}
 			classes={{ content: '!text-white', close: '!text-white' }}
 		>
-			Scan link copied to clipboard.
+			<span role="status">{toast.message}</span>
 		</Toast>
 	{/if}
 
@@ -172,8 +184,8 @@
 		<!-- Main content area (80-85% width) -->
 		<div class="col-span-12 rounded-lg bg-white p-3 sm:p-2 md:col-span-10 dark:bg-gray-800">
 			<div class="min-h-[600px]">
-				<!-- First row: Breadcrumbs and timestamp -->
-				<TopBar {data} />
+				<!-- First row: Breadcrumbs, timestamp, copy link -->
+				<TopBar {data} onLinkCopied={handleLinkCopied} />
 
 				<!-- Second row: Using tabs for scan content -->
 				<ScanTabs {data} />

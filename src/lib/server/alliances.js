@@ -10,13 +10,11 @@ async function getAllianceFromESI(id) {
 	// fetchGET has tracing built-in
 	const allianceData = await fetchGET(`https://esi.evetech.net/alliances/${id}`);
 
-	if (!allianceData) {
-		logger.error(`Failed to fetch alliance ${id}: no response`);
-		return null;
-	}
-
-	if (!allianceData.ok) {
-		logger.error(`Failed to fetch alliance ${id}: ${allianceData.statusText}`);
+	if (!allianceData || !allianceData.ok) {
+		logger.error(
+			{ allianceId: id, status: allianceData?.status ?? null },
+			'Failed to fetch alliance'
+		);
 		return null;
 	}
 

@@ -12,13 +12,21 @@ import {
 } from './characters.js';
 import logger from '../logger.js';
 import { withSpan } from './tracer';
-import {
-	cacheHitCounter,
-	cacheMissCounter,
-	scanItemsCount,
-	scanDuration,
-	scansProcessedCounter
-} from './metrics';
+import { cacheHitCounter, cacheMissCounter, scanItemsCount, scanDuration } from './metrics';
+
+/**
+ * Removes duplicate names case-insensitively, keeping the first spelling. EVE character
+ * names are unique regardless of case, so "bob" and "Bob" are the same pilot.
+ * @param {string[]} names
+ */
+export function uniqueNames(names) {
+	const byKey = new Map();
+	for (const name of names) {
+		const key = name.toLowerCase();
+		if (!byKey.has(key)) byKey.set(key, name);
+	}
+	return [...byKey.values()];
+}
 
 /**
  * Retrieves and updates character data for a local scan.
@@ -34,9 +42,9 @@ async function getCharacters(data) {
 				'operation.type': 'character_resolution'
 			});
 
-			// get characters in the database
+			// get characters in the database (matched case-insensitively, canonical names)
 			const charactersInDB = await getCharactersByName(data);
-			const charactersInDBNames = new Set(charactersInDB.map((c) => c.name));
+			const charactersInDBNames = new Set(charactersInDB.map((c) => c.name.toLowerCase()));
 
 			const {
 				missingCharacters,
@@ -44,7 +52,7 @@ async function getCharacters(data) {
 				outdatedCachedCharacters,
 				goodCharacters
 			} = await withSpan('server.local.filter_characters', async (span) => {
-				const missingCharacters = data.filter((l) => !charactersInDBNames.has(l));
+				const missingCharacters = data.filter((l) => !charactersInDBNames.has(l.toLowerCase()));
 
 				const nowSeconds = Math.floor(Date.now() / 1000);
 				const oneDaySeconds = 86400;
@@ -140,6 +148,7 @@ async function getCharacters(data) {
 
 			span.setAttributes({
 				'characters.final_count': finalCharacters.length,
+				'characters.unresolved_count': data.length - finalCharacters.length,
 				'characters.esi_calls_made':
 					missingCharacters.length +
 					outdatedExpiredCharacters.length +
@@ -159,8 +168,8 @@ export async function createNewLocalScan(data) {
 		'server.local.create_new',
 		async (span) => {
 			const startTime = Date.now();
-			// Remove duplicates
-			data = [...new Set(data)];
+			// Remove duplicates (case-insensitive)
+			data = uniqueNames(data);
 
 			span.setAttributes({
 				'scan.type': 'local',
@@ -285,11 +294,10 @@ export async function createNewLocalScan(data) {
 				'scan.corporations_count': totalCorporations
 			});
 
-			// Record scan metrics
+			// Record scan metrics (scans_processed_total is counted by the route once stored)
 			const duration = Date.now() - startTime;
 			scanItemsCount.record(data.length, { type: 'local' });
 			scanDuration.record(duration / 1000, { type: 'local' });
-			scansProcessedCounter.add(1, { type: 'local' });
 
 			return formattedData;
 		},

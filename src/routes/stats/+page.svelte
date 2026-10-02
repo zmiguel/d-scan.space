@@ -1,10 +1,12 @@
 <script>
-	import {} from 'flowbite-svelte';
 	import MetaTags from '$lib/components/MetaTags.svelte';
 
-	export let data;
+	let { data } = $props();
 
-	const { scanStats, characterStats, corporationStats, allianceStats } = data;
+	const scanStats = $derived(data.scanStats);
+	const characterStats = $derived(data.characterStats);
+	const corporationStats = $derived(data.corporationStats);
+	const allianceStats = $derived(data.allianceStats);
 
 	// Helper function to calculate percentage
 	function getPercentage(value, total) {

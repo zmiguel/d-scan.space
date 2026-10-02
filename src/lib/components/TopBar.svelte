@@ -1,10 +1,20 @@
 <script>
 	import { Breadcrumb, BreadcrumbItem, Badge } from 'flowbite-svelte';
-	import { ChevronLeftOutline, CloseOutline, EditOutline } from 'flowbite-svelte-icons';
+	import {
+		ChevronLeftOutline,
+		CloseOutline,
+		EditOutline,
+		LinkOutline
+	} from 'flowbite-svelte-icons';
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { securityBadgeColor as badgeColorFor } from '$lib/utils/secStatus.js';
+	import { copyText, scanGroupUrl } from '$lib/utils/clipboard.js';
+	import CompareDialog from '$lib/components/compare/CompareDialog.svelte';
 
-	let { data } = $props();
+	/** @type {{ data: any, onLinkCopied?: (copied: boolean) => void }} */
+	let { data, onLinkCopied } = $props();
 	let isEditingSystem = $state(false);
 	let systemQuery = $state('');
 	let systemSuggestions = $state([]);
@@ -13,21 +23,19 @@
 	let isSearching = $state(false);
 	let isSaving = $state(false);
 	let searchDebounceHandle;
-
-	// Function to determine security color based on value
-	function getSecurityClass(secValue) {
-		if (secValue >= 0.5) return 'green';
-		if (secValue > 0.0) return 'yellow';
-		return 'red';
-	}
+	/** @type {AbortController | null} */
+	let searchController = null;
 
 	const systemSecurity = $derived(
 		data.system && typeof data.system.security === 'number' ? data.system.security : null
 	);
 
-	const securityBadgeColor = $derived(
-		systemSecurity !== null ? getSecurityClass(systemSecurity) : 'purple'
-	);
+	// Colour follows the in-game rounded security; the label keeps the SDE value.
+	const securityBadgeColor = $derived(badgeColorFor(systemSecurity));
+
+	async function copyLink() {
+		onLinkCopied?.(await copyText(scanGroupUrl(page.url.pathname, page.url.origin)));
+	}
 
 	const systemName = $derived(data.system?.name ?? 'Unknown System');
 	const constellation = $derived(data.system?.constellation ?? 'Unknown Constellation');
@@ -50,17 +58,27 @@
 			return;
 		}
 
+		// Only the latest query's answer may update the suggestions.
+		searchController?.abort();
+		searchController = null;
+
 		const trimmed = query.trim();
 		if (trimmed.length < 2) {
 			systemSuggestions = [];
 			searchError = '';
+			isSearching = false;
 			return;
 		}
 
+		const controller = new AbortController();
+		searchController = controller;
 		isSearching = true;
 		searchError = '';
 		try {
-			const response = await fetch(`/api/systems/search?q=${encodeURIComponent(trimmed)}&limit=10`);
+			const response = await fetch(
+				`/api/systems/search?q=${encodeURIComponent(trimmed)}&limit=10`,
+				{ signal: controller.signal }
+			);
 			if (!response.ok) {
 				throw new Error('Search failed');
 			}
@@ -68,10 +86,14 @@
 			const payload = await response.json();
 			systemSuggestions = payload?.systems ?? [];
 		} catch {
+			if (controller.signal.aborted) return;
 			systemSuggestions = [];
 			searchError = 'Could not load system suggestions.';
 		} finally {
-			isSearching = false;
+			if (searchController === controller) {
+				searchController = null;
+				isSearching = false;
+			}
 		}
 	}
 
@@ -89,6 +111,10 @@
 	function toggleSystemEditor() {
 		isEditingSystem = !isEditingSystem;
 		if (!isEditingSystem) {
+			clearTimeout(searchDebounceHandle);
+			searchController?.abort();
+			searchController = null;
+			isSearching = false;
 			systemQuery = '';
 			systemSuggestions = [];
 			searchError = '';
@@ -160,6 +186,7 @@
 						use:enhance={handleSetSystemSubmit}
 						class="flex items-center gap-2"
 					>
+						<label for="manual-system" class="sr-only">System name</label>
 						<input
 							id="manual-system"
 							type="text"
@@ -168,6 +195,8 @@
 							oninput={handleSystemInput}
 							list="manual-system-suggestions"
 							autocomplete="off"
+							placeholder="System name"
+							aria-describedby="manual-system-status"
 							required
 							class="w-56 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
 						/>
@@ -212,19 +241,33 @@
 			</button>
 		{/if}
 	</div>
-	<div class="text-xs text-gray-600 sm:text-sm dark:text-gray-400">
+	<div class="flex items-center gap-2 text-xs text-gray-600 sm:text-sm dark:text-gray-400">
+		<button
+			type="button"
+			onclick={copyLink}
+			title="Copy the link to this scan group (opens its latest scan)"
+			class="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+		>
+			<LinkOutline class="h-3.5 w-3.5" />
+			Copy link
+		</button>
+		{#if data.params?.scan && data.related}
+			<CompareDialog scanId={data.params.scan} related={data.related} />
+		{/if}
 		<span class="font-medium">{formattedTimestamp}</span>
 	</div>
 </div>
 
 {#if !data.system && canEditSystem && isEditingSystem}
-	{#if isSearching}
-		<p class="-mt-2 mb-3 text-xs text-gray-500">Searching systems...</p>
-	{/if}
-	{#if searchError}
-		<p class="-mt-2 mb-3 text-xs text-red-500">{searchError}</p>
-	{/if}
-	{#if saveError}
-		<p class="-mt-2 mb-3 text-xs text-red-500">{saveError}</p>
-	{/if}
+	<div id="manual-system-status" aria-live="polite">
+		{#if isSearching}
+			<p class="-mt-2 mb-3 text-xs text-gray-500">Searching systems...</p>
+		{/if}
+		{#if searchError}
+			<p class="-mt-2 mb-3 text-xs text-red-500">{searchError}</p>
+		{/if}
+		{#if saveError}
+			<p class="-mt-2 mb-3 text-xs text-red-500">{saveError}</p>
+		{/if}
+	</div>
 {/if}
