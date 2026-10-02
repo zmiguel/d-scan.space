@@ -1,5 +1,42 @@
 import { describe, it, expect } from 'vitest';
-import { secStatusColor } from '../../../src/lib/utils/secStatus.js';
+import {
+	secStatusColor,
+	securityBadgeColor,
+	systemSecurityBand
+} from '../../../src/lib/utils/secStatus.js';
+
+describe('systemSecurityBand (in-game rounding)', () => {
+	it.each([
+		[1, 'high'],
+		[0.5, 'high'],
+		[0.45, 'high'], // shows as 0.5 in game
+		[0.449, 'low'], // shows as 0.4
+		[0.05, 'low'], // shows as 0.1
+		[0.04, 'low'], // 0.0 < sec < 0.05 counts as 0.1
+		[0.0001, 'low'],
+		[0, 'null'],
+		[-0.04, 'null'], // shows as -0.0
+		[-1, 'null']
+	])('%s -> %s', (security, band) => {
+		expect(systemSecurityBand(security)).toBe(band);
+	});
+
+	it.each([[null], [undefined], [Number.NaN], [/** @type {any} */ ('0.9')]])(
+		'is unknown for %j',
+		(security) => {
+			expect(systemSecurityBand(security)).toBeNull();
+		}
+	);
+
+	it('maps bands to badge colours, purple when unknown', () => {
+		expect([0.95, 0.04, -0.2, null].map(securityBadgeColor)).toEqual([
+			'green',
+			'yellow',
+			'red',
+			'purple'
+		]);
+	});
+});
 
 describe('secStatusColor', () => {
 	it('should return gray for 0', () => {

@@ -3,8 +3,10 @@
  */
 import logger from '../logger.js';
 import { withSpan } from './tracer.js';
-import { scansProcessedCounter, scanItemsCount, scanDuration } from './metrics.js';
-import { getTypeHierarchyMetadata, getSystemByName } from '../database/sde.js';
+import { scanItemsCount, scanDuration } from './metrics.js';
+import { getTypeHierarchyMetadata, getSystemsByNames } from '../database/sde.js';
+import { DSCAN_ON_GRID_MAX_KM } from './constants.js';
+import { isOnGrid } from '../utils/distance.js';
 
 const GRID_BUCKETS = {
 	ON: 'on_grid',
@@ -13,7 +15,7 @@ const GRID_BUCKETS = {
 
 const UNKNOWN_LABEL = 'Unknown';
 const HIDDEN_CONTROL_PATTERN =
-	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g; // eslint-disable-line no-control-regex
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\u2060\uFEFF]/g; // eslint-disable-line no-control-regex
 
 const sanitizeDirectionalLine = (line) => line.replace(HIDDEN_CONTROL_PATTERN, '');
 
@@ -43,7 +45,8 @@ export async function createNewDirectionalScan(rawData) {
 			[GRID_BUCKETS.ON]: createBucket(),
 			[GRID_BUCKETS.OFF]: createBucket()
 		};
-		const systemNameCounts = new Map();
+		/** @type {Map<string, { name: string, score: number, celestial: number }>} */
+		const systemEvidence = new Map();
 
 		for (const entry of parsed.entries) {
 			const metadata = metadataMap.get(entry.typeId);
@@ -68,56 +71,28 @@ export async function createNewDirectionalScan(rawData) {
 			const groupId =
 				typeof resolvedMetadata.groupId === 'number' ? resolvedMetadata.groupId : null;
 
-			const candidate = determineSystemName(entry.name, categoryId, groupId);
-			if (candidate) {
-				systemNameCounts.set(candidate, (systemNameCounts.get(candidate) || 0) + 1);
-			}
+			addSystemEvidence(systemEvidence, determineSystemEvidence(entry.name, categoryId, groupId));
 
 			const bucketKey = entry.isOnGrid ? GRID_BUCKETS.ON : GRID_BUCKETS.OFF;
 			const bucket = buckets[bucketKey];
 			accumulateEntry(bucket, entry, resolvedMetadata);
 		}
 
-		// Find most common system name
-		let systemNameCandidate = null;
-		let maxCount = 0;
-		let totalCandidates = 0;
-		for (const [name, count] of systemNameCounts) {
-			totalCandidates += count;
-			if (count > maxCount) {
-				maxCount = count;
-				systemNameCandidate = name;
-			}
-		}
+		const duration = Date.now() - startTime;
+		scanItemsCount.record(parsed.entries.length, { type: 'directional' });
+		scanDuration.record(duration / 1000, { type: 'directional' });
+		// scans_processed_total is counted by the route once the scan is stored
+
+		const systemDetails = await resolveSystem(systemEvidence);
 
 		span.setAttributes({
 			'scan.unique_type_ids': metadataMap.size,
 			'scan.missing_type_ids': missingTypes.size,
 			'scan.on_grid_objects': buckets[GRID_BUCKETS.ON].totalObjects,
 			'scan.off_grid_objects': buckets[GRID_BUCKETS.OFF].totalObjects,
-			'scan.system_candidates_count': totalCandidates,
-			'scan.unique_system_candidates_count': systemNameCounts.size,
-			'scan.system_candidate': systemNameCandidate
+			'scan.unique_system_candidates_count': systemEvidence.size,
+			'scan.system_candidate': systemDetails?.name ?? 'none'
 		});
-
-		const duration = Date.now() - startTime;
-		scanItemsCount.record(parsed.entries.length, { type: 'directional' });
-		scanDuration.record(duration / 1000, { type: 'directional' });
-		scansProcessedCounter.add(1, { type: 'directional' });
-
-		let systemDetails;
-		if (systemNameCandidate) {
-			const systemRow = await getSystemByName(systemNameCandidate);
-			if (systemRow) {
-				systemDetails = {
-					id: systemRow.id,
-					name: systemRow.name,
-					constellation: systemRow.constellation,
-					region: systemRow.region,
-					security: Number(systemRow.secStatus)
-				};
-			}
-		}
 
 		const result = {
 			[GRID_BUCKETS.ON]: finalizeBucket(buckets[GRID_BUCKETS.ON]),
@@ -161,7 +136,8 @@ function parseDirectionalLines(rawData) {
 		const typeNameRaw = parts[parts.length - 2];
 		const nameRaw = parts.slice(1, -2).join(' ');
 		const typeId = Number(typeIdRaw);
-		if (!Number.isFinite(typeId) || typeId <= 0) {
+		// Same rule as detection (src/lib/utils/scan_type.js): positive integer type ids only.
+		if (!Number.isInteger(typeId) || typeId <= 0) {
 			invalidLines++;
 			continue;
 		}
@@ -171,7 +147,7 @@ function parseDirectionalLines(rawData) {
 			name: (nameRaw || '').trim() || UNKNOWN_LABEL,
 			typeName: (typeNameRaw || '').trim() || UNKNOWN_LABEL,
 			distance: distanceRaw.trim(),
-			isOnGrid: isOnGrid(distanceRaw.trim())
+			isOnGrid: isOnGrid(distanceRaw, DSCAN_ON_GRID_MAX_KM)
 		});
 	}
 
@@ -208,28 +184,6 @@ function normalizeLines(rawData) {
 	}
 
 	return [];
-}
-
-/**
- * Determines if an object is on grid based on distance string.
- * @param {string} distance
- * @returns {boolean}
- */
-function isOnGrid(distance) {
-	/* v8 ignore next */
-	if (!distance) return false;
-	const normalized = distance.toLowerCase();
-	if (normalized === '-') return false;
-	if (normalized.endsWith('au')) return false;
-	if (normalized.endsWith('km')) {
-		const numeric = Number(normalized.replace('km', '').trim().replace(/,/g, ''));
-		return Number.isFinite(numeric);
-	}
-	if (normalized.endsWith('m')) {
-		const numeric = Number(normalized.replace('m', '').trim().replace(/,/g, ''));
-		return Number.isFinite(numeric);
-	}
-	return false;
 }
 
 /**
@@ -345,42 +299,103 @@ function buildResult() {
 }
 
 /**
- * Determines the system name from a scan entry based on its category and group.
+ * How much one object counts towards "the scan was taken in system X".
+ * Celestials outweigh player structures: their names are generated by the game from
+ * the system name, while structures can be numerous (one citadel spam outvotes the sun)
+ * and Ansiblex names point at two systems.
+ */
+const EVIDENCE_WEIGHT = {
+	sun: 10, // exactly one per system, d-scan name "<System> - Star"
+	celestial: 3, // planets, moons, belts, NPC stations
+	structure: 1 // player structures ("<System> - <name>") and Ansiblex gates
+};
+
+/**
+ * System evidence from one scanned object, or null. Stargates are ignored on purpose:
+ * "Stargate (X)" names the destination, not the current system.
  * @param {string} name
  * @param {number|null} categoryId
  * @param {number|null} groupId
- * @returns {string|null}
+ * @returns {{ name: string, weight: number, celestial: boolean } | null}
  */
-function determineSystemName(name, categoryId, groupId) {
+function determineSystemEvidence(name, categoryId, groupId) {
 	if (!name || name === UNKNOWN_LABEL) return null;
+
+	let candidate = null;
+	let weight = 0;
 
 	// Category 65: Structure (Player)
 	if (categoryId === 65) {
 		// Group 1408: Ansiblex Jump Bridge
-		if (groupId === 1408) {
-			return extractSystemFromAnsiblexName(name);
-		}
-		return extractSystemFromStructureName(name);
+		candidate =
+			groupId === 1408 ? extractSystemFromAnsiblexName(name) : extractSystemFromStructureName(name);
+		weight = EVIDENCE_WEIGHT.structure;
 	}
 
 	// Category 3: Station (NPC)
 	if (categoryId === 3) {
-		return extractSystemFromCelestialName(name);
+		candidate = extractSystemFromCelestialName(name);
+		weight = EVIDENCE_WEIGHT.celestial;
 	}
 
 	// Category 2: Celestial
 	if (categoryId === 2) {
 		// Group 6: Sun
 		if (groupId === 6) {
-			return extractSystemFromSunName(name);
+			candidate = extractSystemFromSunName(name);
+			weight = EVIDENCE_WEIGHT.sun;
 		}
 		// Group 7: Planet, 8: Moon, 9: Asteroid Belt
 		if (groupId === 7 || groupId === 8 || groupId === 9) {
-			return extractSystemFromCelestialName(name);
+			candidate = extractSystemFromCelestialName(name);
+			weight = EVIDENCE_WEIGHT.celestial;
 		}
 	}
 
-	return null;
+	return candidate
+		? { name: candidate, weight, celestial: weight > EVIDENCE_WEIGHT.structure }
+		: null;
+}
+
+/**
+ * @param {Map<string, { name: string, score: number, celestial: number }>} evidence
+ * @param {{ name: string, weight: number, celestial: boolean } | null} item
+ */
+function addSystemEvidence(evidence, item) {
+	if (!item) return;
+	const key = item.name.toLowerCase();
+	const entry = evidence.get(key) ?? { name: item.name, score: 0, celestial: 0 };
+	entry.score += item.weight;
+	if (item.celestial) entry.celestial += 1;
+	evidence.set(key, entry);
+}
+
+/**
+ * Picks the best-supported candidate that is a real solar system (one case-insensitive
+ * lookup for all candidates, so a structure called "HQ" can never win). Ties prefer
+ * more celestial evidence, then the name, for determinism.
+ * @param {Map<string, { name: string, score: number, celestial: number }>} evidence
+ */
+async function resolveSystem(evidence) {
+	if (evidence.size === 0) return undefined;
+
+	const systemsByName = await getSystemsByNames([...evidence.values()].map((e) => e.name));
+	const [best] = [...evidence.entries()]
+		.filter(([key]) => systemsByName.has(key))
+		.sort(
+			([keyA, a], [keyB, b]) =>
+				b.score - a.score || b.celestial - a.celestial || keyA.localeCompare(keyB)
+		);
+	if (!best) return undefined;
+
+	const systemRow = systemsByName.get(best[0]);
+	return {
+		id: systemRow.id,
+		name: systemRow.name,
+		constellation: systemRow.constellation,
+		region: systemRow.region,
+		security: Number(systemRow.secStatus)
+	};
 }
 
 function extractSystemFromAnsiblexName(name) {
@@ -390,11 +405,14 @@ function extractSystemFromAnsiblexName(name) {
 	return candidate && candidate.length > 0 ? candidate : null;
 }
 
+/**
+ * Upwell structure names are shown as "<System> - <name>"; without that delimiter the
+ * name says nothing about the system.
+ */
 function extractSystemFromStructureName(name) {
 	const delimiter = ' - ';
 	const delimiterIndex = name.indexOf(delimiter);
-	const candidate = delimiterIndex === -1 ? name.trim() : name.slice(0, delimiterIndex).trim();
-	return candidate;
+	return delimiterIndex === -1 ? null : name.slice(0, delimiterIndex).trim() || null;
 }
 
 function extractSystemFromSunName(name) {

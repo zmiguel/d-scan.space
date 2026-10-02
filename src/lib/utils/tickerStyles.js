@@ -1,16 +1,26 @@
-const styleCache = new Set();
+/**
+ * Background colours of local-scan rows, derived from alliance/corporation tickers.
+ *
+ * A row gets its colours as CSS custom properties (`tickerRowStyle`) plus two static
+ * classes defined in src/app.css:
+ * - `ticker-hover`: background while hovered = the row's own ticker colour,
+ * - `ticker-highlight`: background while part of the focused alliance/corp/pilot context.
+ * The hover rule is more specific, so a hovered row shows its hover colour even when it is
+ * highlighted (same precedence as the per-ticker style tags this replaced).
+ */
 
 export function normalizeTicker(ticker) {
 	return ticker && ticker !== '' ? ticker : 'none';
 }
 
+/**
+ * Stable colours per ticker (hash → hue).
+ * @param {string | null | undefined} ticker
+ * @returns {{ lightColor: string, darkColor: string }}
+ */
 export function getTickerColor(ticker) {
 	if (!ticker || ticker === 'none') {
-		return {
-			lightColor: '#e5e7eb',
-			darkColor: '#4b5563',
-			customClass: 'ticker-none'
-		};
+		return { lightColor: '#e5e7eb', darkColor: '#4b5563' };
 	}
 
 	let hash = 0;
@@ -19,50 +29,23 @@ export function getTickerColor(ticker) {
 	}
 
 	const hue = Math.abs(hash) % 360;
-	const lightColor = `hsl(${hue}, 70%, 85%)`;
-	const darkColor = `hsl(${hue}, 60%, 25%)`;
-
 	return {
-		lightColor,
-		darkColor,
-		customClass: `ticker-${ticker.replace(/[^a-zA-Z0-9]/g, '')}`
+		lightColor: `hsl(${hue}, 70%, 85%)`,
+		darkColor: `hsl(${hue}, 60%, 25%)`
 	};
 }
 
-function addTickerStyles(ticker, colors) {
-	const className = colors.customClass;
-	if (styleCache.has(className)) return;
-
-	const styleId = `style-${className}`;
-	if (!document.getElementById(styleId)) {
-		const style = document.createElement('style');
-		style.id = styleId;
-		style.textContent = `
-			.${className} { background-color: ${colors.lightColor} !important; }
-			.dark .${className} { background-color: ${colors.darkColor} !important; }
-			.hover-${className}:hover { background-color: ${colors.lightColor} !important; }
-			.dark .hover-${className}:hover { background-color: ${colors.darkColor} !important; }
-		`;
-		document.head.appendChild(style);
-		styleCache.add(className);
+/**
+ * Inline style with the row's colour variables.
+ * @param {string | null | undefined} hoverTicker ticker whose colour the row shows on hover
+ * @param {string | null | undefined} [highlightTicker] colour of the active highlight, if any
+ */
+export function tickerRowStyle(hoverTicker, highlightTicker) {
+	const hover = getTickerColor(normalizeTicker(hoverTicker));
+	let style = `--ticker-hover-light: ${hover.lightColor}; --ticker-hover-dark: ${hover.darkColor};`;
+	if (highlightTicker) {
+		const highlight = getTickerColor(normalizeTicker(highlightTicker));
+		style += ` --ticker-highlight-light: ${highlight.lightColor}; --ticker-highlight-dark: ${highlight.darkColor};`;
 	}
-}
-
-export function ensureTickerStyles(ticker) {
-	const normalizedTicker = normalizeTicker(ticker);
-	const colors = getTickerColor(normalizedTicker);
-	addTickerStyles(normalizedTicker, colors);
-	return colors;
-}
-
-export function getHoverClass(ticker) {
-	return `hover-${ensureTickerStyles(ticker).customClass}`;
-}
-
-export function getHighlightClass(ticker) {
-	return ensureTickerStyles(ticker).customClass;
-}
-
-export function getPilotHoverClass(corpTicker) {
-	return getHoverClass(corpTicker);
+	return style;
 }

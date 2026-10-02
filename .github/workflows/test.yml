@@ -1,11 +1,11 @@
 name: Test & Build
 
 on:
-  push:
-    branches:
-      - main
-      - preview
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 26
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: 'npm'
 
       - name: Install dependencies
@@ -27,6 +27,9 @@ jobs:
       - name: Run linting
         run: npm run lint
 
+      - name: Run svelte-check
+        run: npm run check
+
       - name: Run tests
         run: npm run test
 
@@ -34,7 +37,7 @@ jobs:
         run: BUILD=true npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: build/
@@ -46,13 +49,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Test Docker build (Main)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -61,7 +64,7 @@ jobs:
           platforms: linux/amd64
 
       - name: Test Docker build (Updater)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: workers/updater/Dockerfile
@@ -75,7 +78,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_db
@@ -87,40 +90,61 @@ jobs:
         ports:
           - 5432:5432
 
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate database schema
-        run: npm run db:generate
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      - name: Check schema/migration drift
+        run: |
+          for env in dev preview prod; do
+            echo "::group::drizzle-kit generate (DB_ENV=$env)"
+            DB_ENV="$env" npx drizzle-kit generate --name=drift-check
+            echo "::endgroup::"
+            if [ -n "$(git status --porcelain -- drizzle)" ]; then
+              echo "::error::Schema changes for DB_ENV=$env are not covered by a committed migration. Run 'npm run db:generate' and commit the result."
+              git status --porcelain -- drizzle
+              git --no-pager diff -- drizzle
+              git ls-files --others --exclude-standard -- drizzle | while read -r f; do
+                echo "----- new file: $f -----"
+                cat "$f"
+              done
+              exit 1
+            fi
+          done
 
-      - name: Run database migrations
+      - name: Apply database migrations
         run: npm run db:migrate
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DB_ENV: dev
+
+      - name: Re-apply database migrations (idempotency)
+        run: npm run db:migrate
+        env:
+          DB_ENV: dev
 
   security-scan:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: 'npm'
 
       - name: Install dependencies

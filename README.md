@@ -21,7 +21,7 @@ The Ultimate EVE Online Local/Direction Scan Tool
 ## Tech stack
 
 - SvelteKit (adapter-node) + Svelte 5
-- Node.js 24
+- Node.js 26 (required: `engines` + `engine-strict`; npm scripts load `.env` with `--env-file-if-exists`)
 - Tailwind CSS v4 + Flowbite Svelte
 - PostgreSQL + Drizzle ORM
 - OpenTelemetry (traces + Prometheus exporter)
@@ -73,15 +73,20 @@ docker compose up -d
 
 4. Open the app:
 
-- App: <http://localhost:3000>
-- Adminer (DB UI): <http://localhost:8080>
+- App: <http://localhost:3000> (health: `/healthz`, 200 when the database answers)
+- Adminer (DB UI, optional): `docker compose --profile debug up -d`, then <http://127.0.0.1:8080> (bound to localhost only)
 
 Services started by Compose:
 
-- `app`: SvelteKit (adapter-node)
-- `updater`: cron worker (dynamic + static refresh)
-- `postgres-main`: PostgreSQL
-- `adminer`: database UI
+- `app`: SvelteKit (adapter-node), healthy once `/healthz` answers (migrations run before it listens)
+- `updater`: cron worker (dynamic + static refresh), started after the app is healthy; healthy while a job run succeeded within `HEALTHCHECK_MAX_AGE_MS`
+- `postgres-main`: PostgreSQL 18 (volume mounted at `/var/lib/postgresql`)
+- `adminer`: database UI, only with the `debug` profile
+
+> [!WARNING]
+> Upgrading from a Compose setup whose database volume was created by PostgreSQL ≤ 17 (mounted at `/var/lib/postgresql/data`): do not just pull and restart. Dump the old database and restore it into the new volume; the exact commands are in the header of `docker-compose.yml`.
+
+Both images run as the unprivileged `node` user and start `node` directly, so `docker stop` reaches the process and in-flight requests/jobs finish.
 
 ## Configuration (environment variables)
 
@@ -96,12 +101,21 @@ All runtime configuration is via environment variables. The canonical list (with
 
 ### App server (adapter-node)
 
-| Name              | Default                 | Description                                                         |
-| ----------------- | ----------------------- | ------------------------------------------------------------------- |
-| `HOST`            | `0.0.0.0`               | Bind address for the HTTP server.                                   |
-| `PORT`            | `3000`                  | Bind port for the HTTP server.                                      |
-| `ORIGIN`          | `http://localhost:3000` | Public origin (also included in the ESI User-Agent).                |
-| `BODY_SIZE_LIMIT` | `256M`                  | Max request body size (supports values like `512K`, `10M`, `256M`). |
+| Name              | Default                 | Description                                                                                           |
+| ----------------- | ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `HOST`            | `0.0.0.0`               | Bind address for the HTTP server.                                                                     |
+| `PORT`            | `3000`                  | Bind port for the HTTP server.                                                                        |
+| `ORIGIN`          | `http://localhost:3000` | Public origin (also included in the ESI User-Agent).                                                  |
+| `BODY_SIZE_LIMIT` | `16M`                   | Max request body size; the only size limit for d-scans. Set it: adapter-node's own default is `512K`. |
+
+### Scans / ESI client
+
+| Name                     | Default | Description                                                                 |
+| ------------------------ | ------- | --------------------------------------------------------------------------- |
+| `LOCAL_SCAN_MAX_LINES`   | `12000` | Maximum names per local scan (413 above). D-scans are not line-limited.     |
+| `DSCAN_ON_GRID_MAX_KM`   | `50000` | D-scan objects up to this distance (km) count as on-grid; AU and `-` never. |
+| `ESI_MAX_CONCURRENCY`    | `32`    | ESI requests in flight per process (app and worker separately).             |
+| `ESI_REQUEST_TIMEOUT_MS` | `15000` | Per-attempt ESI timeout.                                                    |
 
 ### Auth.js / EVE SSO
 
@@ -116,9 +130,9 @@ EVE SSO callback URL must be set to `<ORIGIN>/auth/callback/eveonline`.
 
 ### Migrations / runtime flags
 
-| Name              | Default | Description                                                          |
-| ----------------- | ------- | -------------------------------------------------------------------- |
-| `SKIP_MIGRATIONS` | `false` | Skip auto-migrations on app boot (see `src/lib/database/client.js`). |
+| Name              | Default | Description                                                                  |
+| ----------------- | ------- | ---------------------------------------------------------------------------- |
+| `SKIP_MIGRATIONS` | `false` | Skip auto-migrations on boot when `true` (see `src/lib/database/client.js`). |
 
 ### Logging / identity
 
@@ -141,28 +155,33 @@ These are included in the ESI User-Agent string built in `src/lib/server/constan
 
 ### Updater worker (cron)
 
-The worker runs scheduled jobs from `workers/updater/src/index.js`.
+The worker runs scheduled jobs from `workers/updater/src/index.js` (start it with `npm run start` in `workers/updater/`, which loads OpenTelemetry via `node --import`). Each job runs at most once at a time, also across several worker replicas (Postgres advisory lock); a replica that finds the job running skips that tick.
 
 > [!CAUTION]
 > Do not change these unless you really understand what you are doing.
 >
 > Changing these might make you receive an email from CCP for putting too much load on ESI
 
-| Name                  | Default          | Description                                  |
-| --------------------- | ---------------- | -------------------------------------------- |
-| `DYNAMIC_UPDATE_CRON` | `* * * * *`      | Cron schedule for dynamic refresh jobs.      |
-| `STATIC_UPDATE_CRON`  | `30 11,12 * * *` | Cron schedule for static (SDE) refresh jobs. |
+| Name                     | Default                         | Description                                                                                                                    |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `DYNAMIC_UPDATE_CRON`    | `* * * * *`                     | Cron schedule for dynamic refresh jobs.                                                                                        |
+| `STATIC_UPDATE_CRON`     | `30 11,12 * * *`                | Cron schedule for static (SDE) refresh jobs.                                                                                   |
+| `SHUTDOWN_TIMEOUT_MS`    | `6000`                          | On SIGINT/SIGTERM, how long to wait for a running job (telemetry flush adds up to 3 s; keep below the container stop timeout). |
+| `HEALTHCHECK_MAX_AGE_MS` | `900000`                        | Docker healthcheck: unhealthy when no job run succeeded for this long (raise it if `DYNAMIC_UPDATE_CRON` runs less often).     |
+| `HEALTHCHECK_FILE`       | `/tmp/d-scan-updater.heartbeat` | Heartbeat file written by the worker and read by `src/healthcheck.js`.                                                         |
 
 ### OpenTelemetry (optional)
 
-Tracing is configured in `src/instrumentation.server.js` (app) and `workers/updater/src/instrumentation.js` (worker). For local setup, see `TRACING_GUIDE.md`.
+Telemetry is set up in `src/lib/server/telemetry.js`, started by `src/instrumentation.server.js` (app) and `workers/updater/src/instrumentation.js` (worker). See `TRACING_GUIDE.md`.
 
-| Name                               | Default                           | Description                                                      |
-| ---------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`      | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (metrics auto-switch to `/v1/metrics`). |
-| `OTEL_EXPORTER_OTLP_AUTHORIZATION` | ``                                | Optional `Authorization` header value (e.g. `Basic ...`).        |
-| `OTEL_SERVICE_NAME`                | `d-scan.space`                    | Base service name; app/worker append environment suffixes.       |
-| `PROMETHEUS_PORT`                  | `9464`                            | Port for Prometheus exporter (`/metrics`).                       |
+| Name                               | Default        | Description                                                                                                                                                         |
+| ---------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`      | empty          | OTLP/HTTP collector. Base URL (`http://collector:4318`) or traces URL (`…/v1/traces`); traces and metrics go to `/v1/traces`/`/v1/metrics`. Empty = no OTLP export. |
+| `OTEL_EXPORTER_OTLP_AUTHORIZATION` | empty          | Optional `Authorization` header value (e.g. `Basic ...`). Never logged.                                                                                             |
+| `OTEL_METRIC_EXPORT_INTERVAL`      | `15000`        | OTLP metric export interval (ms). Span batching uses the standard `OTEL_BSP_*` variables.                                                                           |
+| `OTEL_METRICS_EXPORTER`            | empty          | `prometheus` (or `none`) keeps metrics off OTLP, for collectors that accept traces only (their `/v1/metrics` answers 404).                                          |
+| `OTEL_SERVICE_NAME`                | `d-scan.space` | Base service name; app/worker append environment suffixes.                                                                                                          |
+| `PROMETHEUS_PORT`                  | `9464`         | Port for Prometheus exporter (`/metrics`), always on.                                                                                                               |
 
 ### Docker Compose-only variables
 
@@ -173,9 +192,8 @@ These are used by `docker-compose.yml` for convenience.
 | `POSTGRES_USER`          | `dscanspace`    | Postgres username for the Compose database container.      |
 | `POSTGRES_PASSWORD`      | `dscanspace`    | Postgres password for the Compose database container.      |
 | `POSTGRES_DB`            | `dscanspace`    | Postgres database name for the Compose database container. |
-| `POSTGRES_PORT`          | `5432`          | Host port mapped to Postgres.                              |
 | `POSTGRES_HOSTNAME`      | `postgres-db`   | Container hostname (rarely needed; mostly informational).  |
-| `ADMINER_PORT`           | `8080`          | Host port mapped to Adminer.                               |
+| `ADMINER_PORT`           | `8080`          | Port for Adminer on `127.0.0.1` (`debug` profile only).    |
 | `ADMINER_DEFAULT_SERVER` | `postgres-main` | Default DB host shown by Adminer.                          |
 
 If you change Postgres credentials, make sure `DATABASE_URL` matches.
@@ -183,3 +201,6 @@ If you change Postgres credentials, make sure `DATABASE_URL` matches.
 ## Observability
 
 - Metrics: Prometheus exporter is enabled and exposes `/metrics` on `PROMETHEUS_PORT` for both the app and the updater.
+- Traces: every request has a SERVER span `server.hooks.handle_request` (client address, user agent, route, status, duration) under SvelteKit's `sveltekit.handle.root`; `withSpan` adds the app's own spans below it. Exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; `OTEL_METRICS_EXPORTER=prometheus` keeps metrics off OTLP for traces-only collectors.
+- Health: `GET /healthz` (app, checks the database) and `workers/updater/src/healthcheck.js` (worker heartbeat) back the Docker healthchecks.
+- In production (`NODE_ENV=production`) the app refuses to start without `DATABASE_URL` and `AUTH_SECRET`, the worker without `DATABASE_URL`; missing recommended variables are logged as a warning.

@@ -1,0 +1,18 @@
+# Shared by Dockerfile and workers/updater/Dockerfile (build context: repo root).
+.git
+.github
+node_modules
+workers/updater/node_modules
+build
+.svelte-kit
+coverage
+.env
+.env.*
+__omp_shell(".env.example")
+docs/screenshots
+*.log
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp

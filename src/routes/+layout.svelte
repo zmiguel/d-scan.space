@@ -20,6 +20,15 @@
 	import { DarkMode } from 'flowbite-svelte';
 	let { children, data } = $props();
 	const activeUrl = $derived(page.url.pathname);
+	let userMenuOpen = $state(false);
+	let loginMenuOpen = $state(false);
+	let changeMainOpen = $state(false);
+
+	$effect(() => {
+		if (!userMenuOpen) {
+			changeMainOpen = false;
+		}
+	});
 
 	$effect(() => {
 		if (typeof window === 'undefined') {
@@ -43,6 +52,16 @@
 			characterIdInput.value = String(characterId);
 		}
 		document.getElementById('switch-main-form')?.requestSubmit();
+	}
+
+	/**
+	 * Flowbite's Popper opens on focus and toggles on mousedown, but ignores keyboard clicks.
+	 * Enter/Space on a button fire a click with `detail === 0`; use that to (re)open the menu,
+	 * e.g. after it was closed with Escape while the trigger kept focus.
+	 * @param {MouseEvent} event
+	 */
+	function isKeyboardClick(event) {
+		return event.detail === 0;
 	}
 </script>
 
@@ -77,7 +96,7 @@
 			<NavLi class="p-0 md:p-0" href="/stats">Stats</NavLi>
 			<NavLi class="p-0 md:p-0" href="/about">About</NavLi>
 			{#if data?.session?.user}
-				<NavLi class="p-0 md:p-0">
+				<li>
 					<form id="add-character-form" method="POST" action="/signin" class="hidden">
 						<input type="hidden" name="providerId" value="eveonline" />
 						<input type="hidden" name="redirectTo" value={page.url.pathname} />
@@ -89,9 +108,15 @@
 						<input id="switch-main-character-id" type="hidden" name="characterId" />
 						<input type="hidden" name="redirectTo" value={page.url.pathname} />
 					</form>
-					<div
+					<button
 						id="eve-user-trigger"
-						class="flex cursor-pointer items-center gap-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+						type="button"
+						aria-haspopup="menu"
+						aria-expanded={userMenuOpen}
+						onclick={(event) => {
+							if (isKeyboardClick(event)) userMenuOpen = true;
+						}}
+						class="flex cursor-pointer items-center gap-1.5 rounded-sm text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
 					>
 						<Avatar
 							src={data.session.user.image}
@@ -101,8 +126,8 @@
 							class="h-5 w-5 shrink-0"
 						/>
 						<span class="max-w-24 truncate text-sm">{data.session.user.name}</span>
-					</div>
-					<Dropdown triggeredBy="#eve-user-trigger" class="z-30 w-56">
+					</button>
+					<Dropdown triggeredBy="#eve-user-trigger" bind:isOpen={userMenuOpen} class="z-30 w-56">
 						<DropdownGroup>
 							<DropdownItem href="/my-scans">My Scans</DropdownItem>
 						</DropdownGroup>
@@ -111,37 +136,46 @@
 								>Add Character</DropdownItem
 							>
 							{#if data?.session?.eve?.linkedCharacters?.some((character) => !character.isPrimary)}
-								<div class="group relative">
+								<li>
 									<button
 										type="button"
-										class="flex w-full items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
+										aria-expanded={changeMainOpen}
+										aria-controls="change-main-list"
+										onclick={() => (changeMainOpen = !changeMainOpen)}
+										class="flex w-full cursor-pointer items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
 									>
 										<span>Change Main</span>
-										<span>›</span>
+										<span
+											aria-hidden="true"
+											class:rotate-90={changeMainOpen}
+											class="inline-block transition-transform">›</span
+										>
 									</button>
-									<div
-										class="absolute top-0 left-full z-40 hidden min-w-48 border border-gray-200 bg-white shadow-sm group-hover:block dark:border-gray-600 dark:bg-gray-700"
-									>
-										{#each data.session.eve.linkedCharacters as character (character.characterId)}
-											{#if !character.isPrimary}
-												<button
-													type="button"
-													onclick={() => submitSwitchMain(character.characterId)}
-													class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
-												>
-													<Avatar
-														src={character.image}
-														alt={character.name}
-														rounded
-														size="xs"
-														class="h-5 w-5 shrink-0"
-													/>
-													<span class="truncate">{character.name}</span>
-												</button>
-											{/if}
-										{/each}
-									</div>
-								</div>
+									{#if changeMainOpen}
+										<ul id="change-main-list">
+											{#each data.session.eve.linkedCharacters as character (character.characterId)}
+												{#if !character.isPrimary}
+													<li>
+														<button
+															type="button"
+															onclick={() => submitSwitchMain(character.characterId)}
+															class="flex w-full cursor-pointer items-center gap-2 py-2 ps-8 pe-4 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
+														>
+															<Avatar
+																src={character.image}
+																alt={character.name}
+																rounded
+																size="xs"
+																class="h-5 w-5 shrink-0"
+															/>
+															<span class="min-w-0 truncate">{character.name}</span>
+														</button>
+													</li>
+												{/if}
+											{/each}
+										</ul>
+									{/if}
+								</li>
 							{/if}
 						</DropdownGroup>
 						<DropdownGroup>
@@ -152,16 +186,27 @@
 							>
 						</DropdownGroup>
 					</Dropdown>
-				</NavLi>
+				</li>
 			{:else}
-				<NavLi class="p-0 md:p-0">
-					<div
+				<li>
+					<button
 						id="eve-login-trigger"
-						class="cursor-pointer hover:text-gray-900 dark:hover:text-white"
+						type="button"
+						aria-haspopup="menu"
+						aria-expanded={loginMenuOpen}
+						onclick={(event) => {
+							if (isKeyboardClick(event)) loginMenuOpen = true;
+						}}
+						class="block cursor-pointer rounded-sm p-0 text-gray-700 hover:bg-gray-100 hover:text-gray-900 md:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent"
 					>
 						Login
-					</div>
-					<Dropdown simple triggeredBy="#eve-login-trigger" class="z-30 w-64 p-2 [&>ul]:py-0">
+					</button>
+					<Dropdown
+						simple
+						triggeredBy="#eve-login-trigger"
+						bind:isOpen={loginMenuOpen}
+						class="z-30 w-64 p-2 [&>ul]:py-0"
+					>
 						<form method="POST" action="/signin">
 							<input type="hidden" name="providerId" value="eveonline" />
 							<input type="hidden" name="redirectTo" value={page.url.pathname} />
@@ -189,7 +234,7 @@
 							</button>
 						</form>
 					</Dropdown>
-				</NavLi>
+				</li>
 			{/if}
 			<DarkMode class="cursor-pointer p-0" />
 		</NavUl>
@@ -206,7 +251,12 @@
 				class="mt-3 flex flex-wrap items-center text-sm text-gray-500 sm:mt-0 dark:text-gray-400"
 			>
 				<FooterLink href="/about">About</FooterLink>
-				<FooterLink href="/ccp">CCP Copyright Notice</FooterLink>
+				<FooterLink
+					href="/ccp"
+					aria-label="Fenris Creations Copyright Notice"
+					title="Fenris Creations (formerly CCP Games) Copyright Notice"
+					><s class="decoration-2">CCP</s> FC Copyright Notice</FooterLink
+				>
 				<FooterLink href="/contact">Contact</FooterLink>
 				<FooterLink
 					class="text-blue-500 hover:underline dark:text-blue-400"

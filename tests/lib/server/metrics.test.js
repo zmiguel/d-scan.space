@@ -211,14 +211,10 @@ describe('ESI Metrics', () => {
 		// Set values
 		recordEsiRequest('GET', 200, 100, 50, 60);
 
-		const calls = mockMeter.addBatchObservableCallback.mock.calls;
-		expect(calls.length).toBeGreaterThanOrEqual(2);
-
-		// Find ESI callback (use the last one registered, as resetModules causes re-registration)
-		const matchingCalls = calls.filter((c) =>
+		const matchingCalls = mockMeter.addBatchObservableCallback.mock.calls.filter((c) =>
 			c[1].some((g) => g.name === 'esi_error_limit_remain')
 		);
-		const callback = matchingCalls[matchingCalls.length - 1][0];
+		const callback = matchingCalls.at(-1)[0];
 
 		const mockObservableResult = {
 			observe: vi.fn()

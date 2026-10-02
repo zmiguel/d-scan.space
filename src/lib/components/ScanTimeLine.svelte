@@ -47,24 +47,24 @@
 	/**
 	 * Returns delta info for a scan vs its chronological predecessor of the same type.
 	 * Returns null if this is the first of its type (show "New" badge instead).
+	 * `related` rows carry only the counters (see getScanTimeline), not the scan data.
 	 */
 	function getDiff(scan) {
 		const prev = prevScanMap.get(scan.id);
 		if (prev === null) return null; // first of type
 
-		if (!scan.data) return { noData: true };
-
 		if (scan.scan_type === 'local') {
-			const delta = (scan.data.total_pilots ?? 0) - (prev?.data?.total_pilots ?? 0);
+			if (scan.total_pilots == null) return { noData: true };
+			const delta = scan.total_pilots - (prev?.total_pilots ?? 0);
 			return { type: 'local', delta };
 		}
 
 		if (scan.scan_type === 'directional') {
+			if (scan.on_grid_objects == null && scan.off_grid_objects == null) return { noData: true };
 			return {
 				type: 'directional',
-				onGrid: (scan.data.on_grid?.total_objects ?? 0) - (prev?.data?.on_grid?.total_objects ?? 0),
-				offGrid:
-					(scan.data.off_grid?.total_objects ?? 0) - (prev?.data?.off_grid?.total_objects ?? 0)
+				onGrid: (scan.on_grid_objects ?? 0) - (prev?.on_grid_objects ?? 0),
+				offGrid: (scan.off_grid_objects ?? 0) - (prev?.off_grid_objects ?? 0)
 			};
 		}
 

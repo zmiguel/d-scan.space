@@ -5,41 +5,38 @@
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import MetaTags from '$lib/components/MetaTags.svelte';
+	import ScanSubmitError from '$lib/components/ScanSubmitError.svelte';
+	import { copyText, scanGroupUrl } from '$lib/utils/clipboard.js';
 
 	let isLoading = $state(false);
+	/** @type {{ message: string, failedLines?: any[], failedLineCount?: number } | null} */
+	let submitError = $state(null);
 	const copiedFlagKey = 'scan-link-copied';
 
-	async function copyRedirectUrl(location) {
+	/** Copies the new scan's group link; the scan page toasts only if this succeeded. */
+	async function copyGroupLink(location) {
 		if (!browser || !location) {
 			return;
 		}
-
-		const url = new URL(location, window.location.origin);
-		const segments = url.pathname.split('/').filter(Boolean);
-		// Copy the group URL (/scan/<group>) instead of the specific scan URL
-		const groupUrl = new URL('/' + segments.slice(0, 2).join('/'), url.origin).toString();
-		try {
-			await navigator.clipboard.writeText(groupUrl);
-		} catch {
-			// Ignore clipboard write failures (e.g., permission denied)
+		if (await copyText(scanGroupUrl(location, window.location.origin))) {
+			sessionStorage.setItem(copiedFlagKey, '1');
 		}
-	}
-
-	function markCopiedFlag() {
-		if (!browser) {
-			return;
-		}
-
-		sessionStorage.setItem(copiedFlagKey, '1');
 	}
 
 	function handleSubmit() {
 		isLoading = true;
+		submitError = null;
 		return async ({ result, update }) => {
 			if (result?.type === 'redirect') {
-				await copyRedirectUrl(result.location);
-				markCopiedFlag();
+				await copyGroupLink(result.location);
 				window.location.assign(result.location);
+				isLoading = false;
+				return;
+			}
+
+			if (result?.type === 'failure') {
+				// Keep the pasted text and explain what is wrong with it.
+				submitError = /** @type {any} */ (result.data) ?? { message: 'Scan rejected.' };
 				isLoading = false;
 				return;
 			}
@@ -63,34 +60,36 @@
 				Please wait while we analyze your data and fetch the results.
 			</p>
 		</div>
-	{:else}
-		<div class="container mx-auto px-0">
-			<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
-				<Label for="textarea-id" class="mb-2"
-					>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
-					<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
-				>
-				<Textarea
-					id="textarea-id"
-					placeholder="Paste your data"
-					rows={16}
-					name="scan_content"
-					class="block w-full text-sm sm:text-base"
-					required
-				/>
-
-				<Toggle class="mt-3 cursor-pointer text-sm sm:text-base" checked={false} name="is_public"
-					>Make this Scan public on the site.</Toggle
-				>
-
-				<Button
-					class="mt-4 w-full cursor-pointer text-sm sm:text-base"
-					color="primary"
-					type="submit"
-					data-rybbit-event="scan_submit"
-					data-rybbit-prop-form="create">Process</Button
-				>
-			</form>
-		</div>
 	{/if}
+	<!-- Hidden, not unmounted, while processing so the pasted text survives a rejection. -->
+	<div class="container mx-auto px-0" class:hidden={isLoading}>
+		<form method="POST" action="/scan?/create" use:enhance={handleSubmit}>
+			<Label for="textarea-id" class="mb-2"
+				>Paste <span class="text-primary-700 dark:text-primary-400">Local</span> or
+				<span class="text-primary-700 dark:text-primary-400">Directional Scan</span></Label
+			>
+			<Textarea
+				id="textarea-id"
+				placeholder="Paste your data"
+				rows={16}
+				name="scan_content"
+				class="block w-full text-sm sm:text-base"
+				required
+			/>
+
+			<ScanSubmitError error={submitError} />
+
+			<Toggle class="mt-3 cursor-pointer text-sm sm:text-base" checked={false} name="is_public"
+				>Make this Scan public on the site.</Toggle
+			>
+
+			<Button
+				class="mt-4 w-full cursor-pointer text-sm sm:text-base"
+				color="primary"
+				type="submit"
+				data-rybbit-event="scan_submit"
+				data-rybbit-prop-form="create">Process</Button
+			>
+		</form>
+	</div>
 </div>

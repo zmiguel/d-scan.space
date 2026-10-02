@@ -1,4 +1,5 @@
-import { getScansByUser } from '$lib/database/scans.js';
+import { getUserScansPage } from '$lib/database/scans.js';
+import { parseScanListParams, toScanListData } from '$lib/server/scan-list.js';
 import { withSpan } from '$lib/server/tracer';
 
 export async function load(event) {
@@ -21,10 +22,12 @@ export async function load(event) {
 				};
 			}
 
-			const scans = await withSpan(
+			const filters = parseScanListParams(event.url);
+
+			const result = await withSpan(
 				'route.my_scans.fetch_user_scans',
 				async () => {
-					return await getScansByUser(userId);
+					return await getUserScansPage(userId, filters);
 				},
 				{
 					'operation.type': 'read',
@@ -34,7 +37,10 @@ export async function load(event) {
 			);
 
 			span.setAttributes({
-				'scans.user_count': scans?.length || 0,
+				'scans.user_count': result.total,
+				'scans.page': result.page,
+				'scans.filter.type': filters.type || 'all',
+				'scans.filter.has_query': filters.query !== '',
 				'page.type': 'my_scans_list',
 				'auth.logged_in': true,
 				'user.id': userId,
@@ -43,7 +49,7 @@ export async function load(event) {
 
 			return {
 				requiresLogin: false,
-				scans
+				...toScanListData(result, filters)
 			};
 		},
 		{

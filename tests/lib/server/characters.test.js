@@ -1,14 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock dependencies
-const mockSpan = {
-	setAttributes: vi.fn(),
-	setStatus: vi.fn(),
-	addEvent: vi.fn()
-};
+const mocks = vi.hoisted(() => ({
+	span: { setAttributes: () => {}, setStatus: () => {}, addEvent: () => {} }
+}));
 
 vi.mock('../../../src/lib/server/tracer.js', () => ({
-	withSpan: vi.fn((name, fn) => fn(mockSpan))
+	withSpan: (name, fn) => fn(mocks.span)
 }));
 
 vi.mock('../../../src/lib/server/wrappers.js', () => ({
@@ -26,16 +23,20 @@ vi.mock('../../../src/lib/server/alliances.js', () => ({
 
 vi.mock('../../../src/lib/database/characters.js', () => ({
 	addOrUpdateCharactersDB: vi.fn(),
-	biomassCharacter: vi.fn(),
+	biomassCharacters: vi.fn(),
 	getCharactersByName: vi.fn()
 }));
 
+vi.mock('../../../src/lib/database/corporations.js', () => ({
+	getCorporationsByID: vi.fn()
+}));
+
+vi.mock('../../../src/lib/database/alliances.js', () => ({
+	getAlliancesByID: vi.fn()
+}));
+
 vi.mock('../../../src/lib/logger.js', () => ({
-	default: {
-		error: vi.fn(),
-		warn: vi.fn(),
-		info: vi.fn()
-	}
+	default: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} }
 }));
 
 import {
@@ -47,623 +48,376 @@ import {
 import { fetchGET, fetchPOST } from '../../../src/lib/server/wrappers.js';
 import {
 	addOrUpdateCharactersDB,
+	biomassCharacters,
 	getCharactersByName
 } from '../../../src/lib/database/characters.js';
+import { getCorporationsByID } from '../../../src/lib/database/corporations.js';
+import { getAlliancesByID } from '../../../src/lib/database/alliances.js';
+import { _clearUnresolvableNames } from '../../../src/lib/server/unresolved-names.js';
 
-describe('characters', () => {
+const ESI = 'https://esi.evetech.net';
+const IDS_URL = `${ESI}/universe/ids`;
+const AFFILIATION_URL = `${ESI}/characters/affiliation`;
+const DOOMHEIM = 1000001;
+
+/** @param {unknown} data @param {number} [status] @param {Record<string,string>} [headers] */
+const json = (data, status = 200, headers = {}) =>
+	new Response(JSON.stringify(data), { status, headers });
+
+/**
+ * Fake ESI. `characters` maps id → { name, corporation_id, alliance_id? }.
+ * Names resolve case-insensitively to the canonical name.
+ */
+function fakeEsi(characters, { deleted = [], failingGets = [] } = {}) {
+	const byName = new Map(
+		Object.entries(characters).map(([id, c]) => [
+			c.name.toLowerCase(),
+			{ id: Number(id), name: c.name }
+		])
+	);
+
+	fetchPOST.mockImplementation(async (url, body) => {
+		if (url === IDS_URL) {
+			const found = body.map((n) => byName.get(n.toLowerCase())).filter(Boolean);
+			return json(found.length ? { characters: found } : {});
+		}
+		if (url === AFFILIATION_URL) {
+			return json(
+				body
+					.filter((id) => characters[id])
+					.map((id) => ({
+						character_id: id,
+						corporation_id: characters[id].corporation_id,
+						...(characters[id].alliance_id && { alliance_id: characters[id].alliance_id })
+					}))
+			);
+		}
+		throw new Error(`unexpected POST ${url}`);
+	});
+
+	fetchGET.mockImplementation(async (url) => {
+		const id = Number(url.split('/').pop());
+		if (deleted.includes(id)) return json({ error: 'Character has been deleted!' }, 404);
+		if (failingGets.includes(id)) return null;
+		const c = characters[id];
+		if (!c) return json({ error: 'not found' }, 404);
+		return json(
+			{
+				name: c.name,
+				corporation_id: 1, // stale cached value; affiliation must win
+				security_status: 1.5,
+				description: 'long bio',
+				title: 'CEO'
+			},
+			200,
+			{ expires: 'Thu, 01 Oct 2026 12:00:00 GMT' }
+		);
+	});
+}
+
+/** Bodies sent to a POST url. */
+const postBodies = (url) => fetchPOST.mock.calls.filter(([u]) => u === url).map(([, b]) => b);
+const getIds = () => fetchGET.mock.calls.map(([u]) => Number(u.split('/').pop()));
+const storedIds = () =>
+	addOrUpdateCharactersDB.mock.calls.flatMap(([rows]) => rows.map((r) => r.id));
+const biomassedIds = () => biomassCharacters.mock.calls.flatMap(([ids]) => ids);
+
+describe('characters service', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
+		_clearUnresolvableNames();
+		// every corporation/alliance lookup succeeds unless a test says otherwise
+		getCorporationsByID.mockImplementation(async (ids) => ids.map((id) => ({ id })));
+		getAlliancesByID.mockImplementation(async (ids) => ids.map((id) => ({ id })));
+		getCharactersByName.mockResolvedValue([]);
 	});
 
 	describe('addCharactersFromESI', () => {
-		it('should add characters from ESI', async () => {
-			const names = ['Char1', 'Char2'];
-
-			// Mock namesToCharacters flow
-			// 1. names -> ids
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({
-					characters: [
-						{ id: 1, name: 'Char1' },
-						{ id: 2, name: 'Char2' }
-					]
-				})
+		it('stores characters with details from GET and affiliation from /characters/affiliation', async () => {
+			fakeEsi({
+				1: { name: 'Char One', corporation_id: 10, alliance_id: 100 },
+				2: { name: 'Char Two', corporation_id: 20 }
 			});
 
-			// 2. ids -> affiliations
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [
-					{ character_id: 1, corporation_id: 10, alliance_id: 100 },
-					{ character_id: 2, corporation_id: 20 }
-				]
+			await addCharactersFromESI(['Char One', 'Char Two']);
+
+			expect(addOrUpdateCharactersDB).toHaveBeenCalledTimes(1);
+			const rows = addOrUpdateCharactersDB.mock.calls[0][0];
+			expect(rows).toHaveLength(2);
+			const one = rows.find((r) => r.id === 1);
+			expect(one).toMatchObject({
+				id: 1,
+				name: 'Char One',
+				corporation_id: 10,
+				alliance_id: 100,
+				security_status: 1.5,
+				esi_cache_expires: new Date('2026-10-01T12:00:00Z')
 			});
-
-			// 3. ids -> character details
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char', security_status: 0.5 }),
-				headers: { get: () => null }
-			});
-
-			await addCharactersFromESI(names);
-
-			expect(fetchPOST).toHaveBeenCalledTimes(2); // ids and affiliations
-			expect(fetchGET).toHaveBeenCalledTimes(2); // 2 characters
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith(
-				expect.arrayContaining([
-					expect.objectContaining({ id: 1, corporation_id: 10, alliance_id: 100 }),
-					expect.objectContaining({ id: 2, corporation_id: 20, alliance_id: null })
-				])
-			);
+			expect(one).not.toHaveProperty('description');
+			expect(one).not.toHaveProperty('title');
+			expect(rows.find((r) => r.id === 2)).toMatchObject({ corporation_id: 20, alliance_id: null });
 		});
 
-		it('should skip if sanity check passes', async () => {
-			const names = ['Char1'];
-			getCharactersByName.mockResolvedValue([{ name: 'Char1' }]);
-
-			await addCharactersFromESI(names, true);
-
-			expect(fetchPOST).not.toHaveBeenCalled();
-		});
-
-		it('should handle empty input gracefully', async () => {
+		it('does not call ESI for an empty list', async () => {
 			await addCharactersFromESI([]);
 			expect(fetchPOST).not.toHaveBeenCalled();
+			expect(fetchGET).not.toHaveBeenCalled();
 		});
 
-		it('should handle ESI error in names to ids', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: false,
-				status: 500,
-				text: async () => 'Internal Server Error',
-				url: 'https://esi.evetech.net/universe/ids'
-			});
+		it('skips ESI when sanityCheck finds every name already stored', async () => {
+			getCharactersByName.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+			fakeEsi({});
 
-			await addCharactersFromESI(['Char1']);
+			await addCharactersFromESI(['Char One', 'Char Two'], true);
 
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+			expect(fetchPOST).not.toHaveBeenCalled();
 		});
 
-		it('should handle null response in names to ids', async () => {
-			fetchPOST.mockResolvedValueOnce(null);
+		it('still resolves names when sanityCheck finds only some stored', async () => {
+			getCharactersByName.mockResolvedValue([{ id: 1 }]);
+			fakeEsi({
+				1: { name: 'Char One', corporation_id: 10 },
+				2: { name: 'Char Two', corporation_id: 10 }
+			});
 
-			await addCharactersFromESI(['Char1']);
+			await addCharactersFromESI(['Char One', 'Char Two'], true);
 
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+			expect(storedIds().sort()).toEqual([1, 2]);
 		});
 
-		it('should handle getCharacterFromESI failure', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			fetchGET.mockResolvedValue({
-				ok: false,
-				status: 404,
-				statusText: 'Not Found'
-			});
+		it('resolves names in batches of 500', async () => {
+			fakeEsi({});
+			const names = Array.from({ length: 1200 }, (_, i) => `Pilot ${i}`);
 
 			await addCharactersFromESI(names);
 
+			const batches = postBodies(IDS_URL);
+			expect(batches.map((b) => b.length)).toEqual([500, 500, 200]);
+			expect(batches.flat()).toEqual(names);
+		});
+
+		it('negatively caches unknown names so they are not sent to /universe/ids again', async () => {
+			fakeEsi({ 1: { name: 'Char One', corporation_id: 10 } });
+
+			await addCharactersFromESI(['Char One', 'Ghost Pilot']);
+			fetchPOST.mockClear();
+
+			await addCharactersFromESI(['Char One', 'GHOST PILOT']);
+
+			expect(postBodies(IDS_URL)).toEqual([['Char One']]);
+		});
+
+		it('does not call ESI at all when every name is a cached miss', async () => {
+			fakeEsi({});
+			await addCharactersFromESI(['Ghost', 'Nobody']);
+			fetchPOST.mockClear();
+
+			await addCharactersFromESI(['ghost', 'NOBODY']);
+
+			expect(fetchPOST).not.toHaveBeenCalled();
 			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
 		});
 
-		it('should handle getCharacterFromESI null response', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			fetchGET.mockResolvedValue(null);
+		it('treats names resolved under a different case as found, not as misses', async () => {
+			fakeEsi({ 1: { name: 'Char One', corporation_id: 10 } });
+
+			await addCharactersFromESI(['cHaR oNe']);
+			expect(storedIds()).toEqual([1]);
+			expect(addOrUpdateCharactersDB.mock.calls[0][0][0].name).toBe('Char One');
+
+			fetchPOST.mockClear();
+			await addCharactersFromESI(['cHaR oNe']);
+			expect(postBodies(IDS_URL)).toEqual([['cHaR oNe']]);
+		});
+
+		it('does not cache misses when a /universe/ids batch failed', async () => {
+			fakeEsi({});
+			const names = Array.from({ length: 501 }, (_, i) => `Pilot ${i}`);
+			const ok = fetchPOST.getMockImplementation();
+			fetchPOST.mockImplementation(async (url, body) => (body.length === 1 ? null : ok(url, body)));
+
+			await addCharactersFromESI(names);
+			fetchPOST.mockClear();
+			fakeEsi({});
 
 			await addCharactersFromESI(names);
 
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+			expect(postBodies(IDS_URL).flat()).toEqual(names);
 		});
 
-		it('should handle namesToCharacters affiliations failure', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			// Affiliations failure
-			fetchPOST.mockResolvedValueOnce({
-				ok: false,
-				status: 500,
-				text: async () => 'Error',
-				url: 'url'
-			});
-			// Mock fetchGET to avoid crash
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
+		it('still stores characters from successful batches when another batch fails', async () => {
+			const chars = Object.fromEntries(
+				Array.from({ length: 501 }, (_, i) => [
+					i + 1,
+					{ name: `Pilot ${i + 1}`, corporation_id: 10 }
+				])
+			);
+			fakeEsi(chars);
+			const ok = fetchPOST.getMockImplementation();
+			fetchPOST.mockImplementation(async (url, body) =>
+				url === IDS_URL && body.length === 1 ? json({}, 503) : ok(url, body)
+			);
 
-			await addCharactersFromESI(names);
-			// Should return empty affiliations, so no characters added
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
-		});
+			await addCharactersFromESI(Object.values(chars).map((c) => c.name));
 
-		it('should handle null response in namesToCharacters affiliations', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			fetchPOST.mockResolvedValueOnce(null);
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			await addCharactersFromESI(names);
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
-		});
-
-		it('should handle empty affiliations from ESI', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			// Empty affiliations
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => []
-			});
-			// Mock fetchGET to avoid crash
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			await addCharactersFromESI(names);
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
-		});
-
-		it('should handle null affiliations payload in namesToCharacters', async () => {
-			const names = ['Char1'];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => null
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			await addCharactersFromESI(names);
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('updateCharactersFromESI', () => {
-		it('should update characters from ESI', async () => {
-			const data = [{ id: 1 }];
-
-			// Mock idsToCharacters flow
-			// 1. ids -> affiliations
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-
-			// 2. ids -> character details
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0.1 }),
-				headers: { get: () => null }
-			});
-
-			await updateCharactersFromESI(data);
-
-			expect(addOrUpdateCharactersDB).toHaveBeenCalled();
-		});
-	});
-
-	describe('updateAffiliationsFromESI', () => {
-		it('should update affiliations only', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 99, alliance_id: 999 }]
-			});
-
-			await updateAffiliationsFromESI(data);
-
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([
-				expect.objectContaining({
-					id: 1,
-					corporation_id: 99,
-					alliance_id: 999
-				})
-			]);
-		});
-
-		it('should handle Doomheim characters in updateAffiliationsFromESI', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 1000001 }]
-			});
-
-			await updateAffiliationsFromESI(data);
-
-			const { biomassCharacter } = await import('../../../src/lib/database/characters.js');
-			expect(biomassCharacter).toHaveBeenCalledWith(1);
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
-		});
-
-		it('should handle failure in updateAffiliationsFromESI', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-
-			fetchPOST.mockResolvedValueOnce({
-				ok: false,
-				status: 500,
-				text: async () => 'Error',
-				url: 'url'
-			});
-
-			await updateAffiliationsFromESI(data);
-
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+			expect(storedIds()).toHaveLength(500);
 		});
 	});
 
 	describe('idsToCharacters', () => {
-		it('should handle empty input', async () => {
-			const result = await idsToCharacters([]);
-			expect(result).toEqual([]);
+		it('requests affiliations in batches of 1000', async () => {
+			fakeEsi({});
+			const ids = Array.from({ length: 2500 }, (_, i) => i + 1);
+
+			await idsToCharacters(ids);
+
+			const batches = postBodies(AFFILIATION_URL);
+			expect(batches.map((b) => b.length)).toEqual([1000, 1000, 500]);
+			expect(batches.flat()).toEqual(ids);
 		});
 
-		it('should handle Doomheim characters (biomass)', async () => {
-			// 1. affiliations -> Doomheim
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 1000001 }]
-			});
-
-			// 2. character details
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Biomassed', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			const result = await idsToCharacters([1]);
-
-			expect(result).toHaveLength(0);
-			// biomassCharacter is mocked, check if it was called
-			const { biomassCharacter } = await import('../../../src/lib/database/characters.js');
-			expect(biomassCharacter).toHaveBeenCalledWith(1);
-		});
-
-		it('should parse cache expiry headers', async () => {
-			// 1. affiliations
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-
-			// 2. character details with Expires header
-			const futureDate = new Date(Date.now() + 3600000).toUTCString();
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: (name) => (name === 'expires' ? futureDate : null) }
-			});
-
-			const result = await idsToCharacters([1]);
-
-			expect(result).toHaveLength(1);
-			expect(result[0].esi_cache_expires).toBeInstanceOf(Date);
-		});
-
-		it('should handle ESI errors in affiliations', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: false,
-				status: 500,
-				text: async () => 'Error',
-				url: 'url'
-			});
-			// Mock fetchGET to avoid crash
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result).toHaveLength(0);
-		});
-
-		it('should handle null response in idsToCharacters affiliations', async () => {
-			fetchPOST.mockResolvedValueOnce(null);
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result).toHaveLength(0);
-		});
-
-		it('should handle invalid expires header in getCharacterFromESI', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1' }),
-				headers: { get: () => 'Invalid Date' }
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result[0].esi_cache_expires).toBeUndefined();
-		});
-
-		it('should handle idsToCharacters with null character result', async () => {
-			// Affiliation ok
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			// Character fetch fails (returns null from getCharacterFromESI)
-			fetchGET.mockResolvedValue({
-				ok: false,
-				status: 404,
-				statusText: 'Not Found'
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result).toHaveLength(0);
-		});
-
-		it('should handle missing affiliation in namesToCharacters', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			// Affiliations return affiliation for a DIFFERENT character (so id 1 is missing)
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 999, corporation_id: 10 }]
-			});
-			// Character fetch
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1' }),
-				headers: { get: () => null }
-			});
-
-			await addCharactersFromESI(['Char1']);
-
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([expect.objectContaining({ id: 1 })]);
-		});
-
-		it('should handle missing affiliation in idsToCharacters', async () => {
-			// Affiliations return empty
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => []
-			});
-			// Character fetch
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1' }),
-				headers: { get: () => null }
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result).toHaveLength(0);
-		});
-
-		it('should handle null affiliations payload in idsToCharacters', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => null
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
-
-			const result = await idsToCharacters([1]);
-			expect(result).toHaveLength(0);
-		});
-
-		it('should merge affiliations into character results', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [
-					{ character_id: 1, corporation_id: 10, alliance_id: 100 },
-					{ character_id: 2, corporation_id: 20 }
-				]
-			});
-
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char', security_status: 0 }),
-				headers: { get: () => null }
+		it('biomasses Doomheim characters without requesting their details', async () => {
+			fakeEsi({
+				1: { name: 'Alive', corporation_id: 10 },
+				2: { name: 'Dead', corporation_id: DOOMHEIM }
 			});
 
 			const result = await idsToCharacters([1, 2]);
 
-			expect(result).toHaveLength(2);
-			expect(result).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({ id: 1, corporation_id: 10, alliance_id: 100 }),
-					expect.objectContaining({ id: 2, corporation_id: 20, alliance_id: null })
-				])
+			expect(biomassedIds()).toEqual([2]);
+			expect(getIds()).toEqual([1]);
+			expect(result.map((c) => c.id)).toEqual([1]);
+		});
+
+		it('biomasses a character whose details answer 404 and leaves it out', async () => {
+			fakeEsi(
+				{
+					1: { name: 'Alive', corporation_id: 10 },
+					2: { name: 'Just Deleted', corporation_id: 10 }
+				},
+				{ deleted: [2] }
 			);
-		});
-
-		it('should skip characters without matching affiliations', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char', security_status: 0 }),
-				headers: { get: () => null }
-			});
 
 			const result = await idsToCharacters([1, 2]);
 
-			expect(result).toHaveLength(1);
-			expect(result[0]).toEqual(expect.objectContaining({ id: 1, corporation_id: 10 }));
+			expect(biomassCharacters).toHaveBeenCalledWith([2]);
+			expect(result.map((c) => c.id)).toEqual([1]);
 		});
 
-		it('should handle missing affiliation in updateAffiliationsFromESI', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-			// Affiliations return empty
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => []
-			});
+		it('leaves out characters whose details could not be fetched without biomassing them', async () => {
+			fakeEsi(
+				{
+					1: { name: 'Alive', corporation_id: 10 },
+					2: { name: 'Unlucky', corporation_id: 10 }
+				},
+				{ failingGets: [2] }
+			);
 
-			await updateAffiliationsFromESI(data);
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+			const result = await idsToCharacters([1, 2]);
+
+			expect(result.map((c) => c.id)).toEqual([1]);
+			expect(biomassedIds()).not.toContain(2);
 		});
 
-		it('should handle null affiliations payload in updateAffiliationsFromESI', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => null
-			});
+		it('takes corporation and alliance from the affiliation, not the cached details', async () => {
+			fakeEsi({ 1: { name: 'Mover', corporation_id: 10, alliance_id: 100 } });
 
-			await updateAffiliationsFromESI(data);
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
-		});
+			const [character] = await idsToCharacters([1]);
 
-		it('should handle null response in updateAffiliationsFromESI', async () => {
-			const data = [{ id: 1, name: 'Char1' }];
-			fetchPOST.mockResolvedValueOnce(null);
-
-			await updateAffiliationsFromESI(data);
-			expect(addOrUpdateCharactersDB).toHaveBeenCalledWith([]);
+			expect(character).toMatchObject({ id: 1, corporation_id: 10, alliance_id: 100 });
 		});
 	});
 
-	describe('Edge Cases', () => {
-		it('should handle namesToCharacters with missing characters property', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({}) // No characters array
+	describe('updateCharactersFromESI', () => {
+		it('returns and stores only characters whose corporation and alliance exist', async () => {
+			fakeEsi({
+				1: { name: 'Fine', corporation_id: 10, alliance_id: 100 },
+				2: { name: 'Corp Missing', corporation_id: 20 },
+				3: { name: 'Alliance Missing', corporation_id: 10, alliance_id: 200 },
+				4: { name: 'No Alliance', corporation_id: 10 }
 			});
+			getCorporationsByID.mockImplementation(async (ids) =>
+				ids.filter((id) => id !== 20).map((id) => ({ id }))
+			);
+			getAlliancesByID.mockImplementation(async (ids) =>
+				ids.filter((id) => id !== 200).map((id) => ({ id }))
+			);
 
-			await addCharactersFromESI(['Char1']);
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+			const stored = await updateCharactersFromESI([{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }]);
+
+			expect(stored.map((c) => c.id).sort()).toEqual([1, 4]);
+			expect(storedIds().sort()).toEqual([1, 4]);
 		});
 
-		it('should handle namesToCharacters where affiliation lookup returns no match', async () => {
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
-			});
-			// Affiliations return empty or mismatch
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => []
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1' }),
-				headers: { get: () => null }
+		it('returns an empty list when nothing could be fetched', async () => {
+			fetchPOST.mockResolvedValue(null);
+
+			await expect(updateCharactersFromESI([{ id: 1 }])).resolves.toEqual([]);
+			expect(fetchGET).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('updateAffiliationsFromESI', () => {
+		it('applies new affiliations without fetching character details', async () => {
+			fakeEsi({
+				1: { name: 'Joined Alliance', corporation_id: 11, alliance_id: 101 },
+				2: { name: 'Left Alliance', corporation_id: 22 }
 			});
 
-			await addCharactersFromESI(['Char1']);
-			expect(addOrUpdateCharactersDB).not.toHaveBeenCalled();
+			const stored = await updateAffiliationsFromESI([
+				{ id: 1, corporation_id: 10, alliance_id: null },
+				{ id: 2, corporation_id: 20, alliance_id: 200 }
+			]);
+
+			expect(fetchGET).not.toHaveBeenCalled();
+			expect(stored).toEqual([
+				expect.objectContaining({ id: 1, corporation_id: 11, alliance_id: 101 }),
+				expect.objectContaining({ id: 2, corporation_id: 22, alliance_id: null })
+			]);
 		});
 
-		it('should handle addCharactersFromESI sanity check mismatch', async () => {
-			const names = ['Char1', 'Char2'];
-			// DB has only 1
-			getCharactersByName.mockResolvedValue([{ name: 'Char1' }]);
-
-			// Proceed to fetch
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({
-					characters: [
-						{ id: 1, name: 'Char1' },
-						{ id: 2, name: 'Char2' }
-					]
-				})
-			});
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [
-					{ character_id: 1, corporation_id: 10 },
-					{ character_id: 2, corporation_id: 20 }
-				]
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char' }),
-				headers: { get: () => null }
+		it('biomasses Doomheim characters and does not store them', async () => {
+			fakeEsi({
+				1: { name: 'Alive', corporation_id: 10 },
+				2: { name: 'Dead', corporation_id: DOOMHEIM }
 			});
 
-			await addCharactersFromESI(names, true);
-			expect(fetchPOST).toHaveBeenCalled();
+			const stored = await updateAffiliationsFromESI([
+				{ id: 1, corporation_id: 10, alliance_id: null },
+				{ id: 2, corporation_id: 10, alliance_id: null }
+			]);
+
+			expect(biomassedIds()).toEqual([2]);
+			expect(stored.map((c) => c.id)).toEqual([1]);
 		});
 
-		it('should handle undefined concurrency in batching', async () => {
-			vi.resetModules();
-			vi.doMock('../../../src/lib/server/constants.js', () => ({
-				CHARACTER_REQUEST_BATCH_SIZE: 250,
-				CHARACTER_BATCH_CONCURRENCY: undefined,
-				DOOMHEIM_ID: 1000001
-			}));
+		it('leaves characters missing from the affiliation response untouched', async () => {
+			fakeEsi({ 1: { name: 'Known', corporation_id: 10 } });
 
-			const { addCharactersFromESI } = await import('../../../src/lib/server/characters.js');
-			const { fetchGET, fetchPOST } = await import('../../../src/lib/server/wrappers.js');
+			const stored = await updateAffiliationsFromESI([
+				{ id: 1, corporation_id: 10, alliance_id: null },
+				{ id: 2, corporation_id: 20, alliance_id: null }
+			]);
 
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => ({ characters: [{ id: 1, name: 'Char1' }] })
+			expect(stored.map((c) => c.id)).toEqual([1]);
+		});
+
+		it('skips characters whose new corporation could not be stored', async () => {
+			fakeEsi({
+				1: { name: 'Stays', corporation_id: 10 },
+				2: { name: 'Moves', corporation_id: 30 }
 			});
-			fetchPOST.mockResolvedValueOnce({
-				ok: true,
-				json: async () => [{ character_id: 1, corporation_id: 10 }]
-			});
-			fetchGET.mockResolvedValue({
-				ok: true,
-				json: async () => ({ name: 'Char1', security_status: 0 }),
-				headers: { get: () => null }
-			});
+			getCorporationsByID.mockImplementation(async (ids) =>
+				ids.filter((id) => id !== 30).map((id) => ({ id }))
+			);
 
-			await addCharactersFromESI(['Char1']);
+			const stored = await updateAffiliationsFromESI([
+				{ id: 1, corporation_id: 10, alliance_id: null },
+				{ id: 2, corporation_id: 20, alliance_id: null }
+			]);
 
-			const { addOrUpdateCharactersDB } = await import('../../../src/lib/database/characters.js');
-			expect(addOrUpdateCharactersDB).toHaveBeenCalled();
+			expect(stored.map((c) => c.id)).toEqual([1]);
+			expect(storedIds()).toEqual([1]);
 		});
 	});
 });

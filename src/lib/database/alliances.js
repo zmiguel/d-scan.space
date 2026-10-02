@@ -3,19 +3,25 @@
  */
 import { db } from './client.js';
 import { alliances } from './schema.js';
+import { UPSERT_CHUNK_SIZE, inChunks, uniqueBy } from './batching.js';
+import { claimDueRows } from './refresh.js';
 import logger from '../logger.js';
 import { withSpan } from '../server/tracer.js';
 import { inArray, sql } from 'drizzle-orm';
 
 export async function getAlliancesByID(ids) {
-	return db.select().from(alliances).where(inArray(alliances.id, ids));
+	return inChunks(ids, (part) => db.select().from(alliances).where(inArray(alliances.id, part)));
 }
 
-export async function getAllAlliances() {
-	return withSpan('database.alliances.get_all', async (span) => {
-		const result = await db.select().from(alliances);
-		span.setAttributes({ 'alliances.count': result.length });
-		return result;
+/**
+ * Claims up to `limit` alliances due for a refresh (see refresh.js).
+ * @param {number} limit
+ */
+export async function claimAlliancesForRefresh(limit) {
+	return await withSpan('database.alliances.claim_for_refresh', async (span) => {
+		const rows = await claimDueRows(alliances, limit);
+		span.setAttributes({ 'db.alliances.claimed': rows.length, 'db.alliances.limit': limit });
+		return rows;
 	});
 }
 
@@ -29,27 +35,36 @@ export async function addOrUpdateAlliancesDB(data) {
 			return;
 		}
 
-		const values = data.map((alliance) => ({
-			id: alliance.id,
-			name: alliance.name,
-			ticker: alliance.ticker
-		}));
+		const values = uniqueBy(
+			data.map((alliance) => ({
+				id: alliance.id,
+				name: alliance.name,
+				ticker: alliance.ticker
+			})),
+			(row) => row.id
+		);
 
 		span.setAttributes({
 			'alliances.data.length': values.length
 		});
 
-		await db
-			.insert(alliances)
-			.values(values)
-			.onConflictDoUpdate({
-				target: alliances.id,
-				set: {
-					name: sql`excluded.name`,
-					ticker: sql`excluded.ticker`,
-					updated_at: sql`now()`
-				}
-			});
+		await inChunks(
+			values,
+			(part) =>
+				db
+					.insert(alliances)
+					.values(part)
+					.onConflictDoUpdate({
+						target: alliances.id,
+						set: {
+							name: sql`excluded.name`,
+							ticker: sql`excluded.ticker`,
+							updated_at: sql`now()`
+						}
+					})
+					.then(() => []),
+			UPSERT_CHUNK_SIZE
+		);
 	});
 }
 
@@ -59,10 +74,13 @@ export async function updateAlliancesLastSeen(allianceIDs) {
 		return;
 	}
 
-	await db
-		.update(alliances)
-		.set({
-			last_seen: sql`now()`
-		})
-		.where(inArray(alliances.id, allianceIDs));
+	await inChunks(allianceIDs, (part) =>
+		db
+			.update(alliances)
+			.set({
+				last_seen: sql`now()`
+			})
+			.where(inArray(alliances.id, part))
+			.then(() => [])
+	);
 }

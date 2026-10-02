@@ -6,28 +6,41 @@ import logger from '../logger.js';
 // Get a tracer instance for your application
 const tracer = trace.getTracer('d-scan.space', pkg.version);
 
+// tracer.js is shared with the updater worker, which does not ship @sveltejs/kit, so
+// Kit's isRedirect/isHttpError cannot be imported here. Kit's Redirect and HttpError are
+// plain classes (not Error subclasses); that distinguishes them from real errors that
+// happen to carry a `status` (fetch/pg/ESI errors).
+
 /**
- * Check if an error is actually a SvelteKit redirect
- * @param {any} error - The error/object to check
- * @returns {boolean} - True if it's a redirect
+ * SvelteKit `redirect()` result.
+ * @param {any} error
+ * @returns {boolean}
  */
 function isRedirect(error) {
 	return (
-		error &&
+		error !== null &&
 		typeof error === 'object' &&
-		error.constructor.name === 'Redirect' &&
-		typeof error.status === 'number' &&
+		!(error instanceof Error) &&
+		Number.isInteger(error.status) &&
+		error.status >= 300 &&
+		error.status <= 308 &&
 		typeof error.location === 'string'
 	);
 }
 
 /**
- * Check if this is a SvelteKit HttpError
- * @param {any} error - The error/object to check
- * @returns {boolean} - True if it's an HttpError with status
+ * SvelteKit `error()` result.
+ * @param {any} error
+ * @returns {boolean}
  */
 function isHttpError(error) {
-	return error && typeof error === 'object' && typeof error.status === 'number';
+	return (
+		error !== null &&
+		typeof error === 'object' &&
+		!(error instanceof Error) &&
+		Number.isInteger(error.status) &&
+		'body' in error
+	);
 }
 
 /**
@@ -115,7 +128,7 @@ export async function withSpan(name, fn, attributes = {}, options = {}, event = 
 
 		// Treat SvelteKit 4xx HttpErrors as handled client errors
 		if (isHttpError(error) && error.status >= 400 && error.status < 500) {
-			const errorMessage = error?.message ?? String(error);
+			const errorMessage = error.body?.message ?? `HTTP ${error.status}`;
 			const isWarning = error.status === 422;
 			span.setAttributes({
 				'http.response.status_code': error.status,
@@ -134,7 +147,7 @@ export async function withSpan(name, fn, attributes = {}, options = {}, event = 
 		const errorMessage = error?.message ?? String(error);
 		const errorStack = error?.stack;
 		const errorCode = error?.code || 'UNKNOWN_ERROR';
-		logger.error('Error occurred in span: ' + errorMessage);
+		logger.error({ err: error, span: name }, 'Error occurred in span');
 		span.recordException(error);
 		span.setStatus({
 			code: SpanStatusCode.ERROR,

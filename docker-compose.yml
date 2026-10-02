@@ -1,10 +1,25 @@
+# Self-host / dev stack.
+#
+# PostgreSQL 18 upgrade note: the postgres:18 image keeps its data in
+# /var/lib/postgresql/18/docker (PGDATA), so the volume is mounted at /var/lib/postgresql.
+# A volume created by postgres <=17 (mounted at /var/lib/postgresql/data) must NOT just be
+# remounted here; migrate it with a dump/restore (or pg_upgrade) instead:
+#   1. With the OLD compose file/image still running:
+#        docker compose exec postgres-main pg_dumpall -U dscanspace > dscanspace.sql
+#   2. docker compose down; remove or rename the old volume (docker volume rm <project>_db_data)
+#   3. Start only the new database:  docker compose up -d postgres-main
+#   4. Restore:  docker compose exec -T postgres-main psql -U dscanspace -d postgres < dscanspace.sql
+#   5. docker compose up -d
+#
+# Adminer (DB UI) is only started with:  docker compose --profile debug up -d
 services:
   adminer:
     image: adminer
     restart: unless-stopped
     container_name: database-admin
+    profiles: [debug]
     ports:
-      - '${ADMINER_PORT:-8080}:8080'
+      - '127.0.0.1:${ADMINER_PORT:-8080}:8080'
     environment:
       ADMINER_DEFAULT_SERVER: ${ADMINER_DEFAULT_SERVER:-postgres-main}
 
@@ -15,11 +30,17 @@ services:
     container_name: postgres-db
     hostname: ${POSTGRES_HOSTNAME:-postgres-db}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dscanspace}
       POSTGRES_USER: ${POSTGRES_USER:-dscanspace}
       POSTGRES_DB: ${POSTGRES_DB:-dscanspace}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   app:
     image: ghcr.io/zmiguel/d-scan-space:main
@@ -36,7 +57,7 @@ services:
       HOST: ${HOST:-0.0.0.0}
       PORT: ${PORT:-3000}
       ORIGIN: ${ORIGIN:-http://localhost:3000}
-      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-256M}
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-16M}
 
       # Logging / identity
       NODE_ENV: ${NODE_ENV:-production}
@@ -49,13 +70,33 @@ services:
       CONTACT_EVE: ${CONTACT_EVE:-YourCharacterName}
       CONTACT_DISCORD: ${CONTACT_DISCORD:-YourDiscord}
 
-      # OpenTelemetry (optional)
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318/v1/traces}
+      # Auth (EVE SSO)
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_EVEONLINE_ID: ${AUTH_EVEONLINE_ID:-}
+      AUTH_EVEONLINE_SECRET: ${AUTH_EVEONLINE_SECRET:-}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+
+      # Limits / ESI tuning (empty = code default)
+      LOCAL_SCAN_MAX_LINES: ${LOCAL_SCAN_MAX_LINES:-}
+      DSCAN_ON_GRID_MAX_KM: ${DSCAN_ON_GRID_MAX_KM:-}
+      ESI_MAX_CONCURRENCY: ${ESI_MAX_CONCURRENCY:-}
+      ESI_REQUEST_TIMEOUT_MS: ${ESI_REQUEST_TIMEOUT_MS:-}
+
+      # OpenTelemetry (optional; empty endpoint = no OTLP export, /metrics stays on)
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_AUTHORIZATION: ${OTEL_EXPORTER_OTLP_AUTHORIZATION:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-d-scan.space}
       PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9464}
     depends_on:
-      - postgres-main
+      postgres-main:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:$${PORT:-3000}/healthz" || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     ports:
       - '${PORT:-3000}:${PORT:-3000}'
 
@@ -91,13 +132,23 @@ services:
       # Worker should not run migrations (let the app handle them)
       SKIP_MIGRATIONS: 'true'
 
-      # OpenTelemetry (optional)
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318/v1/traces}
+      # ESI tuning / shutdown / healthcheck (empty = code default)
+      ESI_MAX_CONCURRENCY: ${ESI_MAX_CONCURRENCY:-}
+      ESI_REQUEST_TIMEOUT_MS: ${ESI_REQUEST_TIMEOUT_MS:-}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-}
+      HEALTHCHECK_MAX_AGE_MS: ${HEALTHCHECK_MAX_AGE_MS:-}
+
+      # OpenTelemetry (optional; empty endpoint = no OTLP export, /metrics stays on)
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_AUTHORIZATION: ${OTEL_EXPORTER_OTLP_AUTHORIZATION:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-d-scan.space}
       PROMETHEUS_PORT: ${PROMETHEUS_PORT:-9464}
+    # The app runs the migrations (SKIP_MIGRATIONS above), so wait until it is healthy.
     depends_on:
-      - postgres-main
+      postgres-main:
+        condition: service_healthy
+      app:
+        condition: service_healthy
 
 volumes:
   db_data:

@@ -1,18 +1,9 @@
 import { db } from '$lib/database/client';
 import { authAccounts, authUsers } from '$lib/database/schema';
+import { EVE_PROVIDER, characterImage, parseCharacterId } from '$lib/database/accounts';
+import { safeRedirectPath } from '$lib/server/redirects';
 import { and, eq } from 'drizzle-orm';
 import { withSpan } from '$lib/server/tracer.js';
-
-const EVE_PROVIDER = 'eveonline';
-
-function parseCharacterId(value) {
-	const id = Number(value);
-	return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function characterImage(characterId, size = 128) {
-	return characterId ? `https://image.eveonline.com/Character/${characterId}_${size}.jpg` : null;
-}
 
 /** @type {import('./$types').RequestHandler} */
 export async function POST(event) {
@@ -27,8 +18,7 @@ export async function POST(event) {
 
 			const formData = await event.request.formData();
 			const characterId = parseCharacterId(formData.get('characterId'));
-			const redirectTo = String(formData.get('redirectTo') ?? '/');
-			const safeRedirectTo = redirectTo.startsWith('/') ? redirectTo : '/';
+			const safeRedirectTo = safeRedirectPath(formData.get('redirectTo'));
 
 			if (!characterId) {
 				span.setAttributes({ 'auth.logged_in': true, 'character.id': null });

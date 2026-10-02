@@ -1,133 +1,47 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
 	normalizeTicker,
 	getTickerColor,
-	ensureTickerStyles,
-	getHoverClass,
-	getHighlightClass,
-	getPilotHoverClass
+	tickerRowStyle
 } from '../../../src/lib/utils/tickerStyles.js';
 
 describe('tickerStyles', () => {
-	beforeEach(() => {
-		// Mock DOM
-		global.document = {
-			getElementById: vi.fn(),
-			createElement: vi.fn(() => ({})),
-			head: {
-				appendChild: vi.fn()
-			}
-		};
+	it('treats a missing ticker as "none"', () => {
+		expect(normalizeTicker('ABC')).toBe('ABC');
+		expect(normalizeTicker('')).toBe('none');
+		expect(normalizeTicker(null)).toBe('none');
+		expect(normalizeTicker(undefined)).toBe('none');
 	});
 
-	afterEach(() => {
-		vi.restoreAllMocks();
-		delete global.document;
+	it('uses neutral greys for pilots/corps without a ticker', () => {
+		expect(getTickerColor('none')).toEqual({ lightColor: '#e5e7eb', darkColor: '#4b5563' });
 	});
 
-	describe('normalizeTicker', () => {
-		it('should return the ticker if present', () => {
-			expect(normalizeTicker('ABC')).toBe('ABC');
-		});
-
-		it('should return "none" if ticker is empty string', () => {
-			expect(normalizeTicker('')).toBe('none');
-		});
-
-		it('should return "none" if ticker is null/undefined', () => {
-			expect(normalizeTicker(null)).toBe('none');
-			expect(normalizeTicker(undefined)).toBe('none');
-		});
+	it('gives every ticker a stable light/dark colour pair of the same hue', () => {
+		const colors = getTickerColor('TEST');
+		expect(getTickerColor('TEST')).toEqual(colors);
+		const lightHue = colors.lightColor.match(/^hsl\((\d+), 70%, 85%\)$/)?.[1];
+		const darkHue = colors.darkColor.match(/^hsl\((\d+), 60%, 25%\)$/)?.[1];
+		expect(lightHue).toBeDefined();
+		expect(darkHue).toBe(lightHue);
+		expect(getTickerColor('OTHER').lightColor).not.toBe(colors.lightColor);
 	});
 
-	describe('getTickerColor', () => {
-		it('should return default colors for "none"', () => {
-			const colors = getTickerColor('none');
-			expect(colors).toEqual({
-				lightColor: '#e5e7eb',
-				darkColor: '#4b5563',
-				customClass: 'ticker-none'
-			});
-		});
+	it('sets hover colours, and highlight colours only while highlighted', () => {
+		const corp = getTickerColor('CORP');
+		const alliance = getTickerColor('ALLY');
 
-		it('should return consistent colors for a given ticker', () => {
-			const colors1 = getTickerColor('TEST');
-			const colors2 = getTickerColor('TEST');
-			expect(colors1).toEqual(colors2);
-			expect(colors1.customClass).toBe('ticker-TEST');
-			expect(colors1.lightColor).toMatch(/hsl\(\d+, 70%, 85%\)/);
-			expect(colors1.darkColor).toMatch(/hsl\(\d+, 60%, 25%\)/);
-		});
+		const idle = tickerRowStyle('CORP');
+		expect(idle).toContain(`--ticker-hover-light: ${corp.lightColor}`);
+		expect(idle).toContain(`--ticker-hover-dark: ${corp.darkColor}`);
+		expect(idle).not.toContain('--ticker-highlight');
 
-		it('should sanitize ticker for class name', () => {
-			const colors = getTickerColor('T.E-S_T');
-			expect(colors.customClass).toBe('ticker-TEST');
-		});
+		const highlighted = tickerRowStyle('CORP', 'ALLY');
+		expect(highlighted).toContain(`--ticker-highlight-light: ${alliance.lightColor}`);
+		expect(highlighted).toContain(`--ticker-highlight-dark: ${alliance.darkColor}`);
 	});
 
-	describe('ensureTickerStyles', () => {
-		it('should add style element if not present', () => {
-			const mockStyle = {};
-			document.createElement.mockReturnValue(mockStyle);
-			document.getElementById.mockReturnValue(null);
-
-			ensureTickerStyles('NEW');
-
-			expect(document.getElementById).toHaveBeenCalledWith('style-ticker-NEW');
-			expect(document.createElement).toHaveBeenCalledWith('style');
-			expect(mockStyle.id).toBe('style-ticker-NEW');
-			expect(mockStyle.textContent).toContain('.ticker-NEW');
-			expect(document.head.appendChild).toHaveBeenCalledWith(mockStyle);
-		});
-
-		it('should not add style element if already present in DOM', () => {
-			document.getElementById.mockReturnValue({});
-
-			ensureTickerStyles('EXISTING');
-
-			expect(document.getElementById).toHaveBeenCalledWith('style-ticker-EXISTING');
-			expect(document.createElement).not.toHaveBeenCalled();
-			expect(document.head.appendChild).not.toHaveBeenCalled();
-		});
-
-		it('should not add style element if already in cache', () => {
-			const mockStyle = {};
-			document.createElement.mockReturnValue(mockStyle);
-			document.getElementById.mockReturnValue(null);
-
-			// First call adds to cache
-			ensureTickerStyles('CACHED');
-
-			// Reset mocks to verify second call
-			document.createElement.mockClear();
-			document.head.appendChild.mockClear();
-
-			// Second call should hit cache
-			ensureTickerStyles('CACHED');
-
-			expect(document.createElement).not.toHaveBeenCalled();
-			expect(document.head.appendChild).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('getHoverClass', () => {
-		it('should return correct hover class', () => {
-			document.getElementById.mockReturnValue({}); // Assume style exists
-			expect(getHoverClass('ABC')).toBe('hover-ticker-ABC');
-		});
-	});
-
-	describe('getHighlightClass', () => {
-		it('should return correct highlight class', () => {
-			document.getElementById.mockReturnValue({}); // Assume style exists
-			expect(getHighlightClass('ABC')).toBe('ticker-ABC');
-		});
-	});
-
-	describe('getPilotHoverClass', () => {
-		it('should return correct pilot hover class', () => {
-			document.getElementById.mockReturnValue({}); // Assume style exists
-			expect(getPilotHoverClass('ABC')).toBe('hover-ticker-ABC');
-		});
+	it('uses the "none" colours for rows without a ticker', () => {
+		expect(tickerRowStyle('', 'none')).toContain('--ticker-highlight-light: #e5e7eb');
 	});
 });

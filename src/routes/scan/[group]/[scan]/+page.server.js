@@ -1,16 +1,17 @@
 import {
 	getScanByID,
-	getScansByGroupID,
 	getScanGroupByID,
+	getScanTimeline,
 	setScanGroupSystemIfOwnerAndUnset
 } from '$lib/database/scans.js';
 import { getSystemByName } from '$lib/database/sde.js';
 import { withSpan } from '$lib/server/tracer.js';
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 
 /** @satisfies {import('./$types').Actions} */
 export const actions = {
-	setSystem: async ({ request, params, locals, event }) => {
+	setSystem: async (event) => {
+		const { request, params, locals } = event;
 		return await withSpan(
 			'route.scan_detail.set_system',
 			async (span) => {
@@ -119,11 +120,20 @@ export async function load(event) {
 			}
 
 			const thisScan = getScanResult[0];
-			const scanGroup = await withSpan(
-				'route.scan_detail.fetch_group',
-				async () => {
-					return await getScanGroupByID(group);
-				},
+
+			// A scan only belongs to one group. Opening it under another group id would mix
+			// that group's timeline/permissions with this scan, so send it to its real URL.
+			if (thisScan.group_id && thisScan.group_id !== group) {
+				span.setAttributes({
+					'scan.group_mismatch': true,
+					'response.status': 301
+				});
+				redirect(301, `/scan/${thisScan.group_id}/${scan}`);
+			}
+
+			const [scanGroup, groupScans] = await withSpan(
+				'route.scan_detail.fetch_group_and_timeline',
+				async () => Promise.all([getScanGroupByID(group), getScanTimeline(group)]),
 				{
 					'scan.group_id': group,
 					'operation.type': 'read'
@@ -137,16 +147,6 @@ export async function load(event) {
 				});
 				throw error(404, 'Scan group not found');
 			}
-			const groupScans = await withSpan(
-				'route.scan_detail.fetch_group_scans',
-				async () => {
-					return await getScansByGroupID(group);
-				},
-				{
-					'scan.group_id': group,
-					'operation.type': 'read'
-				}
-			);
 
 			const thisScanDate = new Date(thisScan.created_at);
 			let priorOppositeScan = null;
@@ -219,12 +219,22 @@ export async function load(event) {
 
 			return {
 				system: thisScan.system,
+				isPublic: Boolean(scanGroup.public),
 				canEditSystem,
 				canUpdateScan,
 				created_at: thisScan.created_at,
 				local: localScan ? localScan.data : null,
 				directional: directionalScan ? directionalScan.data : null,
 				related: groupScans,
+				// The other scan type shown alongside this one (latest earlier scan of the
+				// other type in the group), so the page can say how old that data is.
+				pairedScan: priorOppositeScan
+					? {
+							id: priorOppositeScan.id,
+							scan_type: priorOppositeScan.scan_type,
+							created_at: priorOppositeScan.created_at
+						}
+					: null,
 				params: {
 					group: group,
 					scan: scan

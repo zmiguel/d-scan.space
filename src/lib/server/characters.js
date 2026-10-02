@@ -1,502 +1,282 @@
 /**
- *  Functions related to characters
+ * Character lookups against ESI and their persistence.
+ *
+ * Flow for a set of characters:
+ * 1. names → ids with POST /universe/ids (≤500 names per request, case-insensitive,
+ *    returns canonical names; unknown names are omitted and negatively cached),
+ * 2. ids → corporation/alliance with POST /characters/affiliation (≤1000 ids). This
+ *    route is never stale for affiliations (GET /characters/{id} is cached for days).
+ *    Deleted characters are reported in the Doomheim corporation and are biomassed
+ *    here, *before* their details are requested: GET /characters/{id} would answer 404
+ *    and spend ESI error budget,
+ * 3. details (name, security status) with GET /characters/{id} for living characters,
+ * 4. persistence: alliances → corporations → characters, skipping characters whose
+ *    corporation/alliance could not be stored so one failed ESI lookup does not abort
+ *    the whole batch on a foreign key.
+ *
+ * Concurrency, retries and rate limiting are handled by the ESI client (wrappers.js).
  */
 import { addOrUpdateCorporations } from './corporations.js';
 import { addOrUpdateAlliances } from './alliances.js';
 import {
 	addOrUpdateCharactersDB,
-	biomassCharacter,
+	biomassCharacters,
 	getCharactersByName
 } from '../database/characters.js';
-
+import { getCorporationsByID } from '../database/corporations.js';
+import { getAlliancesByID } from '../database/alliances.js';
+import { chunk } from '../database/batching.js';
 import { fetchGET, fetchPOST } from './wrappers.js';
 import { withSpan } from './tracer.js';
 import logger from '../logger.js';
-import {
-	CHARACTER_REQUEST_BATCH_SIZE,
-	CHARACTER_BATCH_CONCURRENCY,
-	DOOMHEIM_ID
-} from './constants.js';
+import { DOOMHEIM_ID, ESI_AFFILIATION_BATCH, ESI_IDS_BATCH } from './constants.js';
+import { isKnownUnresolvable, rememberUnresolvable } from './unresolved-names.js';
 
+const ESI = 'https://esi.evetech.net';
+
+/**
+ * Character details. 404 means the character was deleted: it is biomassed.
+ * @param {number} id
+ */
 async function getCharacterFromESI(id) {
-	const characterData = await fetchGET(`https://esi.evetech.net/characters/${id}`);
+	const response = await fetchGET(`${ESI}/characters/${id}`);
 
-	if (!characterData) {
-		logger.error(`Failed to fetch character ${id}: no response`);
+	if (!response) {
+		logger.error({ characterId: id }, 'Failed to fetch character: no response');
 		return null;
 	}
 
-	if (!characterData.ok) {
-		logger.error(
-			`Failed to fetch character ${id}: ${characterData.status} ${characterData.statusText}`
-		);
+	if (response.status === 404) {
+		// "Character has been deleted!"
+		await biomassCharacters([id]);
 		return null;
 	}
 
-	const characterInfo = await characterData.json();
+	if (!response.ok) {
+		logger.error({ characterId: id, status: response.status }, 'Failed to fetch character');
+		return null;
+	}
+
+	const characterInfo = await response.json();
 	characterInfo.id = id;
 	delete characterInfo.description;
 	delete characterInfo.title;
 
-	// Determine cache expiry from headers
-	try {
-		const expiresHeader = characterData.headers.get('expires');
-		let cacheExpiresDate = null; // JS Date for DB
-		let cacheExpiresAt = null; // ISO string for telemetry
-
-		if (expiresHeader) {
-			const ts = Date.parse(expiresHeader);
-			if (!Number.isNaN(ts)) {
-				cacheExpiresDate = new Date(ts);
-				cacheExpiresAt = cacheExpiresDate.toISOString();
-			}
-		}
-
-		if (cacheExpiresAt) {
-			// Attach cache expiry info for callers and DB
-			characterInfo.esi_cache_expires = cacheExpiresDate;
-		}
-	} catch {
-		// ignore header parsing errors
+	// ESI caches character details; remember until when so we do not refetch early.
+	const expires = Date.parse(response.headers.get('expires') ?? '');
+	if (!Number.isNaN(expires)) {
+		characterInfo.esi_cache_expires = new Date(expires);
 	}
 
 	return characterInfo;
 }
 
-async function runBatchesWithConcurrency(batches, concurrency, handler) {
-	if (!Array.isArray(batches) || batches.length === 0) {
-		return [];
-	}
-
-	const limit = Math.max(1, Math.floor(concurrency ?? 1));
-	const results = new Array(batches.length);
-	let index = 0;
-
-	const workers = Array.from({ length: Math.min(limit, batches.length) }, async () => {
-		while (true) {
-			const currentIndex = index++;
-			if (currentIndex >= batches.length) {
-				break;
+/**
+ * POSTs `items` in batches and returns the parsed JSON bodies of successful batches.
+ * A failed batch is logged and skipped (its items are simply not resolved).
+ * @template T
+ * @param {string} url
+ * @param {T[]} items
+ * @param {number} batchSize
+ * @returns {Promise<any[]>}
+ */
+async function postInBatches(url, items, batchSize) {
+	const batches = chunk(items, batchSize);
+	const bodies = await Promise.all(
+		batches.map(async (batch) => {
+			const response = await fetchPOST(url, batch);
+			if (!response || !response.ok) {
+				logger.error(
+					{ url, status: response?.status ?? null, batchSize: batch.length },
+					'ESI batch request failed'
+				);
+				return null;
 			}
-
-			results[currentIndex] = await handler(batches[currentIndex], currentIndex);
-		}
-	});
-
-	await Promise.all(workers);
-
-	return results.flat();
+			return response.json();
+		})
+	);
+	return bodies.filter((body) => body != null);
 }
 
-async function namesToCharacters(names) {
-	// Split names into batches
-	const batchSize = 50;
-	const idsBatches = [];
-	for (let i = 0; i < names.length; i += batchSize) {
-		idsBatches.push(names.slice(i, i + batchSize));
-	}
+/**
+ * Resolves character names to ids. Names ESI does not know are negatively cached.
+ * @param {string[]} names
+ * @returns {Promise<Array<{ id: number, name: string }>>}
+ */
+async function resolveCharacterNames(names) {
+	return withSpan('server.characters.names_to_ids', async (span) => {
+		const toResolve = names.filter((name) => !isKnownUnresolvable(name));
+		const bodies = await postInBatches(`${ESI}/universe/ids`, toResolve, ESI_IDS_BATCH);
+		const found = bodies.flatMap((body) => body?.characters ?? []);
 
-	// Run all batch requests in parallel
-	const allCharacters = await withSpan('server.characters.names_to_ids', async (span) => {
-		const batchPromises = idsBatches.map(async (batch) => {
-			const response = await fetchPOST('https://esi.evetech.net/universe/ids', batch);
-
-			if (!response) {
-				logger.error(
-					`Failed to get character ids from ESI - no response, batch size: ${batch.length}`
-				);
-				return [];
-			}
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				logger.error(
-					`Failed to get character ids from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
-				);
-				return [];
-			}
-
-			const data = await response.json();
-			return data?.characters || [];
-		});
-
-		// Wait for all batches to complete
-		const batchResults = await Promise.all(batchPromises);
-
-		// Flatten the results from all batches
-		const flatResults = batchResults.flat();
-
-		span.setAttributes({
-			'batch.total_batches': idsBatches.length,
-			'batch.names_input': names.length,
-			'batch.characters_found': flatResults.length
-		});
-
-		return flatResults;
-	});
-
-	if (!allCharacters || allCharacters.length === 0) {
-		logger.warn('Tried to add characters from ESI but charactersIds array was empty');
-		return [];
-	}
-
-	// The character endpoint is cached up to 30 days, so we cannot rely on it for updated corp and alliance info.
-	// We will fetch all character affiliations in batches like we did for the names to ids.
-	// then we get the individual character info and replace the corp and alliance ids with the ones from the affiliation endpoint.
-
-	// Build batches for affiliations and character detail fetches
-	const affiliationBatches = [];
-	for (let i = 0; i < allCharacters.length; i += batchSize) {
-		affiliationBatches.push(allCharacters.slice(i, i + batchSize));
-	}
-
-	const characterBatches = [];
-	for (let i = 0; i < allCharacters.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
-		characterBatches.push(allCharacters.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
-	}
-
-	// Kick off both long-running operations in parallel
-	const affiliationsPromise = withSpan('server.characters.get_affiliations', async (span) => {
-		const batchPromises = affiliationBatches.map(async (batch) => {
-			const response = await fetchPOST(
-				'https://esi.evetech.net/characters/affiliation',
-				batch.map((c) => c.id)
-			);
-
-			if (!response) {
-				logger.error(
-					`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
-				);
-				return [];
-			}
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				logger.error(
-					`Failed to get character affiliations from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
-				);
-				return [];
-			}
-
-			const data = await response.json();
-			return data || [];
-		});
-
-		const batchResults = await Promise.all(batchPromises);
-		const flatResults = batchResults.flat();
-
-		span.setAttributes({
-			'batch.total_batches': affiliationBatches.length,
-			'batch.affiliations_found': flatResults.length
-		});
-
-		return flatResults;
-	});
-
-	const charactersPromise = withSpan('server.characters.fetch_data', async (span) => {
-		const effectiveConcurrency = Math.min(
-			Math.max(characterBatches.length, 1),
-			Math.max(1, CHARACTER_BATCH_CONCURRENCY)
-		);
-
-		const allCharacterData = await runBatchesWithConcurrency(
-			characterBatches,
-			CHARACTER_BATCH_CONCURRENCY,
-			async (characterBatch) =>
-				Promise.all(characterBatch.map(async (character) => getCharacterFromESI(character.id)))
-		);
-
-		span.setAttributes({
-			'batch.character_batches': characterBatches.length,
-			'batch.characters_to_fetch': allCharacters.length,
-			'batch.characters_fetched': allCharacterData.length,
-			'batch.character_concurrency': effectiveConcurrency
-		});
-
-		return allCharacterData;
-	});
-
-	const [allCharacterAffiliations, characterData] = await Promise.all([
-		affiliationsPromise,
-		charactersPromise
-	]);
-
-	if (!allCharacterAffiliations || allCharacterAffiliations.length === 0) {
-		logger.error('Affiliation data from ESI was empty');
-		return [];
-	}
-
-	// filter out any null values from characterData first
-	const filteredCharacterData = characterData.filter((char) => char !== null);
-
-	const affiliationMap = new Map(allCharacterAffiliations.map((aff) => [aff.character_id, aff]));
-
-	// now we need to merge the affiliation data into the character data
-	for (const char of filteredCharacterData) {
-		const affiliation = affiliationMap.get(char.id);
-		if (affiliation) {
-			char.corporation_id = affiliation.corporation_id;
-			char.alliance_id = affiliation.alliance_id ?? null;
+		// Only cache misses from batches that actually succeeded.
+		if (bodies.length === Math.ceil(toResolve.length / ESI_IDS_BATCH)) {
+			const foundNames = new Set(found.map((c) => c.name.toLowerCase()));
+			rememberUnresolvable(toResolve.filter((name) => !foundNames.has(name.toLowerCase())));
 		}
-	}
 
-	return filteredCharacterData;
+		span.setAttributes({
+			'characters.names_requested': names.length,
+			'characters.names_skipped_cached_miss': names.length - toResolve.length,
+			'characters.ids_found': found.length
+		});
+		return found;
+	});
 }
 
+/**
+ * Current corporation/alliance for character ids.
+ * @param {number[]} ids
+ * @returns {Promise<Array<{ character_id: number, corporation_id: number, alliance_id?: number }>>}
+ */
+async function idsToAffiliations(ids) {
+	return withSpan('server.characters.ids_to_affiliations', async (span) => {
+		const bodies = await postInBatches(`${ESI}/characters/affiliation`, ids, ESI_AFFILIATION_BATCH);
+		const affiliations = bodies.flat();
+		span.setAttributes({
+			'characters.ids_requested': ids.length,
+			'characters.affiliations_found': affiliations.length
+		});
+		return affiliations;
+	});
+}
+
+/**
+ * Splits affiliations into living characters and biomassed (Doomheim) ones, marking the
+ * latter as deleted.
+ */
+async function separateBiomassed(affiliations) {
+	const living = affiliations.filter((a) => a.corporation_id !== DOOMHEIM_ID);
+	const deletedIds = affiliations
+		.filter((a) => a.corporation_id === DOOMHEIM_ID)
+		.map((a) => a.character_id);
+	await biomassCharacters(deletedIds);
+	return living;
+}
+
+/**
+ * Full character records (details + current affiliation) for ids, from ESI.
+ * Deleted characters are biomassed and left out.
+ * @param {number[]} ids
+ */
 export async function idsToCharacters(ids) {
 	return await withSpan(
 		'server.characters.ids_to_characters',
-		async () => {
-			// Prepare affiliation batches (ESI accepts arrays of ids)
-			const affBatchSize = 50;
-			const affiliationBatches = [];
-			for (let i = 0; i < ids.length; i += affBatchSize) {
-				affiliationBatches.push(ids.slice(i, i + affBatchSize));
-			}
+		async (span) => {
+			const living = await separateBiomassed(await idsToAffiliations(ids));
 
-			// Fire off affiliations in parallel batches
-			const affiliationsPromise = withSpan(
-				'server.characters.ids_to_characters.affiliations',
-				async (span) => {
-					const batchPromises = affiliationBatches.map(async (batch) => {
-						const response = await fetchPOST(
-							'https://esi.evetech.net/characters/affiliation',
-							batch
-						);
+			const details = await Promise.all(living.map((a) => getCharacterFromESI(a.character_id)));
 
-						if (!response) {
-							logger.error(
-								`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
-							);
-							return [];
-						}
+			const characters = [];
+			details.forEach((character, index) => {
+				if (!character) return;
+				character.corporation_id = living[index].corporation_id;
+				character.alliance_id = living[index].alliance_id ?? null;
+				characters.push(character);
+			});
 
-						if (!response.ok) {
-							const errorText = await response.text();
-							logger.error(
-								`Failed to get character affiliations from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
-							);
-							return [];
-						}
-
-						const data = await response.json();
-						return data || [];
-					});
-
-					const batchResults = await Promise.all(batchPromises);
-					const flatResults = batchResults.flat();
-
-					span.setAttributes({
-						'batch.total_batches': affiliationBatches.length,
-						'batch.affiliations_found': flatResults.length
-					});
-
-					return flatResults;
-				}
-			);
-
-			// Split ids into character fetch batches
-			const batches = [];
-			for (let i = 0; i < ids.length; i += CHARACTER_REQUEST_BATCH_SIZE) {
-				batches.push(ids.slice(i, i + CHARACTER_REQUEST_BATCH_SIZE));
-			}
-
-			// Fetch character data (sequential batches) under a parent span
-			const charactersPromise = withSpan(
-				'server.characters.ids_to_characters.fetch_data',
-				async (span) => {
-					const effectiveConcurrency = Math.min(
-						Math.max(batches.length, 1),
-						Math.max(1, CHARACTER_BATCH_CONCURRENCY)
-					);
-
-					const allResults = await runBatchesWithConcurrency(
-						batches,
-						CHARACTER_BATCH_CONCURRENCY,
-						async (batch, batchIndex) =>
-							withSpan(
-								`server.characters.ids_to_characters.batch.${batchIndex + 1}`,
-								async () => Promise.all(batch.map((id) => getCharacterFromESI(id))),
-								{
-									'batch.size': batch.length,
-									'batch.start_id': batch[0],
-									'batch.end_id': batch[batch.length - 1],
-									'batch.index': batchIndex + 1,
-									'batch.total': batches.length
-								}
-							)
-					);
-
-					span.setAttributes({
-						'batch.character_batches': batches.length,
-						'batch.characters_to_fetch': ids.length,
-						'batch.characters_fetched': allResults.length,
-						'batch.character_concurrency': effectiveConcurrency
-					});
-
-					return allResults;
-				}
-			);
-
-			const [allCharacterAffiliations, allResults] = await Promise.all([
-				affiliationsPromise,
-				charactersPromise
-			]);
-
-			if (!allCharacterAffiliations || allCharacterAffiliations.length === 0) {
-				logger.error('Affiliation data from ESI was empty');
-				return [];
-			}
-
-			let processedCharacters = [];
-
-			// Merge affiliation data into character results using a Map for O(1) lookups
-			const affByCharId = new Map(allCharacterAffiliations.map((a) => [a.character_id, a]));
-			for (const char of allResults) {
-				if (!char) continue;
-				const affiliation = affByCharId.get(char.id);
-				if (affiliation) {
-					if (affiliation.corporation_id === DOOMHEIM_ID) {
-						// Biomass the character if they are in Doomheim
-						await biomassCharacter(char.id);
-						continue;
-					}
-					char.corporation_id = affiliation.corporation_id;
-					char.alliance_id = affiliation.alliance_id ?? null;
-					processedCharacters.push(char);
-				}
-			}
-
-			// Filter out any null values from results
-			const filtered = processedCharacters.filter((char) => char !== null);
-			return filtered;
+			span.setAttributes({
+				'characters.living': living.length,
+				'characters.fetched': characters.length
+			});
+			return characters;
 		},
-		{
-			'idsToCharacters.id.length': ids.length,
-			'idsToCharacters.batchSize': CHARACTER_REQUEST_BATCH_SIZE,
-			'idsToCharacters.total_batches': Math.ceil(ids.length / CHARACTER_REQUEST_BATCH_SIZE)
-		}
+		{ 'characters.ids_requested': ids.length }
 	);
 }
 
-async function idsToAffiliations(ids) {
-	// Prepare affiliation batches (ESI accepts arrays of ids)
-	const affBatchSize = 50;
-	const affiliationBatches = [];
-	for (let i = 0; i < ids.length; i += affBatchSize) {
-		affiliationBatches.push(ids.slice(i, i + affBatchSize));
-	}
-
-	// Fire off affiliations in parallel batches
-	return await withSpan('server.characters.ids_to_affiliations', async (span) => {
-		const batchPromises = affiliationBatches.map(async (batch) => {
-			const response = await fetchPOST('https://esi.evetech.net/characters/affiliation', batch);
-
-			if (!response) {
-				logger.error(
-					`Failed to get character affiliations from ESI - no response, batch size: ${batch.length}`
-				);
-				return [];
-			}
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				logger.error(
-					`Failed to get character affiliations from ESI - Status: ${response.status} ${response.statusText}, URL: ${response.url}, Body: ${errorText}`
-				);
-				return [];
-			}
-
-			const data = await response.json();
-			return data || [];
-		});
-
-		const batchResults = await Promise.all(batchPromises);
-		const flatResults = batchResults.flat();
-
-		span.setAttributes({
-			'batch.total_batches': affiliationBatches.length,
-			'batch.affiliations_found': flatResults.length
-		});
-
-		return flatResults;
-	});
-}
-
+/**
+ * Stores characters with their corporations and alliances. Characters whose
+ * corporation or alliance could not be stored (ESI failure) are skipped instead of
+ * failing the whole batch on the foreign key; they are refreshed on a later scan/run.
+ * @returns {Promise<any[]>} the characters that were stored
+ */
 async function addOrUpdateCharacters(data) {
-	await withSpan('server.characters.add_or_update', async () => {
-		// get list of all corp ids
-		const corpIDs = data
-			.map((char) => char.corporation_id)
-			.filter((id) => id !== undefined && id !== null);
-		const corpIDsUnique = [...new Set(corpIDs)];
+	return withSpan('server.characters.add_or_update', async (span) => {
+		if (data.length === 0) return [];
 
-		// get list of all alliance ids
-		const allianceIDs = data
-			.map((char) => char.alliance_id)
-			.filter((id) => id !== undefined && id !== null);
-		const allianceIDsUnique = [...new Set(allianceIDs)];
+		const corpIDs = [
+			...new Set(data.map((char) => char.corporation_id).filter((id) => id != null))
+		];
+		const allianceIDs = [
+			...new Set(data.map((char) => char.alliance_id).filter((id) => id != null))
+		];
 
-		// first we check if we have the alliance info and if the info is updated
-		// if we don't, we get it and update it
-		await addOrUpdateAlliances(allianceIDsUnique);
+		await addOrUpdateAlliances(allianceIDs);
+		await addOrUpdateCorporations(corpIDs);
 
-		// now we can be sure we have all alliances, we can add the corporations
-		await addOrUpdateCorporations(corpIDsUnique);
+		const [storedCorps, storedAlliances] = await Promise.all([
+			getCorporationsByID(corpIDs),
+			getAlliancesByID(allianceIDs)
+		]);
+		const corpSet = new Set(storedCorps.map((c) => c.id));
+		const allianceSet = new Set(storedAlliances.map((a) => a.id));
 
-		// now we can be sure we have all corporations, we can add the characters
-		await addOrUpdateCharactersDB(data);
+		const storable = data.filter(
+			(char) =>
+				corpSet.has(char.corporation_id) &&
+				(char.alliance_id == null || allianceSet.has(char.alliance_id))
+		);
+		const skipped = data.length - storable.length;
+		if (skipped > 0) {
+			logger.warn(
+				{ skipped },
+				'Skipped characters whose corporation/alliance could not be fetched from ESI'
+			);
+		}
+		span.setAttributes({ 'characters.storable': storable.length, 'characters.skipped': skipped });
+
+		await addOrUpdateCharactersDB(storable);
+		return storable;
 	});
 }
 
-export async function addCharactersFromESI(characters, sanityCheck = false) {
+/**
+ * Adds characters that are not in the database yet, by name.
+ * @param {string[]} names
+ * @param {boolean} [sanityCheck] skip ESI when all names are already stored
+ */
+export async function addCharactersFromESI(names, sanityCheck = false) {
 	await withSpan(
 		'server.characters.add_from_esi',
 		async () => {
-			// check if characters is empty
-			if (characters.length === 0 || !characters) {
+			if (!names || names.length === 0) {
 				logger.warn('Tried to add characters from ESI but characters array was empty');
 				return;
 			}
 
-			// sanity check if we already have it in the database
 			if (sanityCheck) {
-				const charactersInDB = await getCharactersByName(characters);
-				if (charactersInDB.length === characters.length) {
+				const charactersInDB = await getCharactersByName(names);
+				if (charactersInDB.length === names.length) {
 					return;
 				}
 			}
 
-			// Get Character IDS
-			const charactersData = await withSpan('server.characters.names_to_characters', async () => {
-				return await namesToCharacters(characters);
-			});
-
-			// check if charactersIds is empty or if characters is empty
-			if (!charactersData || charactersData.length === 0) {
-				logger.warn('Tried to add characters from ESI but charactersIds array was empty');
+			const resolved = await resolveCharacterNames(names);
+			if (resolved.length === 0) {
 				return;
 			}
 
-			await addOrUpdateCharacters(charactersData);
+			const characters = await idsToCharacters(resolved.map((c) => c.id));
+			await addOrUpdateCharacters(characters);
 		},
 		{
-			'characters.add_from_esi': characters.length,
+			'characters.add_from_esi': names.length,
 			sanity_check: sanityCheck
 		}
 	);
 }
 
+/**
+ * Full refresh (details + affiliation) of stored characters whose ESI cache expired.
+ * @param {Array<{ id: number }>} data
+ */
 export async function updateCharactersFromESI(data) {
-	// data is a list of characters, not ids.
-	// we need to extract the ids from the characters
 	return await withSpan(
 		'server.characters.update_from_esi',
 		async () => {
-			const ids = data.map((char) => char.id);
-			const charactersData = await idsToCharacters(ids);
-			await addOrUpdateCharacters(charactersData);
-			return charactersData;
+			const characters = await idsToCharacters(data.map((char) => char.id));
+			return addOrUpdateCharacters(characters);
 		},
 		{
 			'characters.update_from_esi': data.length
@@ -504,34 +284,27 @@ export async function updateCharactersFromESI(data) {
 	);
 }
 
+/**
+ * Affiliation-only refresh of stored characters whose details are still cached by ESI.
+ * @param {Array<{ id: number, corporation_id: number, alliance_id: number | null }>} data
+ */
 export async function updateAffiliationsFromESI(data) {
-	// data is a list of characters, not ids.
-	// we need to extract the ids from the characters
 	return await withSpan(
 		'server.characters.update_affiliations_from_esi',
 		async () => {
-			const ids = data.map((char) => char.id);
-			const affiliationsData = await idsToAffiliations(ids);
-			const affiliationMap = new Map(affiliationsData.map((aff) => [aff.character_id, aff]));
+			const living = await separateBiomassed(await idsToAffiliations(data.map((c) => c.id)));
+			const affiliationMap = new Map(living.map((a) => [a.character_id, a]));
 
-			let updatedCharacters = [];
-
-			// update character data with new affiliation data
+			const updatedCharacters = [];
 			for (const char of data) {
 				const affiliation = affiliationMap.get(char.id);
-				if (affiliation) {
-					if (affiliation.corporation_id === DOOMHEIM_ID) {
-						biomassCharacter(char.id);
-						continue;
-					}
-					char.alliance_id = affiliation.alliance_id;
-					char.corporation_id = affiliation.corporation_id;
-					updatedCharacters.push(char);
-				}
+				if (!affiliation) continue;
+				char.corporation_id = affiliation.corporation_id;
+				char.alliance_id = affiliation.alliance_id ?? null;
+				updatedCharacters.push(char);
 			}
 
-			await addOrUpdateCharacters(updatedCharacters);
-			return updatedCharacters;
+			return addOrUpdateCharacters(updatedCharacters);
 		},
 		{
 			'characters.update_affiliations_from_esi': data.length

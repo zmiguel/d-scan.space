@@ -6,21 +6,10 @@ const config = {
 		alias: {
 			$auth: 'src/auth.js'
 		},
-		// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
-		// If your environment is not supported or you settled on a specific environment, switch out the adapter.
-		// See https://kit.svelte.dev/docs/adapters for more information about adapters.
-		adapter: adapter({
-			external: [
-				'@opentelemetry/api',
-				'@opentelemetry/auto-instrumentations-node',
-				'@opentelemetry/exporter-trace-otlp-proto',
-				'@opentelemetry/resources',
-				'@opentelemetry/sdk-node',
-				'@opentelemetry/sdk-trace-node',
-				'@opentelemetry/semantic-conventions',
-				'shimmer'
-			]
-		}),
+		// Packages in package.json `dependencies` stay external at runtime (adapter-node
+		// bundles everything else). OpenTelemetry, pg and import-in-the-middle must be
+		// external so the instrumentation can patch them.
+		adapter: adapter(),
 		experimental: {
 			tracing: {
 				server: true

@@ -28,3 +28,29 @@ export function secStatusColor(value) {
 	const [h, s, l] = mixHsl(gray, green, t);
 	return hslToString(h, s, l);
 }
+
+/**
+ * Security band of a solar system as the game shows it: the true security is rounded to
+ * one decimal, except that 0.0 < sec < 0.05 counts as 0.1 (low-sec). >= 0.5 is high-sec,
+ * > 0.0 low-sec, everything else null-sec.
+ * @param {number | null | undefined} security true security status (SDE value)
+ * @returns {'high' | 'low' | 'null' | null} null when unknown
+ */
+export function systemSecurityBand(security) {
+	if (typeof security !== 'number' || !Number.isFinite(security)) return null;
+	const rounded = security > 0 && security < 0.05 ? 0.1 : Math.round(security * 10) / 10;
+	if (rounded >= 0.5) return 'high';
+	if (rounded > 0) return 'low';
+	return 'null';
+}
+
+const BAND_BADGE_COLOR = { high: 'green', low: 'yellow', null: 'red' };
+
+/**
+ * flowbite Badge colour for a system's security badge ('purple' when unknown).
+ * @param {number | null | undefined} security
+ */
+export function securityBadgeColor(security) {
+	const band = systemSecurityBand(security);
+	return band ? BAND_BADGE_COLOR[band] : 'purple';
+}

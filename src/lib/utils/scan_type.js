@@ -3,12 +3,38 @@
  */
 
 import logger from '$lib/logger';
+import { isDistanceColumn } from './distance.js';
 
-const DISTANCE_PATTERN = /\b\d+(?:\.\d+)?\s*(?:m|km|AU)\b/i;
 const HIDDEN_CONTROL_PATTERN =
-	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g; // eslint-disable-line no-control-regex
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\u2060\uFEFF]/g; // eslint-disable-line no-control-regex
+/** Leading/trailing whitespace other than tabs (tabs separate d-scan columns). */
+const EDGE_SPACES = /^[^\S\t]+|[^\S\t]+$/g;
+/** Runs of two or more spaces (not tabs) inside a line. */
+const INNER_SPACE_RUNS = /[^\S\t\n]{2,}/g;
+/** Lines/characters shown back to the user or logged when detection fails. */
+export const FAILED_LINES_SAMPLE = 10;
+const FAILED_LINE_MAX_CHARS = 120;
 
 const sanitizeScanLine = (line) => line.replace(HIDDEN_CONTROL_PATTERN, '');
+
+/**
+ * Splits pasted scan text into clean, non-empty lines. Applied before detection and
+ * parsing so both see the same input:
+ * - CRLF/CR line endings (native form posts, Windows clipboards) become LF,
+ * - invisible characters (zero-width spaces, BOM, control characters copied from
+ *   Discord/browsers) are removed,
+ * - spaces around a line are trimmed and repeated inner spaces collapsed (EVE names
+ *   never contain double spaces); tabs are kept because they separate d-scan columns.
+ * @param {string} content
+ * @returns {string[]}
+ */
+export function normalizeScanLines(content) {
+	return String(content ?? '')
+		.replace(/\r\n?/g, '\n')
+		.split('\n')
+		.map((line) => sanitizeScanLine(line).replace(EDGE_SPACES, '').replace(INNER_SPACE_RUNS, ' '))
+		.filter((line) => line.length > 0);
+}
 
 const hasExactTabs = (line, count) => {
 	const matches = line.match(/\t/g);
@@ -24,20 +50,13 @@ const isLocalLine = (line) => {
 };
 
 const isDirectionalLine = (line) => {
-	const tabMatches = line.match(/\t/g);
-	if ((tabMatches ? tabMatches.length : 0) < 3) {
-		return false;
-	}
 	const parts = line.split('\t');
 	if (parts.length < 4) {
 		return false;
 	}
-	const first = parts[0];
-	const last = parts[parts.length - 1];
-	if (first === '' || Number.isNaN(Number.parseFloat(first))) {
-		return false;
-	}
-	return last === '-' || DISTANCE_PATTERN.test(last);
+	// Same rules as the parser in src/lib/server/directional.js.
+	const typeId = Number(parts[0]);
+	return Number.isInteger(typeId) && typeId > 0 && isDistanceColumn(parts[parts.length - 1]);
 };
 
 const isFleetLine = (line) => {
@@ -104,6 +123,15 @@ const getMatchResult = (lines, scanType) => {
 	};
 };
 
+/**
+ * Detects which EVE window the lines were copied from. Every line must match the same
+ * type (strict). On failure the closest type and its non-matching lines are returned so
+ * the user can fix the paste.
+ * @param {string[]} lines
+ * @returns {{ type: string, supported?: boolean,
+ *   closest?: { type: string, matched: number, total: number,
+ *     failed_lines: Array<{ line_number: number, line: string }>, failed_count: number } }}
+ */
 export function detectScanType(lines) {
 	if (!Array.isArray(lines) || lines.length === 0) {
 		return { type: 'unknown' };
@@ -121,27 +149,36 @@ export function detectScanType(lines) {
 		}
 	}
 
-	const [closest] = matchResults.reduce(
-		(best, current) => {
-			if (!best[0] || current.matched > best[0].matched) {
-				return [current];
-			}
-
-			return best;
-		},
-		[null]
+	const closest = matchResults.reduce((best, current) =>
+		current.matched > best.matched ? current : best
 	);
+	const sample = closest.failed_lines
+		.slice(0, FAILED_LINES_SAMPLE)
+		.map(({ line_number, line }) => ({
+			line_number,
+			line: line.length > FAILED_LINE_MAX_CHARS ? `${line.slice(0, FAILED_LINE_MAX_CHARS)}…` : line
+		}));
 
+	// Pasted scans are user content: log counts and line numbers, never the text.
 	logger.warn(
 		{
 			closest_type: closest.type,
 			match_percent: closest.match_percent,
 			matched_lines: closest.matched,
 			total_lines: closest.total,
-			failed_lines: closest.failed_lines
+			failed_line_numbers: sample.map((l) => l.line_number)
 		},
 		'Scan type detection failed; closest scan type did not fully match'
 	);
 
-	return { type: 'unknown' };
+	return {
+		type: 'unknown',
+		closest: {
+			type: closest.type,
+			matched: closest.matched,
+			total: closest.total,
+			failed_lines: sample,
+			failed_count: closest.failed_lines.length
+		}
+	};
 }

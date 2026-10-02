@@ -2,31 +2,21 @@
 <html class="dark" lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta
-			name="description"
-			content="EVE Online intel tool for parsing and visualizing directional scans (d-scan) and local chat data. Fast, accurate, and built for capsuleers."
-		/>
+		<!-- Page-specific tags (title, description, robots, canonical, theme-color, Open Graph)
+		     are rendered per route by src/lib/components/MetaTags.svelte. -->
 		<meta
 			name="keywords"
 			content="EVE Online, d-scan, directional scan, local intel, intel tool, EVE intel, scan parser, dscan tool, EVE utilities"
 		/>
-		<meta
-			name="robots"
-			content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
-		/>
-		<meta name="googlebot" content="index, follow" />
 		<meta name="application-name" content="D-Scan Space" />
-		<meta name="theme-color" content="#1f2937" />
 		<meta name="color-scheme" content="dark light" />
 		<meta name="format-detection" content="telephone=no" />
-		<link rel="canonical" href="https://d-scan.space/" />
 		<link rel="icon" type="image/png" href="%sveltekit.assets%/favicon-96x96.png" sizes="96x96" />
 		<link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon.svg" />
 		<link rel="shortcut icon" href="%sveltekit.assets%/favicon.ico" />
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<meta name="apple-mobile-web-app-title" content="D-Scan" />
 		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
-		<link rel="alternate" hreflang="en" href="/" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script type="application/ld+json">
 			{
@@ -49,6 +39,14 @@
 			data-track-errors="true"
 			data-web-vitals="true"
 		></script>
+		<script>
+			// Mirrors flowbite-svelte's DarkMode (key "THEME_PREFERENCE_KEY", values "dark"/"light"):
+			// apply a saved preference before first paint; without one keep the default dark class.
+			try {
+				const theme = localStorage.getItem('THEME_PREFERENCE_KEY');
+				if (theme !== null) document.documentElement.classList.toggle('dark', theme === 'dark');
+			} catch (e) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body class="bg-gray-100 dark:bg-gray-800" data-sveltekit-preload-data="hover">

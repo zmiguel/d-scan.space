@@ -1,19 +1,25 @@
 <script>
 	import { Avatar } from 'flowbite-svelte';
+	import { untrack } from 'svelte';
 	import { secStatusColor } from '$lib/utils/secStatus';
 	import { asset } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
-	import {
-		getHighlightClass,
-		getHoverClass,
-		getPilotHoverClass,
-		normalizeTicker
-	} from '$lib/utils/tickerStyles';
+	import { normalizeTicker, tickerRowStyle } from '$lib/utils/tickerStyles';
 
 	let { data, corps = [], pilots = [] } = $props();
 
 	let selectedItem = $state(null);
 	let hoveredItem = $state(null);
+
+	// The page component is reused when navigating between scans: start each scan with
+	// nothing selected.
+	$effect(() => {
+		data?.params?.scan;
+		untrack(() => {
+			selectedItem = null;
+			hoveredItem = null;
+		});
+	});
 
 	const highlightLookups = $derived(createHighlightLookups(corps, pilots));
 
@@ -252,10 +258,14 @@
 				<div
 					data-alliance-ticker={allianceTicker}
 					class={combineClasses(
-						'flex items-center justify-between gap-2 rounded transition-colors',
-						getHoverClass(allianceTicker),
-						allianceHighlightTicker ? getHighlightClass(allianceHighlightTicker) : ''
+						'ticker-hover flex items-center justify-between gap-2 rounded transition-colors',
+						allianceHighlightTicker ? 'ticker-highlight' : ''
 					)}
+					style={tickerRowStyle(allianceTicker, allianceHighlightTicker)}
+					aria-pressed={isSameItem(selectedItem, {
+						type: 'alliance',
+						ticker: normalizeTicker(allianceTicker)
+					})}
 					role="button"
 					tabindex="0"
 					onclick={() => toggleAlliance(allianceTicker)}
@@ -325,13 +335,13 @@
 			{#each corps as corp (corp.id)}
 				{@const corpHighlightTicker = highlightedCorps.get(corp.ticker)}
 				<div
-					id="alliance-{corp.alliance_ticker || 'none'}"
 					data-corp-ticker={corp.ticker}
 					class={combineClasses(
-						'flex items-center justify-between gap-2 rounded transition-colors',
-						getHoverClass(corp.ticker),
-						corpHighlightTicker ? getHighlightClass(corpHighlightTicker) : ''
+						'ticker-hover flex items-center justify-between gap-2 rounded transition-colors',
+						corpHighlightTicker ? 'ticker-highlight' : ''
 					)}
+					style={tickerRowStyle(corp.ticker, corpHighlightTicker)}
+					aria-pressed={isSameItem(selectedItem, { type: 'corp', ticker: corp.ticker })}
 					role="button"
 					tabindex="0"
 					onclick={() => toggleCorporation(corp.ticker)}
@@ -395,12 +405,12 @@
 			{#each pilots as pilot (pilot.id)}
 				{@const pilotHighlightTicker = highlightedPilots.get(pilot.id)}
 				<div
-					id="alliance-{pilot.alliance_ticker || 'none'} corporation-{pilot.corporation_ticker}"
 					class={combineClasses(
-						'flex items-center justify-between gap-2 rounded transition-colors',
-						getPilotHoverClass(pilot.corporation_ticker),
-						pilotHighlightTicker ? getHighlightClass(pilotHighlightTicker) : ''
+						'ticker-hover flex items-center justify-between gap-2 rounded transition-colors',
+						pilotHighlightTicker ? 'ticker-highlight' : ''
 					)}
+					style={tickerRowStyle(pilot.corporation_ticker, pilotHighlightTicker)}
+					aria-pressed={isSameItem(selectedItem, { type: 'pilot', id: pilot.id })}
 					role="button"
 					tabindex="0"
 					onclick={() => togglePilot(pilot.id)}

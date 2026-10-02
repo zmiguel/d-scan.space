@@ -11,18 +11,44 @@ import {
 	authUsers,
 	authVerificationTokens
 } from '$lib/database/schema';
+import { EVE_PROVIDER, characterImage, parseCharacterId } from '$lib/database/accounts';
+import { enforceOwnerOnSignIn, validateSessionOwner } from '$lib/server/eve-ownership';
 import { and, eq } from 'drizzle-orm';
 
-const isDevelopment = env.NODE_ENV !== 'production';
-const EVE_PROVIDER = 'eveonline';
+/** Token fields older versions stored in the session JWT; removed on the next refresh. */
+const LEGACY_TOKEN_FIELDS = [
+	'accessToken',
+	'refreshToken',
+	'idToken',
+	'rawProfile',
+	'scope',
+	'tokenType',
+	'sessionState',
+	'accessTokenExpiresAt',
+	'tokenExpiresOn',
+	'esiScopes',
+	'esiTokenType',
+	'intellectualProperty',
+	'accountType'
+];
 
-function parseCharacterId(value) {
-	const id = Number(value);
-	return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function characterImage(characterId, size = 128) {
-	return characterId ? `https://image.eveonline.com/Character/${characterId}_${size}.jpg` : null;
+/**
+ * Drizzle adapter that never persists OAuth tokens. The app only uses EVE SSO for
+ * identity (`publicData` scope) and makes no authenticated ESI calls, so storing
+ * access/refresh tokens would only create a liability.
+ */
+function createAdapter() {
+	const adapter = DrizzleAdapter(db, {
+		usersTable: authUsers,
+		accountsTable: authAccounts,
+		sessionsTable: authSessions,
+		verificationTokensTable: authVerificationTokens,
+		authenticatorsTable: authAuthenticators
+	});
+	const linkAccount = adapter.linkAccount.bind(adapter);
+	adapter.linkAccount = (account) =>
+		linkAccount({ ...account, access_token: null, refresh_token: null, id_token: null });
+	return adapter;
 }
 
 async function ensurePrimaryCharacter(userId, profile) {
@@ -59,6 +85,7 @@ async function ensurePrimaryCharacter(userId, profile) {
 		.where(eq(authUsers.id, userId));
 }
 
+/** Refreshes name/portrait and records the owner hash of the character that just signed in. */
 async function updateLinkedCharacter(userId, profile) {
 	if (!userId || !profile) {
 		return;
@@ -73,7 +100,8 @@ async function updateLinkedCharacter(userId, profile) {
 		.update(authAccounts)
 		.set({
 			character_name: profile.CharacterName ?? null,
-			character_image: characterImage(characterId)
+			character_image: characterImage(characterId),
+			...(profile.CharacterOwnerHash ? { character_owner_hash: profile.CharacterOwnerHash } : {})
 		})
 		.where(
 			and(
@@ -90,13 +118,7 @@ export const {
 	signOut
 } = SvelteKitAuth({
 	trustHost: true,
-	adapter: DrizzleAdapter(db, {
-		usersTable: authUsers,
-		accountsTable: authAccounts,
-		sessionsTable: authSessions,
-		verificationTokensTable: authVerificationTokens,
-		authenticatorsTable: authAuthenticators
-	}),
+	adapter: createAdapter(),
 	session: {
 		strategy: 'jwt'
 	},
@@ -107,32 +129,33 @@ export const {
 		})
 	],
 	callbacks: {
+		// Runs after EVE SSO returns and before Auth.js looks up/links the account.
+		async signIn({ account, profile }) {
+			if (account?.provider !== EVE_PROVIDER) {
+				return true;
+			}
+			return enforceOwnerOnSignIn(profile);
+		},
 		async jwt({ token, account, profile, user }) {
 			const userId = token.sub ?? user?.id ?? null;
 
-			if (account) {
-				token.provider = account.provider;
-				token.providerAccountId = account.providerAccountId;
-				token.accountType = account.type;
-				token.scope = account.scope;
-				token.tokenType = account.token_type;
-				token.sessionState = account.session_state;
-				token.accessToken = account.access_token;
-				token.refreshToken = account.refresh_token;
-				token.idToken = account.id_token;
-				token.accessTokenExpiresAt = account.expires_at;
+			for (const field of LEGACY_TOKEN_FIELDS) {
+				delete token[field];
 			}
+
+			if (!account) {
+				// Existing session: drop it if its character was transferred or unlinked.
+				return (await validateSessionOwner(token)) ? token : null;
+			}
+
+			token.provider = account.provider;
+			token.providerAccountId = account.providerAccountId;
 
 			if (profile) {
 				token.id = String(profile.CharacterID ?? token.id ?? '');
 				token.characterId = profile.CharacterID ?? token.characterId;
 				token.characterName = profile.CharacterName ?? token.characterName;
 				token.characterOwnerHash = profile.CharacterOwnerHash ?? token.characterOwnerHash;
-				token.tokenExpiresOn = profile.ExpiresOn ?? token.tokenExpiresOn;
-				token.esiScopes = profile.Scopes ?? token.esiScopes;
-				token.esiTokenType = profile.TokenType ?? token.esiTokenType;
-				token.intellectualProperty = profile.IntellectualProperty ?? token.intellectualProperty;
-				token.rawProfile = profile;
 			}
 
 			if (user) {
@@ -141,7 +164,7 @@ export const {
 				token.userEmail = user.email ?? token.userEmail;
 			}
 
-			if (userId && profile && account?.provider === EVE_PROVIDER) {
+			if (userId && profile && account.provider === EVE_PROVIDER) {
 				try {
 					await ensurePrimaryCharacter(userId, profile);
 					await updateLinkedCharacter(userId, profile);
@@ -217,30 +240,10 @@ export const {
 			};
 
 			session.eve = {
-				provider: token.provider,
-				providerAccountId: token.providerAccountId,
-				accountType: token.accountType,
 				characterId: primaryCharacterId,
 				characterName: primaryName,
-				characterOwnerHash: token.characterOwnerHash,
-				intellectualProperty: token.intellectualProperty,
-				tokenType: token.tokenType ?? token.esiTokenType,
-				scope: token.scope,
-				esiScopes: token.esiScopes,
-				tokenExpiresOn: token.tokenExpiresOn,
-				accessTokenExpiresAt: token.accessTokenExpiresAt,
-				sessionState: token.sessionState,
 				linkedCharacters
 			};
-
-			if (isDevelopment) {
-				session.eveDebug = {
-					accessToken: token.accessToken,
-					refreshToken: token.refreshToken,
-					idToken: token.idToken,
-					rawProfile: token.rawProfile
-				};
-			}
 
 			return session;
 		}
