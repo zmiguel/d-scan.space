@@ -16,6 +16,14 @@ Notable changes to D-Scan Space. Work in progress is tracked in
   pilots per day, scans per day/hour) include private scans. The installed SDE build is
   shown at the bottom.
 
+### Fixed
+
+- The system search on scan pages (setting a group's system) showed no suggestions in
+  Firefox. It now uses its own suggestion list instead of the browser's `<datalist>`
+  (works in all browsers, with arrow keys / Enter / Escape and the mouse), and each
+  suggestion shows the system's security status. The compare page's scan pickers also
+  show their suggestions in Firefox again.
+
 ### Changed
 
 - Stats page: "Groups w/o System" is removed; cards use the white light-mode background
