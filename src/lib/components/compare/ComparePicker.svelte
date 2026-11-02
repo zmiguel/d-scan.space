@@ -47,7 +47,6 @@
 				value={a}
 				list="{uid}-choices"
 				placeholder="Scan link or id"
-				autocomplete="off"
 				required
 			/>
 		</label>
@@ -60,7 +59,6 @@
 			bind:value={b}
 			list="{uid}-choices"
 			placeholder="Scan link or id"
-			autocomplete="off"
 			required
 			data-autofocus
 		/>

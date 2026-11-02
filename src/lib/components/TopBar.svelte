@@ -22,6 +22,12 @@
 	let saveError = $state('');
 	let isSearching = $state(false);
 	let isSaving = $state(false);
+	// Suggestion list of the system search: a custom combobox, because Firefox shows no
+	// <datalist> popup on autocomplete="off" inputs and does not refresh an open popup
+	// when the options arrive asynchronously.
+	let listOpen = $state(false);
+	let activeIndex = $state(-1);
+	const showSuggestions = $derived(listOpen && systemSuggestions.length > 0);
 	let searchDebounceHandle;
 	/** @type {AbortController | null} */
 	let searchController = null;
@@ -85,6 +91,8 @@
 
 			const payload = await response.json();
 			systemSuggestions = payload?.systems ?? [];
+			activeIndex = -1;
+			listOpen = true;
 		} catch {
 			if (controller.signal.aborted) return;
 			systemSuggestions = [];
@@ -108,6 +116,38 @@
 		}, 150);
 	}
 
+	function pickSystem(suggestion) {
+		clearTimeout(searchDebounceHandle);
+		searchController?.abort();
+		searchController = null;
+		isSearching = false;
+		systemQuery = suggestion.name;
+		systemSuggestions = [];
+		activeIndex = -1;
+		listOpen = false;
+	}
+
+	function handleSystemKeydown(event) {
+		if (event.key === 'Escape' && showSuggestions) {
+			event.preventDefault();
+			listOpen = false;
+			return;
+		}
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			if (systemSuggestions.length === 0) return;
+			event.preventDefault();
+			listOpen = true;
+			const step = event.key === 'ArrowDown' ? 1 : -1;
+			activeIndex = (activeIndex + step + systemSuggestions.length) % systemSuggestions.length;
+			return;
+		}
+		// Enter on a highlighted suggestion picks it instead of submitting the form.
+		if (event.key === 'Enter' && showSuggestions && activeIndex >= 0) {
+			event.preventDefault();
+			pickSystem(systemSuggestions[activeIndex]);
+		}
+	}
+
 	function toggleSystemEditor() {
 		isEditingSystem = !isEditingSystem;
 		if (!isEditingSystem) {
@@ -117,6 +157,8 @@
 			isSearching = false;
 			systemQuery = '';
 			systemSuggestions = [];
+			listOpen = false;
+			activeIndex = -1;
 			searchError = '';
 			saveError = '';
 		}
@@ -187,26 +229,75 @@
 						class="flex items-center gap-2"
 					>
 						<label for="manual-system" class="sr-only">System name</label>
-						<input
-							id="manual-system"
-							type="text"
-							name="system_name"
-							value={systemQuery}
-							oninput={handleSystemInput}
-							list="manual-system-suggestions"
-							autocomplete="off"
-							placeholder="System name"
-							aria-describedby="manual-system-status"
-							required
-							class="w-56 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
-						/>
-						<datalist id="manual-system-suggestions">
-							{#each systemSuggestions as suggestion (suggestion.id)}
-								<option value={suggestion.name}>
-									{suggestion.constellation} · {suggestion.region}
-								</option>
-							{/each}
-						</datalist>
+						<div class="relative">
+							<input
+								id="manual-system"
+								type="text"
+								name="system_name"
+								value={systemQuery}
+								oninput={handleSystemInput}
+								onkeydown={handleSystemKeydown}
+								onfocus={() => (listOpen = true)}
+								onblur={() => (listOpen = false)}
+								role="combobox"
+								aria-autocomplete="list"
+								aria-expanded={showSuggestions}
+								aria-controls="manual-system-listbox"
+								aria-activedescendant={showSuggestions && activeIndex >= 0
+									? `manual-system-option-${activeIndex}`
+									: undefined}
+								autocomplete="off"
+								placeholder="System name"
+								aria-describedby="manual-system-status"
+								required
+								class="w-56 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
+							/>
+							{#if showSuggestions}
+								<ul
+									id="manual-system-listbox"
+									role="listbox"
+									aria-label="Matching systems"
+									class="absolute top-full left-0 z-30 mt-1 max-h-64 w-72 overflow-y-auto rounded border border-gray-300 bg-white py-1 text-xs shadow-lg dark:border-gray-600 dark:bg-gray-800"
+								>
+									{#each systemSuggestions as suggestion, index (suggestion.id)}
+										<!-- mousedown (not click) so the input keeps focus and the list stays open -->
+										<li
+											id="manual-system-option-{index}"
+											role="option"
+											tabindex="-1"
+											aria-selected={index === activeIndex}
+											class={[
+												'flex cursor-pointer items-baseline justify-between gap-2 px-2 py-1',
+												index === activeIndex
+													? 'bg-primary-100 dark:bg-gray-600'
+													: 'hover:bg-gray-100 dark:hover:bg-gray-700'
+											]}
+											onmousedown={(event) => {
+												event.preventDefault();
+												pickSystem(suggestion);
+											}}
+											onmouseenter={() => (activeIndex = index)}
+										>
+											<span class="flex min-w-0 items-center gap-1.5">
+												<Badge
+													color={badgeColorFor(Number(suggestion.secStatus))}
+													class="shrink-0 px-1.5 py-0 text-[10px]"
+													>{Number.isFinite(Number(suggestion.secStatus))
+														? Number(suggestion.secStatus).toFixed(2)
+														: '?'}</Badge
+												>
+												<span class="font-medium text-gray-900 dark:text-white"
+													>{suggestion.name}</span
+												>
+											</span>
+											<span class="truncate text-gray-500 dark:text-gray-400"
+												>{suggestion.constellation} · {suggestion.region}</span
+											>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
 						<button
 							type="submit"
 							disabled={isSaving}
