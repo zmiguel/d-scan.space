@@ -47,7 +47,7 @@
 		"pino": "^10.3.1",
 		"svelte": "^5.57.1",
 		"tailwind-merge": "^3.7.0",
-		"undici": "^8.11.2"
+		"undici": "^8.12.2"
 	},
 	"type": "module",
 	"devDependencies": {
